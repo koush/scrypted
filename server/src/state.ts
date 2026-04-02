@@ -227,7 +227,7 @@ export class ScryptedStateManager extends EventRegistry {
                 }
                 catch (e) {
                     logger.log('e', 'Refresh failed');
-                    logger.log('e', e.toString());
+                    logger.log('e', (e as Error).toString());
                 }
                 finally {
                     delete this.refreshThrottles[id];

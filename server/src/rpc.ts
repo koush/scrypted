@@ -293,7 +293,7 @@ export class RpcPeer {
     finalizers = new FinalizationRegistry(entry => this.finalize(entry as LocalProxiedEntry));
     nameDeserializerMap = new Map<string, RpcSerializer>();
     onProxyTypeSerialization = new Map<string, (value: any) => void>();
-    onProxySerialization: (value: any) => {
+    onProxySerialization?: (value: any) => {
         proxyId: string;
         properties: any;
     };
@@ -301,7 +301,7 @@ export class RpcPeer {
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
     killed: Promise<string>;
     killedSafe: Promise<void>;
-    killedDeferred: Deferred;
+    killedDeferred!: Deferred;
     tags: any = {};
     yieldedAsyncIterators = new Set<AsyncGenerator>();
 

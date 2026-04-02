@@ -39,7 +39,7 @@ export async function newThread<T>(...args: any[]): Promise<T> {
                 thread_worker_threads.parentPort!.postMessage(thread_v8.serialize(message));
             }
             catch (e) {
-                reject?.(e);
+                reject?.(e as Error);
             }
         });
         mainPeer.transportSafeArgumentTypes.add(Buffer.name);
@@ -79,7 +79,7 @@ export async function newThread<T>(...args: any[]): Promise<T> {
             worker.postMessage(v8.serialize(message));
         }
         catch (e) {
-            reject?.(e);
+            reject?.(e as Error);
         }
     });
     threadPeer.transportSafeArgumentTypes.add(Buffer.name);

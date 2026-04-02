@@ -38,7 +38,7 @@ export abstract class PluginHttp<T> {
 
     abstract handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: T): void;
     abstract handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: T): void;
-    abstract getEndpointPluginData(req: Request, endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<T>;
+    abstract getEndpointPluginData(req: Request, endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<T | undefined>;
     abstract handleWebSocket(endpoint: string, httpRequest: HttpRequest, ws: WebSocket, pluginData: T): Promise<void>;
     abstract checkUpgrade(req: Request, res: Response, pluginData: T): void;
 
@@ -129,7 +129,7 @@ export abstract class PluginHttp<T> {
             catch (e) {
                 res.header('Content-Type', 'text/plain');
                 res.status(500);
-                res.send(e.toString());
+                res.send((e as Error).toString());
                 console.error(e);
             }
         }
@@ -140,7 +140,7 @@ export abstract class PluginHttp<T> {
             catch (e) {
                 res.header('Content-Type', 'text/plain');
                 res.status(500);
-                res.send(e.toString());
+                res.send((e as Error).toString());
                 console.error(e);
             }
         }

@@ -2,7 +2,7 @@ export const ONE_DAY_MILLISECONDS = 86400000;
 export const ONE_YEAR_MILLISECONDS = ONE_DAY_MILLISECONDS * 365;
 
 export class UserToken {
-    constructor(public username: string, public aclId: string, public timestamp = Date.now(), public duration = ONE_DAY_MILLISECONDS) {
+    constructor(public username: string, public aclId?: string, public timestamp = Date.now(), public duration = ONE_DAY_MILLISECONDS) {
     }
 
     static validateToken(token: string): UserToken {

@@ -16,7 +16,7 @@ function createLevelDocument(documentConstructor: any, json: any) {
 }
 
 export class WrappedLevel extends Level<string, string | number> {
-    curId: number;
+    curId!: number;
 
     override async open(): Promise<void>;
     override async open(options?: OpenOptions): Promise<void> {
