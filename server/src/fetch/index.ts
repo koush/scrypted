@@ -119,10 +119,7 @@ export function createHeadersArray(headers: HeadersInit | undefined): [string, s
         return headersArray;
     }
 
-    for (const k of Object.keys(headers)) {
-        const v = headers[k];
-        headersArray.push([k, v]);
-    }
+    headersArray.push(...Object.entries(headers));
 
     return headersArray;
 }
