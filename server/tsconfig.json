@@ -5,6 +5,8 @@
         "target": "esnext",
         "noImplicitAny": true,
         "alwaysStrict": true,
+        "strict": true,
+        "strictNullChecks": true,
         "strictBindCallApply": true,
         "noFallthroughCasesInSwitch": true,
         "noImplicitThis": true,
