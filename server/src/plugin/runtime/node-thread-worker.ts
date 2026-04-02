@@ -104,8 +104,8 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
             return;
         this.worker.terminate();
         this.port.close();
-        this.port = undefined;
-        this.worker = undefined;
+        this.port = undefined!;
+        this.worker = undefined!;
     }
 
     send(message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any): void {

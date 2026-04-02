@@ -77,7 +77,7 @@ export class NodeForkWorker extends ChildProcessWorker {
     }
 
     setupRpcPeer(peer: RpcPeer): void {
-        this.worker.on('message', (message, sendHandle) => {
+        this.worker!.on('message', (message, sendHandle) => {
             if ((message as any).type && sendHandle) {
                 peer.handleMessage(message as any, {
                     sendHandle,
