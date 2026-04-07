@@ -1,4 +1,4 @@
-import type { ClipPath, Point } from '@scrypted/sdk';
+import type { ClipPath, Point } from '@scrypted/types';
 
 // x y w h
 export type BoundingBox = [number, number, number, number];

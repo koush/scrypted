@@ -44,6 +44,9 @@
       ],
       "realfs": true
    },
+   "peerDependencies": {
+      "@scrypted/types": "^0.5.55"
+   },
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk"

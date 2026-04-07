@@ -10,9 +10,11 @@
   },
   "author": "",
   "license": "ISC",
+  "peerDependencies": {
+    "@scrypted/types": "^0.5.55"
+  },
   "dependencies": {
     "@scrypted/sdk": "file:../sdk",
-    "@scrypted/types": "^0.5.55",
     "http-auth-utils": "^5.0.1",
     "typescript": "^5.5.3"
   },
