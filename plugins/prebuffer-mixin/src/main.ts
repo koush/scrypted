@@ -351,7 +351,12 @@ class PrebufferSession {
 
       const currentParser = parser.isDefault ? STRING_DEFAULT : parser.parser;
 
-      const choices = this.canUseRtmpParser(this.advertisedMediaStreamOptions)
+      const choices = this.mixin.streamSettings.storageSettings.values.synthenticStreams.includes(this.streamId)
+        ? [
+          FFMPEG_PARSER_TCP,
+          FFMPEG_PARSER_UDP,
+        ]
+        : this.canUseRtmpParser(this.advertisedMediaStreamOptions)
         ? [
           STRING_DEFAULT,
           SCRYPTED_PARSER_TCP,
@@ -1405,6 +1410,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
       session = new PrebufferSession(this, {
         id: synthetic,
+        container: 'rtsp',
       }, false, false);
       this.sessions.set(id, session);
       this.console.log('stream', synthetic, 'is synthetic and will be rebroadcast on demand.');
