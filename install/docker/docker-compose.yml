@@ -38,11 +38,28 @@ services:
             # LXC usage only
             # lxc - SCRYPTED_INSTALL_ENVIRONMENT=lxc-docker
 
-            # Avahi can be used for network discovery by passing in the host daemon
-            # or running the daemon inside the container. Choose one or the other.
-            # Uncomment next line to run avahi-daemon inside the container.
-            # See volumes and security_opt section below to use the host daemon.
+            # Avahi is used by the HomeKit plugin for mDNS advertisement.
+            # Two options depending on your network_mode:
+            #
+            # Option A — host networking (network_mode: host, the default):
+            #   SCRYPTED_DOCKER_AVAHI=true is required. The HomeKit plugin binds
+            #   UDP port 5353 directly; with host networking this conflicts with
+            #   any system avahi-daemon. This variable makes Scrypted run its own
+            #   internal avahi (via dbus) instead.
+            #   You must stop/disable the host avahi-daemon before enabling this:
+            #     sudo systemctl disable --now avahi-daemon avahi-daemon.socket
+            #   To preserve host mDNS services (e.g. Time Machine), mount the
+            #   host services dir into the container (see volumes section below).
+            #   Do NOT use the /var/run/dbus or /var/run/avahi-daemon/socket
+            #   volume mounts with this option — they are incompatible.
             # - SCRYPTED_DOCKER_AVAHI=true
+            #
+            # Option B — bridge networking only:
+            #   Leave SCRYPTED_DOCKER_AVAHI commented out and instead mount the
+            #   host avahi socket (see volumes section below). Scrypted will
+            #   register mDNS services via the host avahi daemon over D-Bus
+            #   without needing to bind port 5353 directly.
+            #   This does NOT work with host networking — use Option A instead.
 
         # NVIDIA (Part 1 of 2)
         # nvidia runtime: nvidia
@@ -70,13 +87,18 @@ services:
             #   volume:
             #     nocopy: true
 
-            # Uncomment the following lines to use Avahi daemon from the host.
-            # Ensure Avahi is running on the host machine:
-            # It can be installed with: sudo apt-get install avahi-daemon
-            # This is not compatible with running avahi inside the container (see above).
-            # Also, uncomment the lines under security_opt
+            # Avahi Option B (bridge networking only): use host avahi daemon.
+            # Scrypted registers mDNS services over D-Bus via the host socket.
+            # Requires avahi-daemon running on the host and apparmor:unconfined
+            # (see security_opt below). Not compatible with SCRYPTED_DOCKER_AVAHI=true
+            # or with host networking — see environment section above.
             # - /var/run/dbus:/var/run/dbus
             # - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
+
+            # Avahi Option A (host networking + SCRYPTED_DOCKER_AVAHI=true):
+            # Mount host avahi service definitions so Scrypted's internal avahi
+            # advertises them (e.g. Time Machine, custom services).
+            # - /etc/avahi/services:/etc/avahi/services:ro
 
             # Default volume for the Scrypted database. Typically should not be changed.
             # The volume will be placed relative to this docker-compose.yml.
@@ -89,8 +111,9 @@ services:
             # lxc - /root/.scrypted/.env:/root/.scrypted/.env
             # lxc - /mnt:/mnt
 
-        # Uncomment the following lines to use Avahi daemon from the host
-        # Without this, AppArmor will block the container's attempt to talk to Avahi via dbus
+        # Required for Avahi Option B (bridge networking + host avahi socket).
+        # Without this, AppArmor blocks the container's D-Bus access to avahi.
+        # Not needed for Option A (SCRYPTED_DOCKER_AVAHI=true).
         # security_opt:
         #     - apparmor:unconfined
         devices: [
