@@ -23,6 +23,12 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
             // todo: change this at some point.
             persistedDefaultValue: false,
         },
+        lockAutoLockDelay: {
+            title: 'Auto-Lock Delay',
+            description: 'If the camera door strike does not report when it re-locks, set this to the number of seconds the lock stays open. HomeKit will automatically revert the state to "Secured" after this time. Set to 0 to disable.',
+            type: 'number',
+            defaultValue: 0,
+        },
     });
 
     constructor(options: SettingsMixinDeviceOptions<T>) {
