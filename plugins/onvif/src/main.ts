@@ -209,7 +209,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
     }
 
     showRtspUrlOverride() {
-        return false;
+        return this.storage.getItem('enableRtspUrlOverride') === 'true';
     }
 
     showRtspPortOverride() {
@@ -229,6 +229,14 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
 
         const ret: Setting[] = [
             ...await super.getOtherSettings(),
+            {
+                subgroup: 'Advanced',
+                key: 'enableRtspUrlOverride',
+                title: 'RTSP URL Override',
+                description: 'Enable to manually specify RTSP stream URLs, overriding those discovered via ONVIF. Useful for routing streams through a relay proxy (e.g., go2rtc) when the camera has limited simultaneous TCP connection capacity.',
+                type: 'boolean',
+                value: this.storage.getItem('enableRtspUrlOverride') === 'true',
+            },
             {
                 subgroup: 'Advanced',
                 title: 'Onvif Doorbell',
