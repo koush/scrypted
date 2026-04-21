@@ -227,7 +227,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
                     hide: false,
                 };
 
-                if (msos?.length > 1) {
+                if (msos?.length > 1 || storageSettings.values.synthenticStreams.length > 0) {
                     return {
                         enabledStreams,
                         defaultStream: createStreamOptions(streamTypes.defaultStream, msos),

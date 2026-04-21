@@ -116,12 +116,20 @@ then
     fi
 fi
 
-readyn "Install avahi-daemon? This is the recommended for reliable HomeKit discovery and pairing."
+readyn "Enable avahi for HomeKit discovery? This is recommended for reliable HomeKit pairing."
 if [ "$yn" == "y" ]
 then
+    # With network_mode: host (the default), the HomeKit plugin binds UDP port
+    # 5353 directly. This conflicts with a running system avahi-daemon.
+    # The correct setup is SCRYPTED_DOCKER_AVAHI=true, which makes Scrypted
+    # run its own internal avahi. The host avahi-daemon must be stopped.
     sudo apt-get -y install avahi-daemon
-    sed -i 's/'#' - \/var\/run\/dbus/- \/var\/run\/dbus/g' $DOCKER_COMPOSE_YML
-    sed -i 's/'#' - \/var\/run\/avahi-daemon/- \/var\/run\/avahi-daemon/g' $DOCKER_COMPOSE_YML
+    sed -i 's/'#' - SCRYPTED_DOCKER_AVAHI=true/- SCRYPTED_DOCKER_AVAHI=true/g' $DOCKER_COMPOSE_YML
+    # Uncomment the avahi services mount so Scrypted's internal avahi picks up
+    # host service definitions (e.g. Time Machine, Samba).
+    sed -i 's/'#' - \/etc\/avahi\/services/- \/etc\/avahi\/services/g' $DOCKER_COMPOSE_YML
+    # Stop and disable the host avahi-daemon — Scrypted now owns port 5353.
+    sudo systemctl disable --now avahi-daemon avahi-daemon.socket 2>/dev/null || true
     sed -i 's/'#' security_opt:/security_opt:/g' $DOCKER_COMPOSE_YML
     sed -i 's/'#'     - apparmor:unconfined/    - apparmor:unconfined/g' $DOCKER_COMPOSE_YML
 fi
