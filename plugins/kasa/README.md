@@ -63,7 +63,6 @@ manual setup below.
 
 ## Notes / limitations
 
-- **Two-way audio** is not implemented yet.
 - **Authentication** uses the cloud account password directly: username is the plain
   Kasa email; password is base64-encoded as Basic auth (a camera-specific quirk).
 - The camera presents a self-signed TLS certificate; certificate verification is disabled.
