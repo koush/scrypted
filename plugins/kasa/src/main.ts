@@ -2,21 +2,40 @@ import { Deferred } from '@scrypted/common/src/deferred';
 import { listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, {
-    Device, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, MediaObject,
-    RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType,
-    ScryptedInterface, ScryptedNativeId, Setting, Settings, SettingValue, VideoCamera,
+    AdoptDevice, Device, DeviceCreator, DeviceCreatorSettings, DeviceDiscovery, DeviceProvider,
+    DiscoveredDevice, FFmpegInput, MediaObject, RequestMediaStreamOptions, ResponseMediaStreamOptions,
+    ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings,
+    SettingValue, VideoCamera,
 } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { randomBytes } from 'crypto';
 import { Writable } from 'stream';
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { findSpsPps, H264SpsPps, KASA_DEFAULT_PORT, KasaClient, KasaMimeG711U, KasaMimeVideo, KasaPart } from './kasa-api';
+import { discoverKasa, KasaDiscoveredDevice, tcpProbeKasaCameras } from './kasa-discovery';
+
+// Models in this set are TP-Link Kasa cameras (sysinfo.type === 'IOT.IPCAMERA' is the primary
+// filter; this is a defense-in-depth allowlist for ambiguous replies).
+const KASA_CAMERA_TYPES = new Set(['IOT.IPCAMERA']);
 
 // Hard ceiling on the upfront SPS/PPS scan. Real cameras emit them well under a second; if we
 // don't see them in this window the camera is misbehaving and there's no point holding the call.
 const SPS_PPS_TIMEOUT_MS = 10000;
 
-const { deviceManager, mediaManager } = sdk;
+const { deviceManager, mediaManager, systemManager } = sdk;
+
+// Walk every known device's state to collect existing room names. Used to populate the room
+// dropdown so the user picks an existing room instead of typing a new one.
+function getKnownRooms(): string[] {
+    const rooms = new Set<string>();
+    const states = systemManager.getSystemState();
+    for (const id of Object.keys(states)) {
+        const room = states[id]?.room?.value;
+        if (typeof room === 'string' && room.trim())
+            rooms.add(room.trim());
+    }
+    return [...rooms].sort((a, b) => a.localeCompare(b));
+}
 
 class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
     storageSettings = new StorageSettings(this, {
@@ -246,13 +265,24 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
     }
 }
 
-class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
+interface KasaDiscoveryEntry {
+    device: KasaDiscoveredDevice;
+    // The cached entry expires so a stale IP/MAC mapping doesn't linger across DHCP changes.
+    timeout: NodeJS.Timeout;
+}
+
+class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator, DeviceDiscovery {
     devices = new Map<string, KasaCamera>();
+    discoveredDevices = new Map<string, KasaDiscoveryEntry>();
+    // In-flight scan so concurrent scan=true calls share one network round-trip instead of
+    // each kicking off its own broadcast + TCP sweep.
+    private scanInFlight?: Promise<void>;
 
     constructor(nativeId?: string) {
         super(nativeId);
         this.systemDevice = {
             deviceCreator: 'Kasa Camera',
+            deviceDiscovery: 'Kasa Cameras',
         };
     }
 
@@ -263,17 +293,25 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 title: 'Name',
                 placeholder: 'Front Door, Living Room, etc.',
             },
+            {
+                key: 'room',
+                title: 'Room',
+                placeholder: 'Optional, e.g. Living Room',
+                choices: getKnownRooms(),
+                combobox: true,
+            },
         ];
     }
 
     async createDevice(settings: DeviceCreatorSettings, nativeId?: ScryptedNativeId): Promise<string> {
         nativeId ||= randomBytes(4).toString('hex');
         const name = settings.name?.toString() || 'Kasa Camera';
-        await this.discoverCamera(nativeId, name);
+        const room = settings.room?.toString() || undefined;
+        await this.registerCamera(nativeId, name, room);
         return nativeId;
     }
 
-    private async discoverCamera(nativeId: string, name: string): Promise<void> {
+    private async registerCamera(nativeId: string, name: string, room?: string): Promise<void> {
         const device: Device = {
             nativeId,
             name,
@@ -285,8 +323,188 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
             info: {
                 manufacturer: 'TP-Link',
             },
+            // Empty string would clear the room on re-discovery; pass undefined to leave alone.
+            room: room || undefined,
         };
         await deviceManager.onDeviceDiscovered(device);
+    }
+
+    async discoverDevices(scan?: boolean): Promise<DiscoveredDevice[]> {
+        // Discovery never runs unless explicitly requested (scan === true). When it does, an
+        // in-flight scan is shared across overlapping callers so a single click never produces
+        // more than one network round-trip; calls without scan=true just return the cache.
+        if (scan) {
+            if (!this.scanInFlight) {
+                this.scanInFlight = this.runScan().finally(() => {
+                    this.scanInFlight = undefined;
+                });
+            }
+            await this.scanInFlight;
+        }
+
+        const defaults = this.getDefaultCredentials();
+        const rooms = getKnownRooms();
+        return [...this.discoveredDevices.values()].map(({ device }) => ({
+            nativeId: device.deviceId,
+            name: device.alias || device.model || 'Kasa Camera',
+            description: `${device.model || 'Kasa Camera'} @ ${device.address}`,
+            type: ScryptedDeviceType.Camera,
+            interfaces: [
+                ScryptedInterface.VideoCamera,
+                ScryptedInterface.Settings,
+            ],
+            info: {
+                manufacturer: 'TP-Link',
+                model: device.model,
+                mac: device.mac,
+                ip: device.address,
+            },
+            // Discovery only finds the camera on the LAN; the cloud account credentials are
+            // still required to authenticate the stream, so collect them at adoption time.
+            // Name is pre-filled from the camera's alias/model but can be overridden — alias
+            // is empty for TCP-only candidates, so the field is also a chance to set one then.
+            settings: [
+                {
+                    key: 'name',
+                    title: 'Name',
+                    value: device.alias || device.model || 'Kasa Camera',
+                },
+                {
+                    key: 'room',
+                    title: 'Room',
+                    placeholder: 'Optional, e.g. Living Room',
+                    choices: rooms,
+                    combobox: true,
+                },
+                {
+                    key: 'username',
+                    title: 'Username (Kasa Email)',
+                    placeholder: 'user@example.com',
+                    value: defaults.username,
+                },
+                {
+                    key: 'password',
+                    title: 'Password (Kasa Account)',
+                    type: 'password',
+                    value: defaults.password,
+                },
+            ],
+        }));
+    }
+
+    // Run UDP/9999 broadcast discovery and TCP/19443 sweep in parallel. UDP gives us rich
+    // metadata (alias, model, MAC, deviceId) for cameras that speak the IOT protocol; TCP
+    // catches cameras whose firmware doesn't answer LAN discovery.
+    private async runScan(): Promise<void> {
+        try {
+            const [udpResults, tcpResults] = await Promise.all([
+                discoverKasa(3000, this.console).catch(e => {
+                    this.console.error('kasa udp discovery failed', e);
+                    return [] as KasaDiscoveredDevice[];
+                }),
+                tcpProbeKasaCameras(2000, this.console).catch(e => {
+                    this.console.error('kasa tcp probe failed', e);
+                    return [];
+                }),
+            ]);
+
+            const skipped: string[] = [];
+            let cameras = 0;
+            const udpAddresses = new Set<string>();
+            for (const d of udpResults) {
+                udpAddresses.add(d.address);
+                if (deviceManager.getNativeIds().includes(d.deviceId))
+                    continue;
+                if (d.type && !KASA_CAMERA_TYPES.has(d.type)) {
+                    skipped.push(`${d.alias || d.model || d.deviceId} (${d.type})`);
+                    continue;
+                }
+                cameras++;
+                this.upsertDiscovered(d.deviceId, d);
+            }
+
+            // Promote any TCP-only candidate (no UDP metadata) to a synthetic discovered
+            // device. Without metadata we synthesize a deviceId from the IP; the user can
+            // rename on adoption.
+            for (const c of tcpResults) {
+                if (udpAddresses.has(c.address))
+                    continue;
+                const deviceId = `kasa-tcp-${c.address}`;
+                if (deviceManager.getNativeIds().includes(deviceId))
+                    continue;
+                cameras++;
+                this.upsertDiscovered(deviceId, {
+                    address: c.address,
+                    deviceId,
+                    alias: '',
+                    model: 'Kasa Camera',
+                    mac: '',
+                    type: 'IOT.IPCAMERA',
+                    sysinfo: {},
+                });
+            }
+
+            this.console.log(`kasa discovery: ${udpResults.length} udp responder(s), `
+                + `${tcpResults.length} tcp candidate(s), ${cameras} camera(s)`
+                + (skipped.length ? `, skipped non-cameras: ${skipped.join(', ')}` : ''));
+            this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, undefined);
+        }
+        catch (e) {
+            this.console.error('kasa discovery failed', e);
+        }
+    }
+
+    // In typical home setups, every Kasa camera shares the same TP-Link account, so reuse
+    // the credentials from any already-configured camera as defaults for newly discovered
+    // ones. The user can still override per-camera in the adoption form.
+    private getDefaultCredentials(): { username: string; password: string } {
+        for (const nativeId of deviceManager.getNativeIds()) {
+            if (!nativeId)
+                continue;
+            const storage = deviceManager.getDeviceStorage(nativeId);
+            const username = storage?.getItem('username');
+            const password = storage?.getItem('password');
+            if (username && password)
+                return { username, password };
+        }
+        return { username: '', password: '' };
+    }
+
+    private upsertDiscovered(deviceId: string, device: KasaDiscoveredDevice) {
+        const existing = this.discoveredDevices.get(deviceId);
+        if (existing)
+            clearTimeout(existing.timeout);
+        this.discoveredDevices.set(deviceId, {
+            device,
+            timeout: setTimeout(() => this.discoveredDevices.delete(deviceId), 5 * 60 * 1000),
+        });
+    }
+
+    async adoptDevice(adopt: AdoptDevice): Promise<string> {
+        const entry = this.discoveredDevices.get(adopt.nativeId);
+        if (!entry)
+            throw new Error('kasa device not found in discovered set; rescan and try again');
+
+        const { device } = entry;
+        const name = (adopt.settings.name?.toString() || device.alias || device.model || 'Kasa Camera');
+        const room = adopt.settings.room?.toString() || undefined;
+
+        await this.registerCamera(adopt.nativeId, name, room);
+        const camera = await this.getDevice(adopt.nativeId);
+
+        // Pre-populate the per-camera settings discovered on the LAN plus the credentials the
+        // user supplied during adoption. The stream open happens later, on first getVideoStream.
+        camera.storageSettings.values.ip = device.address;
+        camera.storageSettings.values.port = KASA_DEFAULT_PORT;
+        if (adopt.settings.username)
+            camera.storageSettings.values.username = adopt.settings.username.toString();
+        if (adopt.settings.password)
+            camera.storageSettings.values.password = adopt.settings.password.toString();
+
+        clearTimeout(entry.timeout);
+        this.discoveredDevices.delete(adopt.nativeId);
+        this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, undefined);
+        return camera.id;
     }
 
     async getDevice(nativeId: string): Promise<KasaCamera> {

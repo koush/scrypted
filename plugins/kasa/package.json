@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/kasa",
-   "version": "0.0.5",
+   "version": "0.0.16",
    "description": "TP-Link Kasa Camera Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -31,7 +31,8 @@
          "ScryptedSystemDevice",
          "ScryptedDeviceCreator",
          "DeviceProvider",
-         "DeviceCreator"
+         "DeviceCreator",
+         "DeviceDiscovery"
       ],
       "pluginDependencies": [
          "@scrypted/prebuffer-mixin"
