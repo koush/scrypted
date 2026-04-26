@@ -12,7 +12,7 @@ import { randomBytes } from 'crypto';
 import { Writable } from 'stream';
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { findSpsPps, H264SpsPps, KASA_DEFAULT_PORT, KasaClient, KasaMimeG711U, KasaMimeVideo, KasaPart } from './kasa-api';
-import { discoverKasa, KasaDiscoveredDevice, tcpProbeKasaCameras } from './kasa-discovery';
+import { discoverKasa, KasaDiscoveredDevice, tcpProbeKasaCameras, unicastProbeKasa } from './kasa-discovery';
 
 // Models in this set are TP-Link Kasa cameras (sysinfo.type === 'IOT.IPCAMERA' is the primary
 // filter; this is a defense-in-depth allowlist for ambiguous replies).
@@ -171,6 +171,18 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
                 const videoTrack = parsedSdp.msections.find(s => s.type === 'video')!;
                 const audioTrack = parsedSdp.msections.find(s => s.type === 'audio')!;
 
+                // ffmpeg keeps emitting RTP for a few packets after the consumer disconnects;
+                // a write to a half-closed socket throws EPIPE. Drop packets after teardown
+                // and catch any in-flight write race so we don't crash the plugin.
+                const safeSendTrack = (control: string, rtp: Buffer) => {
+                    if (kill.finished || rtsp.client.destroyed)
+                        return;
+                    try {
+                        rtsp.sendTrack(control, rtp, false);
+                    }
+                    catch { }
+                };
+
                 // pipe:3 + pipe:5: startRtpForwarderProcess reserves pipe:4 for its own
                 // -sdp_file output, so we steer our two raw inputs around it.
                 // Both codecs are passed through (`-vcodec copy`, `-acodec copy`); ffmpeg does
@@ -186,13 +198,13 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
                     ],
                 }, {
                     video: {
-                        onRtp: rtp => rtsp.sendTrack(videoTrack.control, rtp, false),
+                        onRtp: rtp => safeSendTrack(videoTrack.control, rtp),
                         encoderArguments: [
                             '-vcodec', 'copy',
                         ],
                     },
                     audio: {
-                        onRtp: rtp => rtsp.sendTrack(audioTrack.control, rtp, false),
+                        onRtp: rtp => safeSendTrack(audioTrack.control, rtp),
                         encoderArguments: [
                             '-acodec', 'copy',
                         ],
@@ -311,7 +323,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
         return nativeId;
     }
 
-    private async registerCamera(nativeId: string, name: string, room?: string): Promise<void> {
+    private async registerCamera(nativeId: string, name: string, room?: string, info?: { model?: string; mac?: string; ip?: string; serialNumber?: string; firmware?: string }): Promise<void> {
         const device: Device = {
             nativeId,
             name,
@@ -321,7 +333,12 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 ScryptedInterface.Settings,
             ],
             info: {
-                manufacturer: 'TP-Link',
+                manufacturer: 'TP-Link Kasa',
+                model: info?.model || undefined,
+                mac: info?.mac || undefined,
+                ip: info?.ip || undefined,
+                serialNumber: info?.serialNumber || undefined,
+                firmware: info?.firmware || undefined,
             },
             // Empty string would clear the room on re-discovery; pass undefined to leave alone.
             room: room || undefined,
@@ -354,7 +371,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 ScryptedInterface.Settings,
             ],
             info: {
-                manufacturer: 'TP-Link',
+                manufacturer: 'TP-Link Kasa',
                 model: device.model,
                 mac: device.mac,
                 ip: device.address,
@@ -423,24 +440,33 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 this.upsertDiscovered(d.deviceId, d);
             }
 
-            // Promote any TCP-only candidate (no UDP metadata) to a synthetic discovered
-            // device. Without metadata we synthesize a deviceId from the IP; the user can
-            // rename on adoption.
-            for (const c of tcpResults) {
-                if (udpAddresses.has(c.address))
-                    continue;
-                const deviceId = `kasa-tcp-${c.address}`;
+            // For TCP-only candidates, send a unicast UDP/9999 probe in case the camera ignores
+            // broadcast but answers direct queries — that's the only way to get a real model
+            // and alias from these cameras.
+            const tcpOnly = tcpResults.filter(c => !udpAddresses.has(c.address));
+            const unicastSysinfo = tcpOnly.length
+                ? await unicastProbeKasa(tcpOnly.map(c => c.address), 2000, this.console).catch(e => {
+                    this.console.error('kasa unicast probe failed', e);
+                    return new Map();
+                })
+                : new Map();
+
+            // Promote any TCP-only candidate to a synthetic discovered device. Use the unicast
+            // metadata when available, then the cert-derived model, then a generic fallback.
+            for (const c of tcpOnly) {
+                const sys = unicastSysinfo.get(c.address);
+                const deviceId = sys?.deviceId || `kasa-tcp-${c.address}`;
                 if (deviceManager.getNativeIds().includes(deviceId))
                     continue;
                 cameras++;
                 this.upsertDiscovered(deviceId, {
                     address: c.address,
                     deviceId,
-                    alias: '',
-                    model: 'Kasa Camera',
-                    mac: '',
-                    type: 'IOT.IPCAMERA',
-                    sysinfo: {},
+                    alias: sys?.alias || '',
+                    model: sys?.model || c.model || 'Kasa Camera',
+                    mac: (sys?.mic_mac || sys?.mac || '').toString(),
+                    type: (sys?.type || sys?.mic_type || 'IOT.IPCAMERA').toString(),
+                    sysinfo: sys || {},
                 });
             }
 
@@ -489,7 +515,15 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
         const name = (adopt.settings.name?.toString() || device.alias || device.model || 'Kasa Camera');
         const room = adopt.settings.room?.toString() || undefined;
 
-        await this.registerCamera(adopt.nativeId, name, room);
+        // deviceId is the Kasa-issued 40-char hex per-unit identifier — treat it as the
+        // serial number, which is what HomeKit and the UI expect under that label.
+        await this.registerCamera(adopt.nativeId, name, room, {
+            model: device.model,
+            mac: device.mac,
+            ip: device.address,
+            serialNumber: device.deviceId,
+            firmware: typeof device.sysinfo?.sw_ver === 'string' ? device.sysinfo.sw_ver : undefined,
+        });
         const camera = await this.getDevice(adopt.nativeId);
 
         // Pre-populate the per-camera settings discovered on the LAN plus the credentials the

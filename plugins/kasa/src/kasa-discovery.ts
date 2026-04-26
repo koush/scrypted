@@ -102,21 +102,29 @@ function tcpSweepTargets(): string[] {
 
 const TCP_PROBE_PORT = 19443;
 
+interface ProbeResult {
+    ok: boolean;
+    certInfo?: {
+        cn?: string;
+        ou?: string;
+        o?: string;
+        san?: string;
+    };
+}
+
 // Probe a single host: open TCP and start the TLS handshake. We don't actually need the
 // handshake to succeed (cert is self-signed and we'd need ALPN/SNI to match), only to confirm
-// that something on this port answers like a TLS server. A bare TCP open could be any service,
-// so we wait briefly for the TLS server hello to ensure it's not just a port-open black hole.
-async function probeTcpHttps(host: string, port: number, timeoutMs: number): Promise<boolean> {
+// that something on this port answers like a TLS server. We capture the peer certificate's
+// subject and SAN on the way out so we can label the candidate.
+async function probeTcpHttps(host: string, port: number, timeoutMs: number): Promise<ProbeResult> {
     return new Promise(resolve => {
         let settled = false;
-        const finish = (v: boolean) => {
+        const finish = (v: ProbeResult) => {
             if (settled) return;
             settled = true;
             resolve(v);
         };
 
-        // Don't set servername — host is always an IP for the LAN sweep, and SNI with an IP
-        // triggers Node's RFC 6066 deprecation warning. Cert validation is off anyway.
         const socket = tls.connect({
             host,
             port,
@@ -124,39 +132,161 @@ async function probeTcpHttps(host: string, port: number, timeoutMs: number): Pro
             timeout: timeoutMs,
         });
         socket.once('secureConnect', () => {
+            const cert = socket.getPeerCertificate(false);
+            const subject = cert?.subject || {};
             socket.destroy();
-            finish(true);
+            finish({
+                ok: true,
+                certInfo: {
+                    cn: typeof subject.CN === 'string' ? subject.CN : undefined,
+                    ou: typeof subject.OU === 'string' ? subject.OU : undefined,
+                    o: typeof subject.O === 'string' ? subject.O : undefined,
+                    san: typeof cert?.subjectaltname === 'string' ? cert.subjectaltname : undefined,
+                },
+            });
         });
         socket.once('timeout', () => {
             socket.destroy();
-            finish(false);
+            finish({ ok: false });
         });
         socket.once('error', () => {
             socket.destroy();
-            finish(false);
+            finish({ ok: false });
         });
     });
+}
+
+// Best-effort extract of a model identifier ("KC401", "KD110", "EC71", "KC420WS", etc.) from
+// any subject/SAN string the camera presents. We accept things like "kasa-kc401-...",
+// "KC401(US)", "DNS:kd110-abcd". Returns undefined when no candidate token is found.
+function modelFromCertInfo(info?: ProbeResult['certInfo']): string | undefined {
+    if (!info)
+        return;
+    const blob = [info.cn, info.ou, info.o, info.san].filter(Boolean).join(' ');
+    const m = /\b([A-Za-z]{2,3}\d{2,4}[A-Za-z]{0,3})(?:\(([^)]+)\))?\b/.exec(blob);
+    if (!m)
+        return;
+    const model = m[1].toUpperCase();
+    return m[2] ? `${model}(${m[2]})` : model;
 }
 
 export interface KasaTcpCandidate {
     address: string;
     port: number;
+    certInfo?: ProbeResult['certInfo'];
+    model?: string;
 }
 
 export async function tcpProbeKasaCameras(timeoutMs: number = 2000, console?: Console): Promise<KasaTcpCandidate[]> {
     const targets = tcpSweepTargets();
     const found: KasaTcpCandidate[] = [];
-    // Probe in parallel — TLS handshakes are cheap and a /24 finishes well within the budget.
     const results = await Promise.all(targets.map(async address => {
-        const ok = await probeTcpHttps(address, TCP_PROBE_PORT, timeoutMs);
-        return { address, ok };
+        const result = await probeTcpHttps(address, TCP_PROBE_PORT, timeoutMs);
+        return { address, ...result };
     }));
-    for (const { address, ok } of results) {
-        if (ok)
-            found.push({ address, port: TCP_PROBE_PORT });
+    for (const r of results) {
+        if (r.ok)
+            found.push({
+                address: r.address,
+                port: TCP_PROBE_PORT,
+                certInfo: r.certInfo,
+                model: modelFromCertInfo(r.certInfo),
+            });
     }
     console?.log(`kasa tcp probe: ${found.length} candidate(s) on port ${TCP_PROBE_PORT}`);
     return found;
+}
+
+// Best-effort extraction of sysinfo-like fields from a JSON response. Different Kasa device
+// families nest the same data under different keys (system.get_sysinfo for plugs, smartlife
+// .iot.IPCamera.* for cameras, etc.), so walk the tree and pick up whatever looks right.
+function extractSysInfo(json: any): KasaSysInfo | undefined {
+    if (!json || typeof json !== 'object')
+        return;
+    const candidates: any[] = [];
+    const walk = (node: any, depth: number) => {
+        if (!node || typeof node !== 'object' || depth > 4)
+            return;
+        if (typeof node.model === 'string' || typeof node.alias === 'string'
+            || typeof node.deviceId === 'string' || typeof node.dev_id === 'string')
+            candidates.push(node);
+        for (const v of Object.values(node))
+            walk(v, depth + 1);
+    };
+    walk(json, 0);
+    if (!candidates.length)
+        return;
+    // Prefer the candidate with the most identifying fields populated.
+    candidates.sort((a, b) => fieldCount(b) - fieldCount(a));
+    const best = candidates[0];
+    return {
+        deviceId: best.deviceId || best.dev_id,
+        alias: best.alias,
+        model: best.model || best.hwId || best.hw_id,
+        mac: best.mic_mac || best.mac,
+        type: best.type || best.mic_type || best.deviceType,
+        ...best,
+    };
+}
+
+function fieldCount(o: any): number {
+    let n = 0;
+    if (o.model) n++;
+    if (o.alias) n++;
+    if (o.deviceId || o.dev_id) n++;
+    if (o.mac || o.mic_mac) n++;
+    if (o.type || o.mic_type) n++;
+    return n;
+}
+
+// Send the IOT.SMARTHOME `get_sysinfo` query as a unicast packet to a specific list of IPs
+// (typically the TCP probe survivors). Some Kasa camera firmwares ignore broadcast probes
+// but still respond to a direct query, so this fills in metadata that broadcast misses.
+export async function unicastProbeKasa(ips: string[], durationMs: number = 2000, console?: Console): Promise<Map<string, KasaSysInfo>> {
+    const found = new Map<string, KasaSysInfo>();
+    if (!ips.length)
+        return found;
+    const probe = xorEncrypt(KASA_DISCOVERY_PROBE);
+    const socket = dgram.createSocket('udp4');
+
+    return new Promise((resolve, reject) => {
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
+            try { socket.close(); } catch { }
+            resolve(found);
+        };
+
+        socket.on('error', e => {
+            if (done) return;
+            done = true;
+            try { socket.close(); } catch { }
+            reject(e);
+        });
+
+        socket.on('message', (msg, rinfo) => {
+            try {
+                const json = JSON.parse(xorDecrypt(msg));
+                const sys = extractSysInfo(json);
+                if (sys)
+                    found.set(rinfo.address, sys);
+            }
+            catch (e) {
+                console?.warn(`kasa unicast: parse failed from ${rinfo.address}:`, e);
+            }
+        });
+
+        socket.bind(0, () => {
+            for (const ip of ips) {
+                socket.send(probe, KASA_DISCOVERY_PORT, ip, err => {
+                    if (err)
+                        console?.warn(`kasa unicast: send to ${ip} failed:`, err.message);
+                });
+            }
+            setTimeout(finish, durationMs);
+        });
+    });
 }
 
 export async function discoverKasa(durationMs: number = 3000, console?: Console): Promise<KasaDiscoveredDevice[]> {

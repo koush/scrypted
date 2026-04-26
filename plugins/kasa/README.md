@@ -24,16 +24,22 @@ Tested models (per go2rtc): KD110, KC200, KC401, KC420WS, EC71.
      camera is configured these fields are pre-populated from any existing Kasa camera
      in Scrypted, so usually just click adopt for additional cameras.
 
-The IP, port, and (when available) model and MAC are filled in automatically.
+Adopted cameras get their IP, port, name, model, MAC, serial number, and firmware version
+populated automatically. The manufacturer is reported as `TP-Link Kasa` to match the Kasa
+Smart plugin's labeling.
 
-Discovery uses two probes in parallel:
+Discovery uses three probes in sequence:
 
-- A **UDP/9999 broadcast** of the IOT.SMARTHOME `get_sysinfo` query. Cameras that respond
-  this way provide their alias, model and MAC. (Smart plugs/bulbs that respond are
-  filtered out.)
+- A **UDP/9999 broadcast** of the IOT.SMARTHOME `get_sysinfo` query. Older Kasa devices
+  (mostly plugs and some camera firmwares) respond this way with full metadata. Smart
+  plugs/bulbs that come back are filtered out by `type`.
 - A **TCP/19443 sweep** of the local /24. Cameras whose firmware ignores LAN broadcasts
-  still listen on the streaming port; any TLS responder is treated as a Kasa-camera
-  candidate. The model is shown as a generic "Kasa Camera" until you authenticate.
+  still listen on the streaming port; any host that completes a TLS handshake on 19443
+  is treated as a Kasa-camera candidate.
+- A **unicast UDP/9999 probe** sent directly at each TCP candidate. Newer camera
+  firmwares (e.g. KC420WS) drop broadcast probes but still answer the same query when
+  it's directed at them. This recovers their alias and model so the discovery list shows
+  real names instead of a generic "Kasa Camera".
 
 If your camera is on a different VLAN/broadcast domain or a non-/24 subnet, use the
 manual setup below.
