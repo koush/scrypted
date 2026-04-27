@@ -1,12 +1,18 @@
 # Kasa Camera Plugin
 
-Adds support for TP-Link Kasa cameras to Scrypted. The plugin connects to the camera's
-proprietary multipart streaming endpoint (HTTPS port 19443, `/https/stream/mixed`) and
-re-streams the H.264 video + G.711 µ-law audio locally over RTSP for Scrypted, HomeKit,
-the NVR, etc.
+Adds support for TP-Link Kasa cameras to Scrypted. The plugin:
 
-Ported from [go2rtc's `pkg/kasa`](https://github.com/AlexxIT/go2rtc/tree/master/pkg/kasa).
-Tested models (per go2rtc): KD110, KC200, KC401, KC420WS, EC71.
+- Reads the camera's proprietary multipart stream (HTTPS port 19443, `/https/stream/mixed`)
+  and re-streams H.264 video + G.711 µ-law audio over local RTSP for Scrypted, HomeKit, the
+  NVR, etc.
+- Streams talk audio back to the camera's speaker via the camera's separate uplink endpoint
+  (HTTPS port 18443, `/https/speaker/audio/g711block`) — usable from HomeKit and any other
+  Scrypted client that supports two-way audio.
+
+Stream side ported from [go2rtc's `pkg/kasa`](https://github.com/AlexxIT/go2rtc/tree/master/pkg/kasa);
+talk side reverse-engineered from the official Kasa iOS app traffic.
+
+Tested models: KD110, KC200, KC401, KC420WS, EC71.
 
 ## Setup
 
@@ -58,19 +64,32 @@ manual setup below.
 
 ## How it works
 
-- On the first request for a stream, the plugin opens a single HTTPS connection to the
-  camera and parses the multipart `multipart/x-mixed-replace` body, splitting it into
-  video parts (`video/x-h264`, annex-b) and audio parts (`audio/g711u`).
+### Receive (camera → Scrypted)
+
+- The plugin opens a single HTTPS connection to the camera on port 19443 and parses the
+  `multipart/x-mixed-replace` body, splitting it into video parts (`video/x-h264`,
+  annex-b) and audio parts (`audio/g711u`).
 - It scans the first H.264 frames for SPS (NAL 7) and PPS (NAL 8) and inlines them into
   the locally served SDP as `sprop-parameter-sets` + `profile-level-id`. This lets short
   -timeout consumers (HomeKit, browser players) pick up the codec immediately.
 - It then runs ffmpeg in codec-copy mode, re-packetizing the raw H.264 and G.711 µ-law
   streams as RTP into a local RTSP server that Scrypted reads from.
 
+### Talk (Scrypted → camera speaker)
+
+- When a client engages two-way audio, the plugin opens a long-lived chunked POST to
+  `https://<ip>:18443/https/speaker/audio/g711block` and ffmpeg-transcodes the client's
+  audio to 8 kHz mono G.711 µ-law.
+- Each 20 ms (160 byte) audio block is wrapped in a `multipart/x-mixed-replace` part with
+  `Content-Type: audio/g711u` and streamed to the camera. Empty `audio/heartbeat` parts
+  are sent every 3 s during silence to keep the connection alive — same pattern the Kasa
+  app uses.
+
 ## Notes / limitations
 
-- **Authentication** uses the cloud account password directly: username is the plain
-  Kasa email; password is base64-encoded as Basic auth (a camera-specific quirk).
+- **Authentication** uses the cloud account password. Both endpoints accept Basic auth
+  with the plain Kasa email; the receive side wants the password as base64(plaintext)
+  and the talk side wants md5_hex(plaintext) — the plugin uses each in the right place.
 - The camera presents a self-signed TLS certificate; certificate verification is disabled.
 - Auto-discovery sweeps the local /24 only. Larger subnets (e.g. /23) are skipped to
   avoid flooding.

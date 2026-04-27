@@ -3,16 +3,23 @@ import { listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, {
     AdoptDevice, Device, DeviceCreator, DeviceCreatorSettings, DeviceDiscovery, DeviceProvider,
-    DiscoveredDevice, FFmpegInput, MediaObject, RequestMediaStreamOptions, ResponseMediaStreamOptions,
-    ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings,
+    DiscoveredDevice, FFmpegInput, Intercom, MediaObject, RequestMediaStreamOptions, ResponseMediaStreamOptions,
+    ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings,
     SettingValue, VideoCamera,
 } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { randomBytes } from 'crypto';
 import { Writable } from 'stream';
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
+import child_process, { ChildProcess } from 'child_process';
 import { findSpsPps, H264SpsPps, KASA_DEFAULT_PORT, KasaClient, KasaMimeG711U, KasaMimeVideo, KasaPart } from './kasa-api';
 import { discoverKasa, KasaDiscoveredDevice, tcpProbeKasaCameras, unicastProbeKasa } from './kasa-discovery';
+import { KASA_TALK_PORT, KasaTalkSession } from './kasa-intercom';
+
+// G.711 µ-law packetization: 8000 samples/sec * 1 byte/sample = 160 bytes/20ms.
+// 20 ms is the standard RTP packetization for PCMU and matches what the Kasa app appears
+// to use for its uplink chunks during active talk.
+const TALK_CHUNK_BYTES = 160;
 
 // Models in this set are TP-Link Kasa cameras (sysinfo.type === 'IOT.IPCAMERA' is the primary
 // filter; this is a defense-in-depth allowlist for ambiguous replies).
@@ -37,7 +44,10 @@ function getKnownRooms(): string[] {
     return [...rooms].sort((a, b) => a.localeCompare(b));
 }
 
-class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
+class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, Intercom {
+    private intercomSession?: KasaTalkSession;
+    private intercomFfmpeg?: ChildProcess;
+
     storageSettings = new StorageSettings(this, {
         ip: {
             title: 'IP Address',
@@ -275,6 +285,68 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
             try { audioPipe.end(); } catch { }
         }
     }
+
+    async startIntercom(media: MediaObject): Promise<void> {
+        // Some Scrypted clients call startIntercom again without an intervening stopIntercom
+        // (e.g. switching audio sources). Tear down any prior session first so we don't leak
+        // an in-flight ffmpeg process or a half-open POST to the camera.
+        await this.stopIntercom();
+
+        const { ip, port, username, password } = this.storageSettings.values;
+        if (!ip || !username || !password)
+            throw new Error('Kasa camera is not configured.');
+
+        const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
+
+        const session = new KasaTalkSession({
+            ip,
+            port: KASA_TALK_PORT,
+            username,
+            password,
+            console: this.console,
+        });
+        this.intercomSession = session;
+        await session.start();
+
+        // ffmpeg transcodes whatever audio Scrypted hands us (Opus/AAC/PCM/...) into raw
+        // 8 kHz mono G.711 µ-law on stdout, which we chunk into 20 ms blocks and write
+        // into the talk session as multipart parts.
+        const ffmpegPath = await mediaManager.getFFmpegPath();
+        const args = [
+            '-hide_banner',
+            ...(ffmpegInput.inputArguments || []),
+            '-vn', '-sn', '-dn',
+            '-f', 'mulaw',
+            '-ar', '8000',
+            '-ac', '1',
+            'pipe:1',
+        ];
+        const cp = child_process.spawn(ffmpegPath, args);
+        this.intercomFfmpeg = cp;
+
+        let buf: Buffer = Buffer.alloc(0);
+        cp.stdout!.on('data', (chunk: Buffer) => {
+            buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
+            while (buf.length >= TALK_CHUNK_BYTES) {
+                session.writeAudio(buf.subarray(0, TALK_CHUNK_BYTES));
+                buf = buf.subarray(TALK_CHUNK_BYTES);
+            }
+        });
+        cp.stderr!.on('data', d => this.console.log('intercom ffmpeg:', d.toString().trim()));
+        cp.on('exit', () => {
+            this.console.log('intercom ffmpeg exited');
+            session.close();
+        });
+    }
+
+    async stopIntercom(): Promise<void> {
+        const session = this.intercomSession;
+        const cp = this.intercomFfmpeg;
+        this.intercomSession = undefined;
+        this.intercomFfmpeg = undefined;
+        session?.close();
+        try { cp?.kill(); } catch { }
+    }
 }
 
 interface KasaDiscoveryEntry {
@@ -331,6 +403,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
             interfaces: [
                 ScryptedInterface.VideoCamera,
                 ScryptedInterface.Settings,
+                ScryptedInterface.Intercom,
             ],
             info: {
                 manufacturer: 'TP-Link Kasa',
@@ -369,6 +442,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
             interfaces: [
                 ScryptedInterface.VideoCamera,
                 ScryptedInterface.Settings,
+                ScryptedInterface.Intercom,
             ],
             info: {
                 manufacturer: 'TP-Link Kasa',
