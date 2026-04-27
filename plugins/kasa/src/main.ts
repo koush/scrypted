@@ -65,7 +65,7 @@ class KasaCameraSpotlight extends ScryptedDeviceBase implements OnOff {
     }
 }
 
-class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, Intercom, DeviceProvider {
+class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, Intercom, DeviceProvider, OnOff {
     private intercomSession?: KasaTalkSession;
     private intercomFfmpeg?: ChildProcess;
     private spotlight?: KasaCameraSpotlight;
@@ -94,9 +94,18 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         if (!ip || !username || !password)
             return;
 
-        const state = await this.linkie().getForceLampState();
-        if (state === undefined)
-            return; // camera doesn't expose a spotlight (or LINKIE2 call failed)
+        const linkie = this.linkie();
+        // Probe LED + spotlight sequentially. The Kasa iOS app issues LINKIE2 calls
+        // serially; firing them in parallel against the same camera occasionally drops one
+        // of the responses (likely camera-side request serialization).
+        const ledState = await linkie.getLedStatus();
+        const lampState = await linkie.getForceLampState();
+
+        if (ledState !== undefined)
+            this.on = ledState === 'on';
+
+        if (lampState === undefined)
+            return; // no spotlight on this camera
 
         await deviceManager.onDeviceDiscovered({
             nativeId: this.spotlightNativeId,
@@ -110,7 +119,7 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         });
         if (!this.spotlight)
             this.spotlight = new KasaCameraSpotlight(this, this.spotlightNativeId);
-        this.spotlight.on = state === 'on';
+        this.spotlight.on = lampState === 'on';
     }
 
     async getDevice(nativeId: string): Promise<any> {
@@ -158,6 +167,20 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         // is the moment the spotlight first becomes detectable.
         if (key === 'ip' || key === 'port' || key === 'username' || key === 'password')
             this.refreshChildDevices().catch(e => this.console.warn('refreshChildDevices failed', e));
+    }
+
+    // OnOff drives the camera's status LED. HomeKit binds its CameraOperatingModeIndicator
+    // characteristic to this when "Link Status Indicator" is enabled in the HomeKit per-camera
+    // settings, so the user can toggle the LED from HomeKit. In Scrypted's UI this surfaces
+    // as a plain on/off control on the camera page.
+    async turnOn(): Promise<void> {
+        await this.linkie().setLedStatus(true);
+        this.on = true;
+    }
+
+    async turnOff(): Promise<void> {
+        await this.linkie().setLedStatus(false);
+        this.on = false;
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
@@ -485,6 +508,9 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 // Required so Scrypted routes child-device lookups (e.g. the spotlight)
                 // through KasaCamera.getDevice rather than treating the camera as a leaf.
                 ScryptedInterface.DeviceProvider,
+                // OnOff drives the camera's status LED — HomeKit binds its
+                // CameraOperatingModeIndicator characteristic to this.
+                ScryptedInterface.OnOff,
             ],
             info: {
                 manufacturer: 'TP-Link Kasa',
@@ -525,6 +551,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 ScryptedInterface.Settings,
                 ScryptedInterface.Intercom,
                 ScryptedInterface.DeviceProvider,
+                ScryptedInterface.OnOff,
             ],
             info: {
                 manufacturer: 'TP-Link Kasa',

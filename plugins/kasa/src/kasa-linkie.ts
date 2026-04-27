@@ -104,4 +104,32 @@ export class KasaLinkieClient {
         if (errCode !== 0)
             throw new Error(`set_force_lamp_state err_code=${errCode}`);
     }
+
+    // Status LED on the camera body, controlled via smartlife.cam.ipcamera.led. Used to
+    // back HomeKit's CameraOperatingModeIndicator characteristic via OnOff on the camera.
+
+    async getLedStatus(): Promise<'on' | 'off' | undefined> {
+        try {
+            const r = await this.call({
+                'smartlife.cam.ipcamera.led': { get_status: {} },
+            });
+            const v = r?.['smartlife.cam.ipcamera.led']?.get_status?.value;
+            return v === 'on' || v === 'off' ? v : undefined;
+        }
+        catch (e) {
+            this.logger?.warn?.('kasa linkie get_status (led) failed:', (e as Error).message);
+            return undefined;
+        }
+    }
+
+    async setLedStatus(on: boolean): Promise<void> {
+        const r = await this.call({
+            'smartlife.cam.ipcamera.led': {
+                set_status: { value: on ? 'on' : 'off' },
+            },
+        });
+        const errCode = r?.['smartlife.cam.ipcamera.led']?.set_status?.err_code;
+        if (errCode !== 0)
+            throw new Error(`led set_status err_code=${errCode}`);
+    }
 }
