@@ -49,11 +49,20 @@ export class KasaBulb extends ScryptedDeviceBase implements OnOff, Brightness, C
     });
 
     private pollTimer?: NodeJS.Timeout;
+    private pollStartTimer?: NodeJS.Timeout;
+    // See KasaIotDevice for rationale: shared in-flight promise prevents overlapping
+    // refreshState calls from racing if a poll takes longer than the interval.
+    private refreshInFlight?: Promise<void>;
 
     constructor(nativeId: string) {
         super(nativeId);
         process.nextTick(() => this.refreshState().catch(e => this.console.warn('refresh state failed', e)));
-        this.pollTimer = setInterval(() => this.refreshState().catch(() => { }), STATE_POLL_INTERVAL_MS);
+        // Random first-fire offset to spread load when many bulbs are constructed together.
+        const jitter = Math.floor(Math.random() * STATE_POLL_INTERVAL_MS);
+        this.pollStartTimer = setTimeout(() => {
+            this.pollStartTimer = undefined;
+            this.pollTimer = setInterval(() => this.refreshState().catch(() => { }), STATE_POLL_INTERVAL_MS);
+        }, jitter);
     }
 
     getSettings(): Promise<Setting[]> {
@@ -106,6 +115,14 @@ export class KasaBulb extends ScryptedDeviceBase implements OnOff, Brightness, C
     }
 
     async refreshState(): Promise<void> {
+        if (this.refreshInFlight)
+            return this.refreshInFlight;
+        this.refreshInFlight = this.refreshStateInternal()
+            .finally(() => { this.refreshInFlight = undefined; });
+        return this.refreshInFlight;
+    }
+
+    private async refreshStateInternal(): Promise<void> {
         if (!this.storageSettings.values.ip)
             return;
         const sys = await getSysInfo(this.iotOptions());
@@ -147,5 +164,6 @@ export class KasaBulb extends ScryptedDeviceBase implements OnOff, Brightness, C
 
     release(): void {
         clearInterval(this.pollTimer);
+        clearTimeout(this.pollStartTimer);
     }
 }

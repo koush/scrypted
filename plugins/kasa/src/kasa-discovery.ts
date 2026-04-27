@@ -55,7 +55,10 @@ function broadcastAddresses(): string[] {
 // unicast sweeps (when broadcast misses cameras) and the legacy TCP/19443 sweep. Networks
 // larger than /24 are skipped to avoid flooding.
 function localSubnetIps(): string[] {
-    const targets: string[] = [];
+    // De-dupe across interfaces — multi-homed hosts (Wi-Fi + Ethernet on the same /24,
+    // VPN tunnels, etc.) would otherwise enqueue the same address twice and burn ~750 ms
+    // resending probes that have already been sent.
+    const targets = new Set<string>();
     const ifaces = networkInterfaces();
     for (const name of Object.keys(ifaces)) {
         for (const info of ifaces[name] || []) {
@@ -69,11 +72,11 @@ function localSubnetIps(): string[] {
             for (let host = 1; host < 255; host++) {
                 if (host === ip[3])
                     continue;
-                targets.push(prefix + host);
+                targets.add(prefix + host);
             }
         }
     }
-    return targets;
+    return [...targets];
 }
 
 // Best-effort extraction of sysinfo-like fields from a JSON response. Different Kasa device

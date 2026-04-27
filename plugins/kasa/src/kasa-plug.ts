@@ -27,14 +27,24 @@ export abstract class KasaIotDevice extends ScryptedDeviceBase implements OnOff,
     });
 
     private pollTimer?: NodeJS.Timeout;
+    private pollStartTimer?: NodeJS.Timeout;
+    // Guard against overlapping polls: if a refresh is in-flight when the interval fires
+    // (e.g., the camera is slow), the second call would open a parallel TCP connection
+    // and could race the first response. Sharing the in-flight promise avoids that.
+    private refreshInFlight?: Promise<void>;
 
     constructor(nativeId: string) {
         super(nativeId);
         // Drive an initial state refresh on next tick (so storageSettings is ready) and a
         // periodic poll thereafter so external state changes (other apps, physical button
-        // presses) eventually surface in Scrypted/HomeKit.
+        // presses) eventually surface in Scrypted/HomeKit. A small per-instance jitter on
+        // the first poll spreads the load when many devices were started together.
         process.nextTick(() => this.refreshState().catch(e => this.console.warn('refresh state failed', e)));
-        this.pollTimer = setInterval(() => this.refreshState().catch(() => { }), STATE_POLL_INTERVAL_MS);
+        const jitter = Math.floor(Math.random() * STATE_POLL_INTERVAL_MS);
+        this.pollStartTimer = setTimeout(() => {
+            this.pollStartTimer = undefined;
+            this.pollTimer = setInterval(() => this.refreshState().catch(() => { }), STATE_POLL_INTERVAL_MS);
+        }, jitter);
     }
 
     getSettings(): Promise<Setting[]> {
@@ -56,6 +66,14 @@ export abstract class KasaIotDevice extends ScryptedDeviceBase implements OnOff,
     }
 
     async refreshState(): Promise<void> {
+        if (this.refreshInFlight)
+            return this.refreshInFlight;
+        this.refreshInFlight = this.refreshStateInternal()
+            .finally(() => { this.refreshInFlight = undefined; });
+        return this.refreshInFlight;
+    }
+
+    private async refreshStateInternal(): Promise<void> {
         if (!this.storageSettings.values.ip)
             return;
         const sys = await getSysInfo(this.iotOptions());
@@ -83,6 +101,7 @@ export abstract class KasaIotDevice extends ScryptedDeviceBase implements OnOff,
 
     release(): void {
         clearInterval(this.pollTimer);
+        clearTimeout(this.pollStartTimer);
     }
 }
 

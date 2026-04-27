@@ -9,6 +9,7 @@ import sdk, {
 } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { randomBytes } from 'crypto';
+import { once } from 'events';
 import { Writable } from 'stream';
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import child_process, { ChildProcess } from 'child_process';
@@ -84,6 +85,10 @@ function bulbCapabilities(d: KasaDiscoveredDevice): BulbCapabilities {
 // Hard ceiling on the upfront SPS/PPS scan. Real cameras emit them well under a second; if we
 // don't see them in this window the camera is misbehaving and there's no point holding the call.
 const SPS_PPS_TIMEOUT_MS = 10000;
+// Belt-and-suspenders cap on the prebuffer size. The timeout already bounds the wait, but a
+// camera that streams at high bitrate and never emits SPS/PPS could stuff hundreds of MB into
+// `buffered` before the timer fires. Cap parts so we throw early instead of OOMing the host.
+const SPS_PPS_MAX_BUFFERED_PARTS = 1024;
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
@@ -299,7 +304,7 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         ];
     }
 
-    async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
+    async getVideoStream(_options?: RequestMediaStreamOptions): Promise<MediaObject> {
         const { ip, port, username, password } = this.storageSettings.values;
 
         if (!ip || !username || !password)
@@ -329,6 +334,8 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
             while (!spsPps.sps || !spsPps.pps) {
                 if (Date.now() > deadline)
                     throw new Error('timed out waiting for H.264 SPS/PPS');
+                if (buffered.length >= SPS_PPS_MAX_BUFFERED_PARTS)
+                    throw new Error(`H.264 SPS/PPS not found within ${SPS_PPS_MAX_BUFFERED_PARTS} parts`);
                 const part = await kasa.readPart();
                 buffered.push(part);
                 if (part.contentType === KasaMimeVideo)
@@ -454,29 +461,43 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
     }
 
     // Replays the parts captured during the SPS/PPS scan (so ffmpeg sees the SPS+PPS+IDR
-    // sequence required to start decoding) and then continues pumping live parts. We don't
-    // honor backpressure: kasa cameras emit a steady ~modest bitrate and ffmpeg keeps up in
-    // codec-copy mode, so accumulating drain promises would just add latency.
+    // sequence required to start decoding) and then continues pumping live parts. We honor
+    // backpressure: if ffmpeg falls behind (CPU spike, paused consumer, etc.) ignoring drain
+    // would let Node's write buffer grow without bound. Awaiting drain throttles the camera
+    // read loop instead — the camera's TCP receive window will fill up and the kernel will
+    // pause it for us.
     private async pump(kasa: KasaClient, videoPipe: Writable, audioPipe: Writable, buffered: KasaPart[]): Promise<void> {
-        const writePart = (part: KasaPart) => {
-            switch (part.contentType) {
-                case KasaMimeVideo:
-                    if (!videoPipe.writableEnded)
-                        videoPipe.write(part.body);
-                    break;
-                case KasaMimeG711U:
-                    if (!audioPipe.writableEnded)
-                        audioPipe.write(part.body);
-                    break;
+        const writePart = async (part: KasaPart) => {
+            const pipe = part.contentType === KasaMimeVideo ? videoPipe
+                : part.contentType === KasaMimeG711U ? audioPipe
+                : undefined;
+            if (!pipe || pipe.writableEnded || pipe.destroyed)
+                return;
+            if (!pipe.write(part.body)) {
+                // Race 'drain' against teardown. If the pipe closes/errors before draining,
+                // 'drain' never fires and the pump would hang forever. AbortController
+                // removes the losing listeners after the race so frequent backpressure
+                // cycles don't accumulate listeners on the pipe.
+                const ac = new AbortController();
+                try {
+                    await Promise.race([
+                        once(pipe, 'drain', { signal: ac.signal }).catch(() => { }),
+                        once(pipe, 'close', { signal: ac.signal }).catch(() => { }),
+                        once(pipe, 'error', { signal: ac.signal }).catch(() => { }),
+                    ]);
+                }
+                finally {
+                    ac.abort();
+                }
             }
         };
 
         try {
             for (const part of buffered)
-                writePart(part);
+                await writePart(part);
             while (true) {
                 const part = await kasa.readPart();
-                writePart(part);
+                await writePart(part);
             }
         }
         finally {
@@ -491,7 +512,9 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         // an in-flight ffmpeg process or a half-open POST to the camera.
         await this.stopIntercom();
 
-        const { ip, port, username, password } = this.storageSettings.values;
+        // `port` from storage is the receive-stream port (19443); the talk endpoint is on a
+        // separate fixed port (KASA_TALK_PORT = 18443), so we don't read it here.
+        const { ip, username, password } = this.storageSettings.values;
         if (!ip || !username || !password)
             throw new Error('Kasa camera is not configured.');
 
@@ -523,12 +546,48 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         const cp = child_process.spawn(ffmpegPath, args);
         this.intercomFfmpeg = cp;
 
-        let buf: Buffer = Buffer.alloc(0);
+        // Queue of incoming chunks plus byte total — avoids repeatedly Buffer.concat'ing the
+        // accumulator on every stdout chunk (O(n²) over a long talk session). We only allocate
+        // a fresh buffer when we have ≥ TALK_CHUNK_BYTES across the queue and need to emit.
+        const queue: Buffer[] = [];
+        let queuedBytes = 0;
+        const takeChunk = (): Buffer => {
+            if (queue.length === 1 && queue[0].length === TALK_CHUNK_BYTES) {
+                queuedBytes -= TALK_CHUNK_BYTES;
+                return queue.shift()!;
+            }
+            const out = Buffer.allocUnsafe(TALK_CHUNK_BYTES);
+            let written = 0;
+            while (written < TALK_CHUNK_BYTES) {
+                const head = queue[0];
+                const need = TALK_CHUNK_BYTES - written;
+                if (head.length <= need) {
+                    head.copy(out, written);
+                    written += head.length;
+                    queue.shift();
+                }
+                else {
+                    head.copy(out, written, 0, need);
+                    queue[0] = head.subarray(need);
+                    written = TALK_CHUNK_BYTES;
+                }
+            }
+            queuedBytes -= TALK_CHUNK_BYTES;
+            return out;
+        };
         cp.stdout!.on('data', (chunk: Buffer) => {
-            buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
-            while (buf.length >= TALK_CHUNK_BYTES) {
-                session.writeAudio(buf.subarray(0, TALK_CHUNK_BYTES));
-                buf = buf.subarray(TALK_CHUNK_BYTES);
+            queue.push(chunk);
+            queuedBytes += chunk.length;
+            while (queuedBytes >= TALK_CHUNK_BYTES) {
+                const ok = session.writeAudio(takeChunk());
+                // Backpressure: if the camera's HTTPS upload can't keep up, pause ffmpeg's
+                // stdout until the body drains. Without this the PassThrough buffer would
+                // grow without bound on a flaky network.
+                if (!ok) {
+                    cp.stdout!.pause();
+                    session.onDrain(() => cp.stdout!.resume());
+                    break;
+                }
             }
         });
         cp.stderr!.on('data', d => this.console.log('intercom ffmpeg:', d.toString().trim()));
@@ -812,8 +871,9 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
 
             const skipped: string[] = [];
             const classCounts: Record<string, number> = {};
+            const existingNativeIds = new Set(deviceManager.getNativeIds());
             for (const d of udpResults) {
-                if (deviceManager.getNativeIds().includes(d.deviceId))
+                if (existingNativeIds.has(d.deviceId))
                     continue;
                 const cls = classifyKasa(d);
                 if (!cls) {
@@ -827,7 +887,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
             const summary = Object.entries(classCounts).map(([k, v]) => `${v} ${k}(s)`).join(', ') || '0 supported devices';
             this.console.log(`kasa discovery: ${udpResults.length} responder(s), ${summary}`
                 + (skipped.length ? `, skipped: ${skipped.join(', ')}` : ''));
-            this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, undefined);
+            void this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, undefined);
         }
         catch (e) {
             this.console.error('kasa discovery failed', e);
@@ -881,7 +941,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
 
         clearTimeout(entry.timeout);
         this.discoveredDevices.delete(adopt.nativeId);
-        this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, undefined);
+        void this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, undefined);
         return id;
     }
 
@@ -1011,7 +1071,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
         return undefined;
     }
 
-    async releaseDevice(id: string, nativeId: string): Promise<void> {
+    async releaseDevice(_id: string, nativeId: string): Promise<void> {
         const dev = this.devices.get(nativeId);
         // Plug/Bulb instances run a state-poll timer that needs to be cleared.
         if (dev && 'release' in dev && typeof (dev as any).release === 'function')

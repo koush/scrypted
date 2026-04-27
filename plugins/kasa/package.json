@@ -1,9 +1,9 @@
 {
    "name": "@scrypted/kasa",
-   "version": "0.8.15",
-   "description": "TP-Link Kasa Plugin for Scrypted",
-   "author": "Scrypted",
-   "license": "Apache",
+   "version": "0.8.18",
+   "description": "TP-Link Kasa plugin for Scrypted — cameras (video, two-way audio, spotlight, siren, status LED), plugs/outlets, wall switches, dimmers, and smart bulbs (on/off, brightness, color, color temperature).",
+   "author": "Sergey Vilgelm <sergey@vilgelm.com>",
+   "license": "MIT",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",

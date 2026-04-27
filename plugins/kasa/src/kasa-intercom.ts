@@ -89,19 +89,29 @@ export class KasaTalkSession {
         }, 3000);
     }
 
-    writeAudio(chunk: Buffer): void {
-        if (chunk.length)
-            this.writePart('audio/g711u', chunk);
+    // Returns false when the underlying stream is asking for backpressure (Node's standard
+    // contract). Caller should pause its source until `drain` fires on `body`. We surface
+    // this so an unhealthy/slow camera socket can't grow the PassThrough buffer without bound.
+    writeAudio(chunk: Buffer): boolean {
+        if (!chunk.length)
+            return true;
+        return this.writePart('audio/g711u', chunk);
     }
 
-    private writePart(contentType: string, body: Buffer): void {
+    onDrain(cb: () => void): void {
+        this.body.once('drain', cb);
+    }
+
+    private writePart(contentType: string, body: Buffer): boolean {
         if (this.closed)
-            return;
+            return true;
         const header = `--${TALK_BOUNDARY}\r\nContent-Length: ${body.length}\r\nContent-Type: ${contentType}\r\n\r\n`;
+        // Only the last write's return value matters for backpressure — if any of these
+        // fills the buffer, Node will emit `drain` after the buffer empties.
         this.body.write(header);
         if (body.length)
             this.body.write(body);
-        this.body.write('\r\n');
+        return this.body.write('\r\n');
     }
 
     close(): void {

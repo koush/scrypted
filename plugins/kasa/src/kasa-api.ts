@@ -1,6 +1,8 @@
 import { authHttpFetch, AuthFetchCredentialState } from '@scrypted/common/src/http-auth-fetch';
-import { readLength, readLine } from '@scrypted/common/src/read-stream';
+import { readLength } from '@scrypted/common/src/read-stream';
+import { once } from 'events';
 import type { IncomingMessage } from 'http';
+import type { Readable } from 'stream';
 
 // Kasa cameras serve a non-standard mixed multipart stream over HTTPS on this port/path.
 // Reverse-engineered: https://medium.com/@hu3vjeen/reverse-engineering-tp-link-kc100-bac4641bf1cd
@@ -122,20 +124,23 @@ export class KasaClient {
     async readPart(): Promise<KasaPart> {
         const expected = '--' + this.boundary;
 
-        // readLine returns up-to-but-not-including '\n'; strip a possible trailing '\r' to
-        // tolerate both CRLF (HTTP standard) and LF-only framing some firmwares emit.
-        while (true) {
-            const line = (await readLine(this.body)).replace(/\r$/, '');
-            if (!line)
-                continue;
-            if (line !== expected)
-                throw new Error(`unexpected boundary line: ${JSON.stringify(line)}`);
-            break;
-        }
+        // Read the boundary + header block as one chunk (terminated by a blank line) instead
+        // of using readLine per-line. At ~30 video parts/sec + audio, every readLine call is a
+        // separate await with its own microtask hop and unshift; bulk parsing trims that.
+        const headerBlock = await readUntilDoubleCrlf(this.body);
+        const lines = headerBlock.split(/\r?\n/);
+
+        let lineIdx = 0;
+        // Tolerate leading empty lines (some firmwares emit a stray CRLF before the boundary).
+        while (lineIdx < lines.length && !lines[lineIdx])
+            lineIdx++;
+        if (lineIdx >= lines.length || lines[lineIdx] !== expected)
+            throw new Error(`unexpected boundary line: ${JSON.stringify(lines[lineIdx] ?? '')}`);
+        lineIdx++;
 
         const headers: Record<string, string> = {};
-        while (true) {
-            const line = (await readLine(this.body)).replace(/\r$/, '');
+        for (; lineIdx < lines.length; lineIdx++) {
+            const line = lines[lineIdx];
             if (!line)
                 break;
             const idx = line.indexOf(':');
@@ -165,5 +170,66 @@ export class KasaClient {
             body,
             timestampSeconds: Number.isFinite(timestampSeconds!) ? timestampSeconds : undefined,
         };
+    }
+}
+
+// Read up to and including the first blank line (CRLF CRLF or LF LF) and return everything
+// up to and including the terminator as a UTF-8 string. Whatever bytes come after are
+// unshifted back so the body that follows can be read intact. Uses a small state machine so
+// the terminator is detected correctly even when it straddles multiple read chunks.
+async function readUntilDoubleCrlf(readable: Readable): Promise<string> {
+    const queued: Buffer[] = [];
+    // crlf encodes how many bytes of \r\n\r\n we've matched: 0,1=\r, 2=\r\n, 3=\r\n\r, 4=done.
+    // lfOnly counts consecutive \n bytes (some firmwares emit LF-only framing).
+    let crlf = 0;
+    let lfOnly = 0;
+    while (true) {
+        if (readable.readableEnded || readable.destroyed)
+            throw new Error('kasa stream ended before headers');
+        const chunk: Buffer | null = readable.read();
+        if (!chunk) {
+            // Race 'readable' against 'end'/'close'/'error': if the stream has already ended
+            // (or terminates while we're waiting), 'readable' will never fire and the await
+            // would strand this promise forever. Re-checking readableEnded on the next loop
+            // turn lets us throw a real error instead of hanging.
+            //
+            // AbortController removes the losing once() listeners; without it each iteration
+            // would leave 2 dangling listeners attached for the lifetime of the stream and
+            // eventually trip MaxListenersExceededWarning on a long stream with many parts.
+            const ac = new AbortController();
+            try {
+                await Promise.race([
+                    once(readable, 'readable', { signal: ac.signal }).catch(() => { /* aborted or end */ }),
+                    once(readable, 'end', { signal: ac.signal }).catch(() => { }),
+                    once(readable, 'close', { signal: ac.signal }).catch(() => { }),
+                ]);
+            }
+            finally {
+                ac.abort();
+            }
+            continue;
+        }
+        let split = -1;
+        for (let i = 0; i < chunk.length; i++) {
+            const b = chunk[i];
+            if (crlf === 0 && b === 0x0d) crlf = 1;
+            else if (crlf === 1 && b === 0x0a) crlf = 2;
+            else if (crlf === 2 && b === 0x0d) crlf = 3;
+            else if (crlf === 3 && b === 0x0a) { split = i + 1; break; }
+            else crlf = b === 0x0d ? 1 : 0;
+            if (b === 0x0a) {
+                if (++lfOnly === 2) { split = i + 1; break; }
+            } else lfOnly = 0;
+        }
+        if (split < 0) {
+            queued.push(chunk);
+            continue;
+        }
+        const headerPart = chunk.subarray(0, split);
+        const rest = chunk.subarray(split);
+        queued.push(headerPart);
+        if (rest.length)
+            readable.unshift(rest);
+        return Buffer.concat(queued).toString('utf8');
     }
 }
