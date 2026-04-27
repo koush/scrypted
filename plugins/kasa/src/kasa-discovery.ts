@@ -1,6 +1,5 @@
 import dgram from 'dgram';
 import { networkInterfaces } from 'os';
-import tls from 'tls';
 import { xorDecrypt as xorDecryptBuf, xorEncrypt as xorEncryptBuf } from './kasa-cipher';
 
 export const KASA_DISCOVERY_PORT = 9999;
@@ -52,11 +51,10 @@ function broadcastAddresses(): string[] {
     return [...addrs];
 }
 
-// Cameras that don't respond to UDP/9999 still listen for the streaming TLS endpoint on /24
-// neighbors. We sweep TCP/19443 and treat any host that completes a TLS handshake (cert is
-// always self-signed, so we skip verification) as a Kasa-camera candidate. Networks larger
-// than /24 are skipped to avoid flooding.
-function tcpSweepTargets(): string[] {
+// All host IPs in each local /24 we're attached to (excluding our own). Used for both UDP
+// unicast sweeps (when broadcast misses cameras) and the legacy TCP/19443 sweep. Networks
+// larger than /24 are skipped to avoid flooding.
+function localSubnetIps(): string[] {
     const targets: string[] = [];
     const ifaces = networkInterfaces();
     for (const name of Object.keys(ifaces)) {
@@ -76,103 +74,6 @@ function tcpSweepTargets(): string[] {
         }
     }
     return targets;
-}
-
-const TCP_PROBE_PORT = 19443;
-
-interface ProbeResult {
-    ok: boolean;
-    certInfo?: {
-        cn?: string;
-        ou?: string;
-        o?: string;
-        san?: string;
-    };
-}
-
-// Probe a single host: open TCP and start the TLS handshake. We don't actually need the
-// handshake to succeed (cert is self-signed and we'd need ALPN/SNI to match), only to confirm
-// that something on this port answers like a TLS server. We capture the peer certificate's
-// subject and SAN on the way out so we can label the candidate.
-async function probeTcpHttps(host: string, port: number, timeoutMs: number): Promise<ProbeResult> {
-    return new Promise(resolve => {
-        let settled = false;
-        const finish = (v: ProbeResult) => {
-            if (settled) return;
-            settled = true;
-            resolve(v);
-        };
-
-        const socket = tls.connect({
-            host,
-            port,
-            rejectUnauthorized: false,
-            timeout: timeoutMs,
-        });
-        socket.once('secureConnect', () => {
-            const cert = socket.getPeerCertificate(false);
-            const subject = cert?.subject || {};
-            socket.destroy();
-            finish({
-                ok: true,
-                certInfo: {
-                    cn: typeof subject.CN === 'string' ? subject.CN : undefined,
-                    ou: typeof subject.OU === 'string' ? subject.OU : undefined,
-                    o: typeof subject.O === 'string' ? subject.O : undefined,
-                    san: typeof cert?.subjectaltname === 'string' ? cert.subjectaltname : undefined,
-                },
-            });
-        });
-        socket.once('timeout', () => {
-            socket.destroy();
-            finish({ ok: false });
-        });
-        socket.once('error', () => {
-            socket.destroy();
-            finish({ ok: false });
-        });
-    });
-}
-
-// Best-effort extract of a model identifier ("KC401", "KD110", "EC71", "KC420WS", etc.) from
-// any subject/SAN string the camera presents. We accept things like "kasa-kc401-...",
-// "KC401(US)", "DNS:kd110-abcd". Returns undefined when no candidate token is found.
-function modelFromCertInfo(info?: ProbeResult['certInfo']): string | undefined {
-    if (!info)
-        return;
-    const blob = [info.cn, info.ou, info.o, info.san].filter(Boolean).join(' ');
-    const m = /\b([A-Za-z]{2,3}\d{2,4}[A-Za-z]{0,3})(?:\(([^)]+)\))?\b/.exec(blob);
-    if (!m)
-        return;
-    const model = m[1].toUpperCase();
-    return m[2] ? `${model}(${m[2]})` : model;
-}
-
-export interface KasaTcpCandidate {
-    address: string;
-    port: number;
-    certInfo?: ProbeResult['certInfo'];
-    model?: string;
-}
-
-export async function tcpProbeKasaCameras(timeoutMs: number = 2000, console?: Console): Promise<KasaTcpCandidate[]> {
-    const targets = tcpSweepTargets();
-    const found: KasaTcpCandidate[] = [];
-    const results = await Promise.all(targets.map(async address => {
-        const result = await probeTcpHttps(address, TCP_PROBE_PORT, timeoutMs);
-        return { address, ...result };
-    }));
-    for (const r of results) {
-        if (r.ok)
-            found.push({
-                address: r.address,
-                port: TCP_PROBE_PORT,
-                certInfo: r.certInfo,
-                model: modelFromCertInfo(r.certInfo),
-            });
-    }
-    console?.log(`kasa tcp probe: ${found.length} candidate(s) on port ${TCP_PROBE_PORT}`);
-    return found;
 }
 
 // Best-effort extraction of sysinfo-like fields from a JSON response. Different Kasa device
@@ -217,57 +118,12 @@ function fieldCount(o: any): number {
     return n;
 }
 
-// Send the IOT.SMARTHOME `get_sysinfo` query as a unicast packet to a specific list of IPs
-// (typically the TCP probe survivors). Some Kasa camera firmwares ignore broadcast probes
-// but still respond to a direct query, so this fills in metadata that broadcast misses.
-export async function unicastProbeKasa(ips: string[], durationMs: number = 2000, console?: Console): Promise<Map<string, KasaSysInfo>> {
-    const found = new Map<string, KasaSysInfo>();
-    if (!ips.length)
-        return found;
-    const probe = xorEncryptString(KASA_DISCOVERY_PROBE);
-    const socket = dgram.createSocket('udp4');
-
-    return new Promise((resolve, reject) => {
-        let done = false;
-        const finish = () => {
-            if (done) return;
-            done = true;
-            try { socket.close(); } catch { }
-            resolve(found);
-        };
-
-        socket.on('error', e => {
-            if (done) return;
-            done = true;
-            try { socket.close(); } catch { }
-            reject(e);
-        });
-
-        socket.on('message', (msg, rinfo) => {
-            try {
-                const json = JSON.parse(xorDecryptToString(msg));
-                const sys = extractSysInfo(json);
-                if (sys)
-                    found.set(rinfo.address, sys);
-            }
-            catch (e) {
-                console?.warn(`kasa unicast: parse failed from ${rinfo.address}:`, e);
-            }
-        });
-
-        socket.bind(0, () => {
-            for (const ip of ips) {
-                socket.send(probe, KASA_DISCOVERY_PORT, ip, err => {
-                    if (err)
-                        console?.warn(`kasa unicast: send to ${ip} failed:`, err.message);
-                });
-            }
-            setTimeout(finish, durationMs);
-        });
-    });
-}
-
-export async function discoverKasa(durationMs: number = 3000, console?: Console): Promise<KasaDiscoveredDevice[]> {
+// One-shot UDP discovery: send a broadcast, then a paced unicast probe at every IP on the
+// local /24, all on a single socket while listening for replies. Cameras that ignore
+// broadcast (newer KC420WS firmware does) still answer the unicast hit. Pacing the unicast
+// sends a few ms apart prevents the network/kernel from dropping the burst — sending 250
+// packets back-to-back was the reason the earlier UDP-only attempt missed cameras.
+export async function discoverKasa(durationMs: number = 2500, console?: Console): Promise<KasaDiscoveredDevice[]> {
     const found = new Map<string, KasaDiscoveredDevice>();
     const probe = xorEncryptString(KASA_DISCOVERY_PROBE);
     const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
@@ -291,7 +147,7 @@ export async function discoverKasa(durationMs: number = 3000, console?: Console)
         socket.on('message', (msg, rinfo) => {
             try {
                 const json = JSON.parse(xorDecryptToString(msg));
-                const sys: KasaSysInfo | undefined = json?.system?.get_sysinfo;
+                const sys = extractSysInfo(json);
                 if (!sys)
                     return;
                 const deviceId = sys.deviceId || sys.mic_mac || sys.mac;
@@ -314,15 +170,23 @@ export async function discoverKasa(durationMs: number = 3000, console?: Console)
             }
         });
 
-        socket.bind(0, () => {
+        socket.bind(0, async () => {
             socket.setBroadcast(true);
-            for (const addr of broadcastAddresses()) {
-                socket.send(probe, KASA_DISCOVERY_PORT, addr, err => {
-                    if (err)
-                        console?.warn(`kasa discovery: broadcast to ${addr} failed:`, err.message);
-                });
-            }
+            // Hard deadline starts now; unicast pacing happens during the same window.
             setTimeout(finish, durationMs);
+
+            for (const addr of broadcastAddresses())
+                socket.send(probe, KASA_DISCOVERY_PORT, addr);
+
+            // Paced unicast — ~3 ms between sends keeps a /24 sweep under 1 s of network
+            // traffic without flooding. Suppress per-target send errors (EHOSTDOWN spam from
+            // dead IPs is uninteresting and would dominate the log).
+            for (const addr of localSubnetIps()) {
+                if (done)
+                    break;
+                socket.send(probe, KASA_DISCOVERY_PORT, addr, () => { });
+                await new Promise(r => setTimeout(r, 3));
+            }
         });
     });
 }

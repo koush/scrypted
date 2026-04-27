@@ -13,7 +13,7 @@ import { Writable } from 'stream';
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import child_process, { ChildProcess } from 'child_process';
 import { findSpsPps, H264SpsPps, KASA_DEFAULT_PORT, KasaClient, KasaMimeG711U, KasaMimeVideo, KasaPart } from './kasa-api';
-import { discoverKasa, KasaDiscoveredDevice, tcpProbeKasaCameras, unicastProbeKasa } from './kasa-discovery';
+import { discoverKasa, KasaDiscoveredDevice } from './kasa-discovery';
 import { KASA_TALK_PORT, KasaTalkSession } from './kasa-intercom';
 import { KasaLinkieClient } from './kasa-linkie';
 
@@ -565,27 +565,18 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
         }));
     }
 
-    // Run UDP/9999 broadcast discovery and TCP/19443 sweep in parallel. UDP gives us rich
-    // metadata (alias, model, MAC, deviceId) for cameras that speak the IOT protocol; TCP
-    // catches cameras whose firmware doesn't answer LAN discovery.
+    // Single-pass UDP discovery: broadcast + paced unicast sweep on the local /24, all on
+    // one socket. Fast (~2.5 s) because there's no TCP handshake step and no second pass.
     private async runScan(): Promise<void> {
         try {
-            const [udpResults, tcpResults] = await Promise.all([
-                discoverKasa(3000, this.console).catch(e => {
-                    this.console.error('kasa udp discovery failed', e);
-                    return [] as KasaDiscoveredDevice[];
-                }),
-                tcpProbeKasaCameras(2000, this.console).catch(e => {
-                    this.console.error('kasa tcp probe failed', e);
-                    return [];
-                }),
-            ]);
+            const udpResults = await discoverKasa(2500, this.console).catch(e => {
+                this.console.error('kasa udp discovery failed', e);
+                return [] as KasaDiscoveredDevice[];
+            });
 
             const skipped: string[] = [];
             let cameras = 0;
-            const udpAddresses = new Set<string>();
             for (const d of udpResults) {
-                udpAddresses.add(d.address);
                 if (deviceManager.getNativeIds().includes(d.deviceId))
                     continue;
                 if (d.type && !KASA_CAMERA_TYPES.has(d.type)) {
@@ -596,38 +587,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 this.upsertDiscovered(d.deviceId, d);
             }
 
-            // For TCP-only candidates, send a unicast UDP/9999 probe in case the camera ignores
-            // broadcast but answers direct queries — that's the only way to get a real model
-            // and alias from these cameras.
-            const tcpOnly = tcpResults.filter(c => !udpAddresses.has(c.address));
-            const unicastSysinfo = tcpOnly.length
-                ? await unicastProbeKasa(tcpOnly.map(c => c.address), 2000, this.console).catch(e => {
-                    this.console.error('kasa unicast probe failed', e);
-                    return new Map();
-                })
-                : new Map();
-
-            // Promote any TCP-only candidate to a synthetic discovered device. Use the unicast
-            // metadata when available, then the cert-derived model, then a generic fallback.
-            for (const c of tcpOnly) {
-                const sys = unicastSysinfo.get(c.address);
-                const deviceId = sys?.deviceId || `kasa-tcp-${c.address}`;
-                if (deviceManager.getNativeIds().includes(deviceId))
-                    continue;
-                cameras++;
-                this.upsertDiscovered(deviceId, {
-                    address: c.address,
-                    deviceId,
-                    alias: sys?.alias || '',
-                    model: sys?.model || c.model || 'Kasa Camera',
-                    mac: (sys?.mic_mac || sys?.mac || '').toString(),
-                    type: (sys?.type || sys?.mic_type || 'IOT.IPCAMERA').toString(),
-                    sysinfo: sys || {},
-                });
-            }
-
-            this.console.log(`kasa discovery: ${udpResults.length} udp responder(s), `
-                + `${tcpResults.length} tcp candidate(s), ${cameras} camera(s)`
+            this.console.log(`kasa discovery: ${udpResults.length} responder(s), ${cameras} camera(s)`
                 + (skipped.length ? `, skipped non-cameras: ${skipped.join(', ')}` : ''));
             this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, undefined);
         }

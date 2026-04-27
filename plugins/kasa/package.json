@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/kasa",
-   "version": "0.5.6",
+   "version": "0.5.7",
    "description": "TP-Link Kasa Camera Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",

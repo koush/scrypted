@@ -37,18 +37,14 @@ Adopted cameras get their IP, port, name, model, MAC, serial number, and firmwar
 populated automatically. The manufacturer is reported as `TP-Link Kasa` to match the Kasa
 Smart plugin's labeling.
 
-Discovery uses three probes in sequence:
+Discovery sends a single UDP/9999 burst on each connected /24:
 
-- A **UDP/9999 broadcast** of the IOT.SMARTHOME `get_sysinfo` query. Older Kasa devices
-  (mostly plugs and some camera firmwares) respond this way with full metadata. Smart
-  plugs/bulbs that come back are filtered out by `type`.
-- A **TCP/19443 sweep** of the local /24. Cameras whose firmware ignores LAN broadcasts
-  still listen on the streaming port; any host that completes a TLS handshake on 19443
-  is treated as a Kasa-camera candidate.
-- A **unicast UDP/9999 probe** sent directly at each TCP candidate. Newer camera
-  firmwares (e.g. KC420WS) drop broadcast probes but still answer the same query when
-  it's directed at them. This recovers their alias and model so the discovery list shows
-  real names instead of a generic "Kasa Camera".
+- A **broadcast** of the IOT.SMARTHOME `get_sysinfo` query for older devices that listen
+  on the broadcast address. Smart plugs/bulbs that come back are filtered out by `type`.
+- A **paced unicast** of the same query at every IP on the subnet (~3 ms between sends).
+  Newer camera firmwares (e.g. KC420WS) drop broadcast probes but still answer when the
+  packet is addressed directly. Pacing keeps the kernel/network from coalescing or
+  dropping the burst.
 
 If your camera is on a different VLAN/broadcast domain or a non-/24 subnet, use the
 manual setup below.
