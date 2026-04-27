@@ -32,7 +32,11 @@ const TALK_CHUNK_BYTES = 160;
 // filter; this is a defense-in-depth allowlist for ambiguous replies).
 const KASA_CAMERA_TYPES = new Set(['IOT.IPCAMERA']);
 
-type KasaDeviceClass = 'camera' | 'plug' | 'switch' | 'bulb';
+// All values stored under the `kasaClass` storage key live in this union. classifyKasa()
+// only returns the four families that auto-discovery can detect from sysinfo; 'dimmer' is
+// added by adoptIotDevice() when the device exposes brightness, and the manual 'Add device'
+// dialog can persist any of the five.
+type KasaDeviceClass = 'camera' | 'plug' | 'switch' | 'dimmer' | 'bulb';
 
 // Classify a discovered device by its sysinfo. Returns undefined for device families we
 // don't model (e.g. multi-outlet plug strips, hubs).
@@ -600,6 +604,17 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
             this.console.log('intercom ffmpeg exited');
             session.close();
         });
+
+        // The camera can drop the talk uplink on its own (network blip, request error,
+        // or the camera ending the response). Without observing that, ffmpeg would keep
+        // running and consuming CPU long after the session is dead.
+        session.onClose(() => {
+            if (this.intercomSession === session) {
+                this.intercomSession = undefined;
+                this.intercomFfmpeg = undefined;
+                try { cp.kill(); } catch { }
+            }
+        });
     }
 
     async stopIntercom(): Promise<void> {
@@ -666,13 +681,13 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
         const room = settings.room?.toString() || undefined;
         const choice = settings.kasaClass?.toString() || 'Camera';
         // Map the user-friendly choice → internal kasaClass marker. Defaults to camera.
-        const kasaClass = ({
+        const kasaClass: KasaDeviceClass = ({
             Camera: 'camera',
             Plug: 'plug',
             Switch: 'switch',
             Dimmer: 'dimmer',
             Bulb: 'bulb',
-        } as Record<string, string>)[choice] || 'camera';
+        } as Record<string, KasaDeviceClass>)[choice] || 'camera';
         const name = settings.name?.toString() || (choice === 'Camera' ? 'Kasa Camera' : `Kasa ${choice}`);
 
         if (kasaClass === 'camera') {
@@ -687,7 +702,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
     // Register a non-camera Kasa device (plug, switch, dimmer, bulb) with the appropriate
     // Scrypted device type + interfaces. IP/port are left empty; the user fills them in
     // through the per-device settings after creation.
-    private async registerIotDevice(nativeId: string, name: string, room: string | undefined, kasaClass: string): Promise<void> {
+    private async registerIotDevice(nativeId: string, name: string, room: string | undefined, kasaClass: KasaDeviceClass): Promise<void> {
         const interfaces = [ScryptedInterface.OnOff, ScryptedInterface.Settings];
         let type: ScryptedDeviceType;
         switch (kasaClass) {
@@ -989,7 +1004,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
         const caps = bulbCapabilities(device);
         // The marker we persist for getDevice routing. 'plug'/'switch' for plain on/off
         // devices, 'dimmer' for anything with brightness control, 'bulb' for true bulbs.
-        let storedClass: string = cls;
+        let storedClass: KasaDeviceClass = cls;
 
         if (cls === 'bulb') {
             type = ScryptedDeviceType.Light;
@@ -1069,7 +1084,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
         }
         // Legacy fallback for devices adopted before kasaClass added 'dimmer'. Older
         // adoptions stored a `dimmer=true` flag on the device's KasaPlug/KasaSwitch
-        // storage when the underlying camera was a dimmer; promote those to KasaDimmer.
+        // storage when the underlying device was a dimmer; promote those to KasaDimmer.
         if (storage?.getItem('dimmer') === 'true')
             return new KasaDimmer(nativeId);
         const state = deviceManager.getDeviceState(nativeId);

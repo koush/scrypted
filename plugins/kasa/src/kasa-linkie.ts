@@ -63,7 +63,9 @@ export class KasaLinkieClient {
                 'User-Agent': 'Kasa/1752 CFNetwork/3860.500.112 Darwin/25.4.0',
                 'Accept': '*/*',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
+                // We don't decompress responses (camera never sends compressed today, but
+                // advertising 'gzip' would let a future firmware break our base64+XOR decode).
+                'Accept-Encoding': 'identity',
                 'Connection': 'keep-alive',
             },
             body: Buffer.from(formBody),
