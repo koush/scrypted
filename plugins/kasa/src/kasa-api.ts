@@ -9,6 +9,12 @@ import type { Readable } from 'stream';
 export const KASA_DEFAULT_PORT = 19443;
 export const KASA_STREAM_PATH = '/https/stream/mixed';
 
+// Real headers from this camera fit in well under 1 KB. Cap at 32 KB so a malformed framing
+// (or an attacker who substitutes a non-Kasa endpoint) can't grow the queued chunks until
+// the stream eventually ends. Throwing here surfaces the problem instead of silently
+// retaining memory.
+const MAX_HEADER_BYTES = 32 * 1024;
+
 export const KasaMimeVideo = 'video/x-h264';
 export const KasaMimeG711U = 'audio/g711u';
 
@@ -67,9 +73,7 @@ export interface KasaConnectOptions {
 
 export interface KasaPart {
     contentType: string;
-    headers: Record<string, string>;
     body: Buffer;
-    timestampSeconds?: number;
 }
 
 // Camera quirk: the Basic auth password must itself be base64(plaintext) before the standard
@@ -124,61 +128,80 @@ export class KasaClient {
     async readPart(): Promise<KasaPart> {
         const expected = '--' + this.boundary;
 
-        // Read the boundary + header block as one chunk (terminated by a blank line) instead
-        // of using readLine per-line. At ~30 video parts/sec + audio, every readLine call is a
-        // separate await with its own microtask hop and unshift; bulk parsing trims that.
+        // Read the boundary + header block as one buffer (terminated by a blank line) and
+        // walk it byte-wise to extract just content-type and content-length. At ~30 parts/s
+        // this avoids the regex split and ~6 string allocations per part that a per-line
+        // approach would do.
         const headerBlock = await readUntilDoubleCrlf(this.body);
-        const lines = headerBlock.split(/\r?\n/);
+        const len = headerBlock.length;
 
-        let lineIdx = 0;
-        // Tolerate leading empty lines (some firmwares emit a stray CRLF before the boundary).
-        while (lineIdx < lines.length && !lines[lineIdx])
-            lineIdx++;
-        if (lineIdx >= lines.length || lines[lineIdx] !== expected)
-            throw new Error(`unexpected boundary line: ${JSON.stringify(lines[lineIdx] ?? '')}`);
-        lineIdx++;
+        // Pull out the next \r\n- or \n-terminated line as a string. Returns the slice plus
+        // the index just after the line terminator. Skips leading blank lines so a stray
+        // CRLF before the boundary (some firmwares) doesn't break parsing.
+        const nextLine = (start: number): { line: string; next: number } => {
+            let i = start;
+            // Find next LF.
+            while (i < len && headerBlock[i] !== 0x0a) i++;
+            // Trim a trailing CR if present.
+            const end = (i > start && headerBlock[i - 1] === 0x0d) ? i - 1 : i;
+            return { line: headerBlock.toString('utf8', start, end), next: i + 1 };
+        };
 
-        const headers: Record<string, string> = {};
-        for (; lineIdx < lines.length; lineIdx++) {
-            const line = lines[lineIdx];
-            if (!line)
+        let pos = 0;
+        // Tolerate leading empty lines.
+        while (pos < len) {
+            const { line, next } = nextLine(pos);
+            if (line) {
+                if (line !== expected)
+                    throw new Error(`unexpected boundary line: ${JSON.stringify(line)}`);
+                pos = next;
                 break;
-            const idx = line.indexOf(':');
-            if (idx < 0)
-                continue;
-            const key = line.slice(0, idx).trim().toLowerCase();
-            const value = line.slice(idx + 1).trim();
-            headers[key] = value;
+            }
+            pos = next;
         }
 
-        const lengthRaw = headers['content-length'];
-        if (!lengthRaw)
-            throw new Error('multipart: no content length');
-        const length = parseInt(lengthRaw, 10);
-        if (!Number.isFinite(length) || length < 0)
-            throw new Error(`multipart: invalid content length: ${lengthRaw}`);
+        let contentType = '';
+        let length = -1;
+        while (pos < len) {
+            const { line, next } = nextLine(pos);
+            pos = next;
+            if (!line)
+                break;
+            // Header names from this camera are stable (`Content-Type:`, `Content-Length:`),
+            // but match case-insensitively to tolerate firmware revisions.
+            if (line.length > 13 && line.charCodeAt(12) === 0x3a /* : */) {
+                const name = line.slice(0, 12);
+                if (name === 'Content-Type' || name.toLowerCase() === 'content-type') {
+                    contentType = line.slice(13).trim();
+                    continue;
+                }
+            }
+            if (line.length > 15 && line.charCodeAt(14) === 0x3a) {
+                const name = line.slice(0, 14);
+                if (name === 'Content-Length' || name.toLowerCase() === 'content-length') {
+                    const n = parseInt(line.slice(15).trim(), 10);
+                    if (Number.isFinite(n) && n >= 0)
+                        length = n;
+                    continue;
+                }
+            }
+        }
+
+        if (length < 0)
+            throw new Error('multipart: no/invalid content length');
 
         const body = length === 0 ? Buffer.alloc(0) : await readLength(this.body, length);
-
-        const contentType = headers['content-type'] || '';
-        const ts = headers['x-timestamp'];
-        const timestampSeconds = ts ? parseFloat(ts) : undefined;
-
-        return {
-            contentType,
-            headers,
-            body,
-            timestampSeconds: Number.isFinite(timestampSeconds!) ? timestampSeconds : undefined,
-        };
+        return { contentType, body };
     }
 }
 
 // Read up to and including the first blank line (CRLF CRLF or LF LF) and return everything
-// up to and including the terminator as a UTF-8 string. Whatever bytes come after are
-// unshifted back so the body that follows can be read intact. Uses a small state machine so
-// the terminator is detected correctly even when it straddles multiple read chunks.
-async function readUntilDoubleCrlf(readable: Readable): Promise<string> {
+// up to and including the terminator as a Buffer. Whatever bytes come after are unshifted
+// back so the body that follows can be read intact. Enforces MAX_HEADER_BYTES so a malformed
+// stream that never sends a terminator can't grow queued chunks unbounded.
+async function readUntilDoubleCrlf(readable: Readable): Promise<Buffer> {
     const queued: Buffer[] = [];
+    let queuedLen = 0;
     // crlf encodes how many bytes of \r\n\r\n we've matched: 0,1=\r, 2=\r\n, 3=\r\n\r, 4=done.
     // lfOnly counts consecutive \n bytes (some firmwares emit LF-only framing).
     let crlf = 0;
@@ -222,14 +245,19 @@ async function readUntilDoubleCrlf(readable: Readable): Promise<string> {
             } else lfOnly = 0;
         }
         if (split < 0) {
+            queuedLen += chunk.length;
+            if (queuedLen > MAX_HEADER_BYTES)
+                throw new Error(`multipart header exceeded ${MAX_HEADER_BYTES} bytes without terminator`);
             queued.push(chunk);
             continue;
         }
         const headerPart = chunk.subarray(0, split);
         const rest = chunk.subarray(split);
+        if (queuedLen + headerPart.length > MAX_HEADER_BYTES)
+            throw new Error(`multipart header exceeded ${MAX_HEADER_BYTES} bytes`);
         queued.push(headerPart);
         if (rest.length)
             readable.unshift(rest);
-        return Buffer.concat(queued).toString('utf8');
+        return queued.length === 1 ? queued[0] : Buffer.concat(queued);
     }
 }

@@ -24,3 +24,26 @@ export function xorDecrypt(ciphertext: Buffer): Buffer {
     }
     return out;
 }
+
+// In-place variants — overwrite the input buffer instead of allocating a fresh one. Use
+// when the caller owns the input (e.g., a freshly-allocated Buffer.from(...) it's about
+// to throw away). Saves an allocation + copy on every encrypt/decrypt pair.
+export function xorEncryptInPlace(plaintext: Buffer): Buffer {
+    let key = 0xAB;
+    for (let i = 0; i < plaintext.length; i++) {
+        const c = key ^ plaintext[i];
+        plaintext[i] = c;
+        key = c;
+    }
+    return plaintext;
+}
+
+export function xorDecryptInPlace(ciphertext: Buffer): Buffer {
+    let key = 0xAB;
+    for (let i = 0; i < ciphertext.length; i++) {
+        const c = ciphertext[i];
+        ciphertext[i] = key ^ c;
+        key = c;
+    }
+    return ciphertext;
+}

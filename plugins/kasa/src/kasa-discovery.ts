@@ -1,12 +1,16 @@
 import dgram from 'dgram';
 import { networkInterfaces } from 'os';
-import { xorDecrypt as xorDecryptBuf, xorEncrypt as xorEncryptBuf } from './kasa-cipher';
+import { xorDecryptInPlace, xorEncryptInPlace } from './kasa-cipher';
 
 export const KASA_DISCOVERY_PORT = 9999;
 const KASA_DISCOVERY_PROBE = '{"system":{"get_sysinfo":{}}}';
 
-const xorEncryptString = (s: string) => xorEncryptBuf(Buffer.from(s, 'utf8'));
-const xorDecryptToString = (b: Buffer) => xorDecryptBuf(b).toString('utf8');
+// Probe is built once at module load; reused across every discovery sweep, so we encrypt
+// in-place into a buffer we own.
+const xorEncryptString = (s: string) => xorEncryptInPlace(Buffer.from(s, 'utf8'));
+// Inbound UDP datagrams are owned by us (dgram allocates a fresh buffer per packet) and
+// not retained anywhere after the message handler returns, so in-place is safe.
+const xorDecryptToString = (b: Buffer) => xorDecryptInPlace(b).toString('utf8');
 
 export interface KasaSysInfo {
     deviceId?: string;
@@ -54,11 +58,12 @@ function broadcastAddresses(): string[] {
 // All host IPs in each local /24 we're attached to (excluding our own). Used for both UDP
 // unicast sweeps (when broadcast misses cameras) and the legacy TCP/19443 sweep. Networks
 // larger than /24 are skipped to avoid flooding.
-function localSubnetIps(): string[] {
+function* localSubnetIps(): Generator<string> {
     // De-dupe across interfaces — multi-homed hosts (Wi-Fi + Ethernet on the same /24,
-    // VPN tunnels, etc.) would otherwise enqueue the same address twice and burn ~750 ms
-    // resending probes that have already been sent.
-    const targets = new Set<string>();
+    // VPN tunnels, etc.) would otherwise yield the same address twice and burn ~750 ms
+    // resending probes that have already been sent. Generator avoids materializing the full
+    // list (254 IPs per /24) when the caller pauses 3 ms between sends.
+    const seen = new Set<string>();
     const ifaces = networkInterfaces();
     for (const name of Object.keys(ifaces)) {
         for (const info of ifaces[name] || []) {
@@ -72,11 +77,14 @@ function localSubnetIps(): string[] {
             for (let host = 1; host < 255; host++) {
                 if (host === ip[3])
                     continue;
-                targets.add(prefix + host);
+                const addr = prefix + host;
+                if (seen.has(addr))
+                    continue;
+                seen.add(addr);
+                yield addr;
             }
         }
     }
-    return [...targets];
 }
 
 // Best-effort extraction of sysinfo-like fields from a JSON response. Different Kasa device
@@ -158,6 +166,28 @@ export async function discoverKasa(durationMs: number = 2500, console?: Console)
                     return;
                 if (found.has(deviceId))
                     return;
+                // Slim the retained sysinfo to fields actually consumed by adoption
+                // (classifyKasa, isDimmer, bulbCapabilities, firmware tag). Full sysinfo
+                // contains ~20 fields, most unused (oemId, latitude/longitude, c_opt, etc.).
+                // Cached entries live up to 5 minutes per device, so dropping the rest noticeably
+                // shrinks retained heap when many devices are on the LAN.
+                const slim: KasaSysInfo = {
+                    deviceId: sys.deviceId,
+                    alias: sys.alias,
+                    model: sys.model,
+                    mac: sys.mac,
+                    mic_mac: sys.mic_mac,
+                    type: sys.type,
+                    mic_type: sys.mic_type,
+                    sw_ver: sys.sw_ver,
+                    hw_ver: sys.hw_ver,
+                    dev_name: (sys as any).dev_name,
+                    feature: (sys as any).feature,
+                    brightness: (sys as any).brightness,
+                    is_color: (sys as any).is_color,
+                    is_variable_color_temp: (sys as any).is_variable_color_temp,
+                    children: (sys as any).children,
+                };
                 found.set(deviceId, {
                     address: rinfo.address,
                     deviceId,
@@ -165,7 +195,7 @@ export async function discoverKasa(durationMs: number = 2500, console?: Console)
                     model: sys.model || '',
                     mac: (sys.mic_mac || sys.mac || '').toString(),
                     type: (sys.type || sys.mic_type || '').toString(),
-                    sysinfo: sys,
+                    sysinfo: slim,
                 });
             }
             catch (e) {

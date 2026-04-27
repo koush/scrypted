@@ -1,5 +1,5 @@
 import net from 'net';
-import { xorDecrypt, xorEncrypt } from './kasa-cipher';
+import { xorDecrypt, xorEncryptInPlace } from './kasa-cipher';
 
 // Legacy Kasa "IOT" protocol used by plugs, switches, and bulbs (everything that isn't a
 // camera). Wire format on TCP/9999:
@@ -22,14 +22,21 @@ export async function kasaIotCall(options: KasaIotOptions, command: Record<strin
     const port = options.port || KASA_IOT_PORT;
     const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
     const json = JSON.stringify(command);
-    const encrypted = xorEncrypt(Buffer.from(json, 'utf8'));
-    const lenBuf = Buffer.alloc(4);
-    lenBuf.writeUInt32BE(encrypted.length, 0);
-    const payload = Buffer.concat([lenBuf, encrypted]);
+    // Encode the 4-byte length prefix and JSON in one allocation, encrypt the JSON portion
+    // in-place (we own this buffer and don't read the plaintext again).
+    const jsonBytes = Buffer.byteLength(json, 'utf8');
+    const payload = Buffer.allocUnsafe(4 + jsonBytes);
+    payload.writeUInt32BE(jsonBytes, 0);
+    payload.write(json, 4, 'utf8');
+    xorEncryptInPlace(payload.subarray(4));
 
     return new Promise((resolve, reject) => {
         const socket = new net.Socket();
-        let received = Buffer.alloc(0);
+        // Queue of received TCP chunks plus byte total, so we don't repeatedly Buffer.concat
+        // the accumulator on every 'data' event (O(n²) over multi-chunk responses; bulb
+        // light_state replies span 2-3 chunks).
+        const chunks: Buffer[] = [];
+        let queuedBytes = 0;
         let expected = -1;
         let settled = false;
 
@@ -38,22 +45,63 @@ export async function kasaIotCall(options: KasaIotOptions, command: Record<strin
             settled = true;
             clearTimeout(timer);
             try { socket.destroy(); } catch { }
+            // Drop references so any retained chunks can be GC'd promptly.
+            chunks.length = 0;
             if (err) reject(err);
             else resolve(value);
         };
 
         const timer = setTimeout(() => finish(new Error(`kasa iot call timeout after ${timeoutMs}ms`)), timeoutMs);
 
-        socket.on('data', chunk => {
-            received = received.length ? Buffer.concat([received, chunk]) : chunk;
-            if (expected < 0) {
-                if (received.length < 4)
-                    return;
-                expected = received.readUInt32BE(0);
-                received = received.subarray(4);
+        const peek4 = (): number => {
+            // We've verified queuedBytes >= 4 before calling. Read big-endian uint32 either
+            // straight from the head buffer (common case) or after walking the queue.
+            if (chunks[0].length >= 4)
+                return chunks[0].readUInt32BE(0);
+            // Rare: 4-byte length straddles two chunks. Concat just the first two.
+            return Buffer.concat(chunks.slice(0, 2), 4).readUInt32BE(0);
+        };
+
+        const consume = (n: number): Buffer => {
+            // Pop and return exactly n bytes from the head of the queue.
+            queuedBytes -= n;
+            if (chunks[0].length === n)
+                return chunks.shift()!;
+            if (chunks[0].length > n) {
+                const out = chunks[0].subarray(0, n);
+                chunks[0] = chunks[0].subarray(n);
+                return out;
             }
-            if (received.length >= expected) {
-                const cipher = received.subarray(0, expected);
+            const out = Buffer.allocUnsafe(n);
+            let written = 0;
+            while (written < n) {
+                const head = chunks[0];
+                const need = n - written;
+                if (head.length <= need) {
+                    head.copy(out, written);
+                    written += head.length;
+                    chunks.shift();
+                }
+                else {
+                    head.copy(out, written, 0, need);
+                    chunks[0] = head.subarray(need);
+                    written = n;
+                }
+            }
+            return out;
+        };
+
+        socket.on('data', chunk => {
+            chunks.push(chunk);
+            queuedBytes += chunk.length;
+            if (expected < 0) {
+                if (queuedBytes < 4)
+                    return;
+                expected = peek4();
+                consume(4);
+            }
+            if (queuedBytes >= expected) {
+                const cipher = consume(expected);
                 const plain = xorDecrypt(cipher).toString('utf8');
                 try {
                     finish(undefined, JSON.parse(plain));

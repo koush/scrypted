@@ -38,7 +38,7 @@ export class KasaTalkSession {
     private playerId = '';
     private heartbeatTimer?: NodeJS.Timeout;
     private closed = false;
-    private closeCallbacks: (() => void)[] = [];
+    private closeCallbacks?: (() => void)[] = [];
     // Resolves once the session is torn down (by the caller, by the camera ending the
     // response, or by an error). Lets the camera's startIntercom await teardown to clean
     // up its ffmpeg process when the uplink dies on its own.
@@ -117,7 +117,7 @@ export class KasaTalkSession {
             queueMicrotask(cb);
             return;
         }
-        this.closeCallbacks.push(cb);
+        this.closeCallbacks!.push(cb);
     }
 
     private writePart(contentType: string, body: Buffer): boolean {
@@ -139,10 +139,15 @@ export class KasaTalkSession {
         clearInterval(this.heartbeatTimer);
         try { this.body.end(); } catch { }
         try { this.request?.end(); } catch { }
-        for (const cb of this.closeCallbacks) {
-            try { cb(); } catch (e) { this.options.console?.warn('kasa talk onClose handler threw', e); }
+        const cbs = this.closeCallbacks;
+        // Drop the array reference before invoking callbacks so V8 can reclaim it; any
+        // late onClose() registration after this point will be served via queueMicrotask.
+        this.closeCallbacks = undefined;
+        if (cbs) {
+            for (const cb of cbs) {
+                try { cb(); } catch (e) { this.options.console?.warn('kasa talk onClose handler threw', e); }
+            }
         }
-        this.closeCallbacks.length = 0;
         this.resolveClosed();
     }
 }

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
-import { xorDecrypt, xorEncrypt } from './kasa-cipher';
+import { xorDecryptInPlace, xorEncryptInPlace } from './kasa-cipher';
 
 export const KASA_LINKIE_PORT = 10443;
 const KASA_LINKIE_PATH = '/data/LINKIE2.json';
@@ -39,7 +39,8 @@ export class KasaLinkieClient {
             context: { source: crypto.randomUUID() },
         };
         const json = JSON.stringify(body);
-        const encrypted = xorEncrypt(Buffer.from(json, 'utf8'));
+        // Encrypt in-place: the Buffer.from we just allocated isn't shared anywhere else.
+        const encrypted = xorEncryptInPlace(Buffer.from(json, 'utf8'));
         const formBody = `content=${encodeURIComponent(encrypted.toString('base64'))}`;
 
         const url = `https://${this.options.ip}:${this.options.port || KASA_LINKIE_PORT}${KASA_LINKIE_PATH}`;
@@ -73,7 +74,8 @@ export class KasaLinkieClient {
         });
 
         const respB64 = response.body.toString('utf8').trim();
-        const respDecrypted = xorDecrypt(Buffer.from(respB64, 'base64'));
+        // Same here: the base64-decoded buffer is freshly ours, decrypt in-place.
+        const respDecrypted = xorDecryptInPlace(Buffer.from(respB64, 'base64'));
         return JSON.parse(respDecrypted.toString('utf8'));
     }
 

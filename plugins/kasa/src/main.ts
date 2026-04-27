@@ -89,16 +89,24 @@ function bulbCapabilities(d: KasaDiscoveredDevice): BulbCapabilities {
 // Hard ceiling on the upfront SPS/PPS scan. Real cameras emit them well under a second; if we
 // don't see them in this window the camera is misbehaving and there's no point holding the call.
 const SPS_PPS_TIMEOUT_MS = 10000;
-// Belt-and-suspenders cap on the prebuffer size. The timeout already bounds the wait, but a
-// camera that streams at high bitrate and never emits SPS/PPS could stuff hundreds of MB into
-// `buffered` before the timer fires. Cap parts so we throw early instead of OOMing the host.
+// Belt-and-suspenders caps on the prebuffer. The timeout already bounds the wait, but a
+// camera that streams at high bitrate and never emits SPS/PPS could fill memory before the
+// timer fires. We enforce both: a part-count cap (against many tiny parts) and a byte cap
+// (against few huge parts). Either trip throws.
 const SPS_PPS_MAX_BUFFERED_PARTS = 1024;
+const SPS_PPS_MAX_BUFFERED_BYTES = 32 * 1024 * 1024;
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
 // Walk every known device's state to collect existing room names. Used to populate the room
-// dropdown so the user picks an existing room instead of typing a new one.
+// dropdown so the user picks an existing room instead of typing a new one. Cached for 2 s so
+// rapid back-to-back calls (Scrypted's UI sometimes re-fetches on every render of the Add
+// Device dialog) don't repeatedly walk the entire system state, which can be hundreds of KB.
+let knownRoomsCache: { rooms: string[]; at: number } | undefined;
 function getKnownRooms(): string[] {
+    const now = Date.now();
+    if (knownRoomsCache && now - knownRoomsCache.at < 2000)
+        return knownRoomsCache.rooms;
     const rooms = new Set<string>();
     const states = systemManager.getSystemState();
     for (const id of Object.keys(states)) {
@@ -106,7 +114,9 @@ function getKnownRooms(): string[] {
         if (typeof room === 'string' && room.trim())
             rooms.add(room.trim());
     }
-    return [...rooms].sort((a, b) => a.localeCompare(b));
+    const out = [...rooms].sort((a, b) => a.localeCompare(b));
+    knownRoomsCache = { rooms: out, at: now };
+    return out;
 }
 
 // Child device for cameras with a spotlight (e.g. KC420WS — the Kasa app calls this
@@ -166,11 +176,17 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
             this.console.warn('refreshChildDevices failed', e)));
     }
 
+    private cachedLinkie?: { client: KasaLinkieClient; ip: string; username: string; password: string };
     linkie(): KasaLinkieClient {
         const { ip, username, password } = this.storageSettings.values;
         // Don't pass storageSettings.port — that's the stream port (19443). LINKIE2 lives
         // on its own fixed port (10443) which the client supplies as a default.
-        return new KasaLinkieClient({ ip, username, password }, this.console);
+        const c = this.cachedLinkie;
+        if (c && c.ip === ip && c.username === username && c.password === password)
+            return c.client;
+        const client = new KasaLinkieClient({ ip, username, password }, this.console);
+        this.cachedLinkie = { client, ip, username, password };
+        return client;
     }
 
     private get spotlightNativeId(): string {
@@ -347,6 +363,7 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         // clients (especially short-timeout ones like HomeKit) may give up before the first
         // in-band SPS/PPS arrives. Buffer everything so we can replay to ffmpeg with no frame loss.
         const buffered: KasaPart[] = [];
+        let bufferedBytes = 0;
         const spsPps: H264SpsPps = {};
         try {
             const deadline = Date.now() + SPS_PPS_TIMEOUT_MS;
@@ -355,8 +372,11 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
                     throw new Error('timed out waiting for H.264 SPS/PPS');
                 if (buffered.length >= SPS_PPS_MAX_BUFFERED_PARTS)
                     throw new Error(`H.264 SPS/PPS not found within ${SPS_PPS_MAX_BUFFERED_PARTS} parts`);
+                if (bufferedBytes >= SPS_PPS_MAX_BUFFERED_BYTES)
+                    throw new Error(`H.264 SPS/PPS not found within ${SPS_PPS_MAX_BUFFERED_BYTES} prebuffered bytes`);
                 const part = await kasa.readPart();
                 buffered.push(part);
+                bufferedBytes += part.body.length;
                 if (part.contentType === KasaMimeVideo)
                     findSpsPps(part.body, spsPps);
             }
@@ -519,6 +539,9 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         try {
             for (const part of buffered)
                 await writePart(part);
+            // Release prebuffered parts (up to a few hundred KB each) — they were captured
+            // during the SPS/PPS scan and are only needed for this single replay.
+            buffered.length = 0;
             while (true) {
                 const part = await kasa.readPart();
                 await writePart(part);
@@ -955,10 +978,11 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
         const existing = this.discoveredDevices.get(deviceId);
         if (existing)
             clearTimeout(existing.timeout);
-        this.discoveredDevices.set(deviceId, {
-            device,
-            timeout: setTimeout(() => this.discoveredDevices.delete(deviceId), 5 * 60 * 1000),
-        });
+        // Use unref() so the cache-expiry timer doesn't keep the plugin process awake; the
+        // entries are best-effort and can be flushed whenever the process idles down.
+        const timeout = setTimeout(() => this.discoveredDevices.delete(deviceId), 5 * 60 * 1000);
+        timeout.unref?.();
+        this.discoveredDevices.set(deviceId, { device, timeout });
     }
 
     async adoptDevice(adopt: AdoptDevice): Promise<string> {
