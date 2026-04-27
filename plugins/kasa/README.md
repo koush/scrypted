@@ -8,9 +8,12 @@ Adds support for TP-Link Kasa cameras to Scrypted. The plugin:
 - Streams talk audio back to the camera's speaker via the camera's separate uplink endpoint
   (HTTPS port 18443, `/https/speaker/audio/g711block`) — usable from HomeKit and any other
   Scrypted client that supports two-way audio.
+- Exposes the camera's spotlight (when present, e.g. KC420WS) as an `OnOff` child light
+  device in the same room as the camera. Driven by the LINKIE2 control protocol on port
+  10443.
 
 Stream side ported from [go2rtc's `pkg/kasa`](https://github.com/AlexxIT/go2rtc/tree/master/pkg/kasa);
-talk side reverse-engineered from the official Kasa iOS app traffic.
+talk and control sides reverse-engineered from the official Kasa iOS app traffic.
 
 Tested models: KD110, KC200, KC401, KC420WS, EC71.
 
@@ -85,11 +88,27 @@ manual setup below.
   are sent every 3 s during silence to keep the connection alive — same pattern the Kasa
   app uses.
 
+### Spotlight / control plane
+
+- The Kasa app talks to the camera's "LINKIE2" RPC on port 10443 for non-streaming
+  features. Wire format: HTTPS POST `/data/LINKIE2.json`, body `application/x-www-form-
+  urlencoded` with a single `content=<base64(xor_ab(json))>` field. The XOR-AB autokey
+  cipher is the same one used by Kasa's UDP/9999 discovery protocol.
+- On adoption (and whenever credentials change) the plugin probes
+  `smartlife.cam.ipcamera.dayNight.get_force_lamp_state`. If the camera responds with
+  `on`/`off`, a child `OnOff` light device named "<camera> Spotlight" is registered in the
+  camera's room.
+- Toggling the light calls `set_force_lamp_state` with `{"value": "on"|"off"}`.
+
 ## Notes / limitations
 
-- **Authentication** uses the cloud account password. Both endpoints accept Basic auth
-  with the plain Kasa email; the receive side wants the password as base64(plaintext)
-  and the talk side wants md5_hex(plaintext) — the plugin uses each in the right place.
+- **Authentication** uses the cloud account password. All three endpoints take Basic auth
+  with the plain Kasa email as the username; the password format differs by endpoint —
+  receive uses base64(plaintext), talk and LINKIE2 use md5_hex(plaintext). The plugin
+  uses each in the right place.
+- LINKIE2 requests must include a `User-Agent: Kasa/...` header and the `Authorization`
+  header on the very first request — the camera silently drops requests that don't look
+  enough like the official app.
 - The camera presents a self-signed TLS certificate; certificate verification is disabled.
 - Auto-discovery sweeps the local /24 only. Larger subnets (e.g. /23) are skipped to
   avoid flooding.

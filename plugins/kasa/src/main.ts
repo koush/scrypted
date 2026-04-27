@@ -3,7 +3,7 @@ import { listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, {
     AdoptDevice, Device, DeviceCreator, DeviceCreatorSettings, DeviceDiscovery, DeviceProvider,
-    DiscoveredDevice, FFmpegInput, Intercom, MediaObject, RequestMediaStreamOptions, ResponseMediaStreamOptions,
+    DiscoveredDevice, FFmpegInput, Intercom, MediaObject, OnOff, RequestMediaStreamOptions, ResponseMediaStreamOptions,
     ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, Settings,
     SettingValue, VideoCamera,
 } from '@scrypted/sdk';
@@ -15,6 +15,7 @@ import child_process, { ChildProcess } from 'child_process';
 import { findSpsPps, H264SpsPps, KASA_DEFAULT_PORT, KasaClient, KasaMimeG711U, KasaMimeVideo, KasaPart } from './kasa-api';
 import { discoverKasa, KasaDiscoveredDevice, tcpProbeKasaCameras, unicastProbeKasa } from './kasa-discovery';
 import { KASA_TALK_PORT, KasaTalkSession } from './kasa-intercom';
+import { KasaLinkieClient } from './kasa-linkie';
 
 // G.711 µ-law packetization: 8000 samples/sec * 1 byte/sample = 160 bytes/20ms.
 // 20 ms is the standard RTP packetization for PCMU and matches what the Kasa app appears
@@ -44,9 +45,85 @@ function getKnownRooms(): string[] {
     return [...rooms].sort((a, b) => a.localeCompare(b));
 }
 
-class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, Intercom {
+// Child device for cameras with a spotlight (e.g. KC420WS — the Kasa app calls this
+// the "spotlight"). Backed by the LINKIE2 `smartlife.cam.ipcamera.dayNight.set_force_lamp_state`
+// command. (The protocol-level name is "force_lamp" — internally the camera firmware
+// treats this as a generic forced-lamp state, but in the user-facing UI it's a spotlight.)
+class KasaCameraSpotlight extends ScryptedDeviceBase implements OnOff {
+    constructor(public camera: KasaCamera, nativeId: string) {
+        super(nativeId);
+    }
+
+    async turnOn(): Promise<void> {
+        await this.camera.linkie().setForceLampState(true);
+        this.on = true;
+    }
+
+    async turnOff(): Promise<void> {
+        await this.camera.linkie().setForceLampState(false);
+        this.on = false;
+    }
+}
+
+class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, Intercom, DeviceProvider {
     private intercomSession?: KasaTalkSession;
     private intercomFfmpeg?: ChildProcess;
+    private spotlight?: KasaCameraSpotlight;
+
+    constructor(nativeId: string) {
+        super(nativeId);
+        // Probe-and-register child devices once settings are available. process.nextTick
+        // defers past constructor so storageSettings is fully wired.
+        process.nextTick(() => this.refreshChildDevices().catch(e =>
+            this.console.warn('refreshChildDevices failed', e)));
+    }
+
+    linkie(): KasaLinkieClient {
+        const { ip, username, password } = this.storageSettings.values;
+        // Don't pass storageSettings.port — that's the stream port (19443). LINKIE2 lives
+        // on its own fixed port (10443) which the client supplies as a default.
+        return new KasaLinkieClient({ ip, username, password }, this.console);
+    }
+
+    private get spotlightNativeId(): string {
+        return `${this.nativeId}-spotlight`;
+    }
+
+    async refreshChildDevices(): Promise<void> {
+        const { ip, username, password } = this.storageSettings.values;
+        if (!ip || !username || !password)
+            return;
+
+        const state = await this.linkie().getForceLampState();
+        if (state === undefined)
+            return; // camera doesn't expose a spotlight (or LINKIE2 call failed)
+
+        await deviceManager.onDeviceDiscovered({
+            nativeId: this.spotlightNativeId,
+            name: `${this.name || 'Kasa Camera'} Spotlight`,
+            type: ScryptedDeviceType.Light,
+            interfaces: [ScryptedInterface.OnOff],
+            providerNativeId: this.nativeId,
+            // Inherit the camera's room so the spotlight shows up next to it in the UI.
+            // Empty string would clear an existing room assignment, so pass undefined when blank.
+            room: this.room || undefined,
+        });
+        if (!this.spotlight)
+            this.spotlight = new KasaCameraSpotlight(this, this.spotlightNativeId);
+        this.spotlight.on = state === 'on';
+    }
+
+    async getDevice(nativeId: string): Promise<any> {
+        if (nativeId === this.spotlightNativeId) {
+            if (!this.spotlight)
+                this.spotlight = new KasaCameraSpotlight(this, this.spotlightNativeId);
+            return this.spotlight;
+        }
+    }
+
+    async releaseDevice(_id: string, _nativeId: string): Promise<void> {
+        // No persistent resources per child to release.
+    }
 
     storageSettings = new StorageSettings(this, {
         ip: {
@@ -70,16 +147,17 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         },
     });
 
-    constructor(nativeId: string) {
-        super(nativeId);
-    }
-
     getSettings(): Promise<Setting[]> {
         return this.storageSettings.getSettings();
     }
 
-    putSetting(key: string, value: SettingValue): Promise<void> {
-        return this.storageSettings.putSetting(key, value);
+    async putSetting(key: string, value: SettingValue): Promise<void> {
+        await this.storageSettings.putSetting(key, value);
+        // Re-probe child devices when network or auth settings change. Manually-added
+        // cameras get their credentials filled in here (rather than at adoption), so this
+        // is the moment the spotlight first becomes detectable.
+        if (key === 'ip' || key === 'port' || key === 'username' || key === 'password')
+            this.refreshChildDevices().catch(e => this.console.warn('refreshChildDevices failed', e));
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
@@ -404,6 +482,9 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 ScryptedInterface.VideoCamera,
                 ScryptedInterface.Settings,
                 ScryptedInterface.Intercom,
+                // Required so Scrypted routes child-device lookups (e.g. the spotlight)
+                // through KasaCamera.getDevice rather than treating the camera as a leaf.
+                ScryptedInterface.DeviceProvider,
             ],
             info: {
                 manufacturer: 'TP-Link Kasa',
@@ -443,6 +524,7 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 ScryptedInterface.VideoCamera,
                 ScryptedInterface.Settings,
                 ScryptedInterface.Intercom,
+                ScryptedInterface.DeviceProvider,
             ],
             info: {
                 manufacturer: 'TP-Link Kasa',
@@ -612,6 +694,12 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
         clearTimeout(entry.timeout);
         this.discoveredDevices.delete(adopt.nativeId);
         this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, undefined);
+
+        // Now that credentials are set, probe for child devices (spotlight, etc.) so they
+        // appear immediately rather than only after a plugin restart.
+        camera.refreshChildDevices().catch(e =>
+            this.console.warn('post-adopt refreshChildDevices failed', e));
+
         return camera.id;
     }
 

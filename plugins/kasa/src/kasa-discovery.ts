@@ -1,35 +1,13 @@
 import dgram from 'dgram';
 import { networkInterfaces } from 'os';
 import tls from 'tls';
+import { xorDecrypt as xorDecryptBuf, xorEncrypt as xorEncryptBuf } from './kasa-cipher';
 
 export const KASA_DISCOVERY_PORT = 9999;
 const KASA_DISCOVERY_PROBE = '{"system":{"get_sysinfo":{}}}';
 
-// TP-Link Kasa "Smart Home" cipher: XOR autokey, initial key 0xAB.
-// Each ciphertext byte becomes the next key, so encrypt and decrypt differ only in which byte
-// (input vs. output) is fed forward.
-function xorEncrypt(plaintext: string): Buffer {
-    const buf = Buffer.from(plaintext, 'utf8');
-    const out = Buffer.allocUnsafe(buf.length);
-    let key = 0xAB;
-    for (let i = 0; i < buf.length; i++) {
-        const c = key ^ buf[i];
-        out[i] = c;
-        key = c;
-    }
-    return out;
-}
-
-function xorDecrypt(ciphertext: Buffer): string {
-    const out = Buffer.allocUnsafe(ciphertext.length);
-    let key = 0xAB;
-    for (let i = 0; i < ciphertext.length; i++) {
-        const c = ciphertext[i];
-        out[i] = key ^ c;
-        key = c;
-    }
-    return out.toString('utf8');
-}
+const xorEncryptString = (s: string) => xorEncryptBuf(Buffer.from(s, 'utf8'));
+const xorDecryptToString = (b: Buffer) => xorDecryptBuf(b).toString('utf8');
 
 export interface KasaSysInfo {
     deviceId?: string;
@@ -246,7 +224,7 @@ export async function unicastProbeKasa(ips: string[], durationMs: number = 2000,
     const found = new Map<string, KasaSysInfo>();
     if (!ips.length)
         return found;
-    const probe = xorEncrypt(KASA_DISCOVERY_PROBE);
+    const probe = xorEncryptString(KASA_DISCOVERY_PROBE);
     const socket = dgram.createSocket('udp4');
 
     return new Promise((resolve, reject) => {
@@ -267,7 +245,7 @@ export async function unicastProbeKasa(ips: string[], durationMs: number = 2000,
 
         socket.on('message', (msg, rinfo) => {
             try {
-                const json = JSON.parse(xorDecrypt(msg));
+                const json = JSON.parse(xorDecryptToString(msg));
                 const sys = extractSysInfo(json);
                 if (sys)
                     found.set(rinfo.address, sys);
@@ -291,7 +269,7 @@ export async function unicastProbeKasa(ips: string[], durationMs: number = 2000,
 
 export async function discoverKasa(durationMs: number = 3000, console?: Console): Promise<KasaDiscoveredDevice[]> {
     const found = new Map<string, KasaDiscoveredDevice>();
-    const probe = xorEncrypt(KASA_DISCOVERY_PROBE);
+    const probe = xorEncryptString(KASA_DISCOVERY_PROBE);
     const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 
     return new Promise((resolve, reject) => {
@@ -312,7 +290,7 @@ export async function discoverKasa(durationMs: number = 3000, console?: Console)
 
         socket.on('message', (msg, rinfo) => {
             try {
-                const json = JSON.parse(xorDecrypt(msg));
+                const json = JSON.parse(xorDecryptToString(msg));
                 const sys: KasaSysInfo | undefined = json?.system?.get_sysinfo;
                 if (!sys)
                     return;
