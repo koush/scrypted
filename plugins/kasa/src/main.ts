@@ -403,10 +403,15 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
                 // -sdp_file output, so we steer our two raw inputs around it.
                 // Both codecs are passed through (`-vcodec copy`, `-acodec copy`); ffmpeg does
                 // RTP framing only and never touches the bitstream.
+                // -thread_queue_size: ffmpeg defaults to 8 packets per input, which fills up
+                // briefly on 1080p H.264 and triggers "Thread message queue blocking" warnings.
+                // 1024 gives plenty of headroom without measurable extra memory.
                 const forwarder = await startRtpForwarderProcess(this.console, {
                     inputArguments: [
+                        '-thread_queue_size', '1024',
                         '-f', 'h264',
                         '-i', 'pipe:3',
+                        '-thread_queue_size', '1024',
                         '-f', 'mulaw',
                         '-ar', '8000',
                         '-ac', '1',
@@ -871,10 +876,13 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
 
             const skipped: string[] = [];
             const classCounts: Record<string, number> = {};
+            let alreadyAdopted = 0;
             const existingNativeIds = new Set(deviceManager.getNativeIds());
             for (const d of udpResults) {
-                if (existingNativeIds.has(d.deviceId))
+                if (existingNativeIds.has(d.deviceId)) {
+                    alreadyAdopted++;
                     continue;
+                }
                 const cls = classifyKasa(d);
                 if (!cls) {
                     skipped.push(`${d.alias || d.model || d.deviceId} (${d.type})`);
@@ -884,9 +892,12 @@ class KasaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceCre
                 this.upsertDiscovered(d.deviceId, d);
             }
 
-            const summary = Object.entries(classCounts).map(([k, v]) => `${v} ${k}(s)`).join(', ') || '0 supported devices';
+            const summaryParts = Object.entries(classCounts).map(([k, v]) => `${v} new ${k}(s)`);
+            if (alreadyAdopted)
+                summaryParts.push(`${alreadyAdopted} already adopted`);
+            const summary = summaryParts.join(', ') || '0 supported devices';
             this.console.log(`kasa discovery: ${udpResults.length} responder(s), ${summary}`
-                + (skipped.length ? `, skipped: ${skipped.join(', ')}` : ''));
+                + (skipped.length ? `, unsupported: ${skipped.join(', ')}` : ''));
             void this.onDeviceEvent(ScryptedInterface.DeviceDiscovery, undefined);
         }
         catch (e) {
