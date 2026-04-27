@@ -1,6 +1,10 @@
-# Kasa Camera Plugin
+# Kasa Plugin
 
-Adds support for TP-Link Kasa cameras to Scrypted. The plugin:
+Adds support for the TP-Link Kasa device family to Scrypted: cameras, plugs/outlets,
+switches/dimmers, and bulbs. Discovery is unified — one UDP/9999 sweep finds everything
+and the plugin routes each device to the right Scrypted interfaces.
+
+## Cameras
 
 - Reads the camera's proprietary multipart stream (HTTPS port 19443, `/https/stream/mixed`)
   and re-streams H.264 video + G.711 µ-law audio over local RTSP for Scrypted, HomeKit, the
@@ -17,10 +21,29 @@ Adds support for TP-Link Kasa cameras to Scrypted. The plugin:
 - Exposes the camera's **status LED** as the camera's own `OnOff` interface, so HomeKit's
   per-camera "Link Status Indicator" toggle drives the LED.
 
-Stream side ported from [go2rtc's `pkg/kasa`](https://github.com/AlexxIT/go2rtc/tree/master/pkg/kasa);
-talk and control sides reverse-engineered from the official Kasa iOS app traffic.
+## Plugs / Switches / Dimmers / Bulbs (legacy IOT protocol)
 
-Tested models: KD110, KC200, KC401, KC420WS, EC71.
+Each device class is its own implementation, descended from a shared `KasaIotDevice`
+base that holds the relay protocol:
+
+- **`KasaPlug`** — plain plugs/outlets (HS100/HS103/HS105/HS107/HS110/KP100/...). `OnOff`,
+  `ScryptedDeviceType.Outlet`.
+- **`KasaSwitch`** — plain wall switches (HS200/HS210/KS200/...). `OnOff`,
+  `ScryptedDeviceType.Switch`.
+- **`KasaDimmer`** — dimmer plugs and switches (HS220 plug, KS230 3-way switch). `OnOff` +
+  `Brightness`, `ScryptedDeviceType.Light` (dimmable devices are exposed as lights since
+  they're almost always wired to a light fixture, matching the Kasa app's UX).
+- **`KasaBulb`** — smart bulbs (LB1xx, KL1xx). `OnOff` + `Brightness`, plus
+  `ColorSettingHsv` for color bulbs and `ColorSettingTemperature` for variable-temperature
+  bulbs.
+
+Multi-outlet plug strips (HS300, KP303) aren't modeled yet — discovery skips them.
+
+Stream side ported from [go2rtc's `pkg/kasa`](https://github.com/AlexxIT/go2rtc/tree/master/pkg/kasa);
+camera control sides reverse-engineered from the official Kasa iOS app traffic. The
+plug/bulb/switch protocol is the well-documented legacy "smarthome" TCP/9999 wire format.
+
+Tested camera models: KD110, KC200, KC401, KC420WS, EC71.
 
 ## Setup
 
@@ -29,42 +52,41 @@ Tested models: KD110, KC200, KC401, KC420WS, EC71.
 1. Install the plugin.
 2. Open the plugin's page and click **Discover Devices**. Discovery runs only when you
    click the button — there are no background scans.
-3. Each LAN-visible Kasa camera appears in the list.
-4. For each camera you want to adopt, fill in the adoption form and click adopt:
-   - **Name** — pre-filled with the camera's alias or model; edit to taste.
+3. Every LAN-visible Kasa device appears in the list — cameras, plugs, switches, dimmers,
+   and bulbs are all discovered together.
+4. For each device you want to adopt, fill in the adoption form and click adopt:
+   - **Name** — pre-filled with the device's alias or model; edit to taste.
    - **Room** — optional, picked from a dropdown of rooms already in use by other
      Scrypted devices, or type a new one.
-   - **Username** / **Password** — your Kasa account email and password. After the first
-     camera is configured these fields are pre-populated from any existing Kasa camera
-     in Scrypted, so usually just click adopt for additional cameras.
+   - **Username** / **Password** *(cameras only)* — your Kasa account email and password.
+     After the first camera is configured these are pre-populated from any other Kasa
+     camera in Scrypted.
 
-Adopted cameras get their IP, port, name, model, MAC, serial number, and firmware version
-populated automatically. The manufacturer is reported as `TP-Link Kasa` to match the Kasa
-Smart plugin's labeling.
+Adopted devices get their IP, port, name, model, MAC, serial number, and firmware version
+populated automatically. The manufacturer is reported as `TP-Link Kasa`.
 
 Discovery sends a single UDP/9999 burst on each connected /24:
 
-- A **broadcast** of the IOT.SMARTHOME `get_sysinfo` query for older devices that listen
-  on the broadcast address. Smart plugs/bulbs that come back are filtered out by `type`.
+- A **broadcast** of the IOT.SMARTHOME `get_sysinfo` query.
 - A **paced unicast** of the same query at every IP on the subnet (~3 ms between sends).
-  Newer camera firmwares (e.g. KC420WS) drop broadcast probes but still answer when the
+  Newer firmwares (e.g. KC420WS cameras) drop broadcast probes but still answer when the
   packet is addressed directly. Pacing keeps the kernel/network from coalescing or
   dropping the burst.
 
-If your camera is on a different VLAN/broadcast domain or a non-/24 subnet, use the
-manual setup below.
+If a device is on a different VLAN/broadcast domain or a non-/24 subnet, use the manual
+setup below.
 
 ### Manual setup
 
 1. Install the plugin.
-2. Use **Add Camera** to create a new camera. The Add form takes:
+2. Use **Add Device** to create a new device. The Add form takes:
+   - **Type** — Camera, Plug, Switch, Dimmer, or Bulb.
    - **Name** — required.
    - **Room** — optional, with the same dropdown of existing rooms as the discovery flow.
-3. After creation, open the camera's settings and fill in:
-   - **IP Address** of the camera on your LAN
-   - **Port** (default 19443)
-   - **Username** — your TP-Link/Kasa account email
-   - **Password** — your TP-Link/Kasa account password
+3. After creation, open the device's settings and fill in:
+   - **IP Address** of the device on your LAN
+   - **Port** (default 19443 for cameras, 9999 for everything else)
+   - For cameras: **Username** + **Password** (your Kasa account email + password)
 
 ## How it works
 

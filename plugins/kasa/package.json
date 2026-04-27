@@ -1,7 +1,7 @@
 {
    "name": "@scrypted/kasa",
-   "version": "0.7.0",
-   "description": "TP-Link Kasa Camera Plugin for Scrypted",
+   "version": "0.8.15",
+   "description": "TP-Link Kasa Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
    "scripts": {
@@ -25,7 +25,7 @@
       "camera"
    ],
    "scrypted": {
-      "name": "Kasa Camera Plugin",
+      "name": "Kasa Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "ScryptedSystemDevice",
