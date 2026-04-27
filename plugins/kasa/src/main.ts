@@ -153,6 +153,10 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
     private intercomFfmpeg?: ChildProcess;
     private spotlight?: KasaCameraSpotlight;
     private siren?: KasaCameraSiren;
+    // Kill switches for any in-flight video streams. Stored so we can tear them down when
+    // the user changes network/auth settings — otherwise the existing TCP connection keeps
+    // talking to the old IP and clients see "phantom" video from a stale endpoint.
+    private activeStreamKills = new Set<Deferred<void>>();
 
     constructor(nativeId: string) {
         super(nativeId);
@@ -269,11 +273,18 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
 
     async putSetting(key: string, value: SettingValue): Promise<void> {
         await this.storageSettings.putSetting(key, value);
-        // Re-probe child devices when network or auth settings change. Manually-added
-        // cameras get their credentials filled in here (rather than at adoption), so this
-        // is the moment the spotlight first becomes detectable.
-        if (key === 'ip' || key === 'port' || key === 'username' || key === 'password')
+        if (key === 'ip' || key === 'port' || key === 'username' || key === 'password') {
+            // Tear down active streams + intercom — they're holding TCP sockets to the old
+            // endpoint, which keeps delivering frames from the wrong camera until something
+            // else closes them. Clients will reconnect against the new settings.
+            for (const kill of [...this.activeStreamKills])
+                kill.resolve();
+            this.stopIntercom().catch(() => { });
+            // Re-probe child devices when network or auth settings change. Manually-added
+            // cameras get their credentials filled in here (rather than at adoption), so this
+            // is the moment the spotlight first becomes detectable.
             this.refreshChildDevices().catch(e => this.console.warn('refreshChildDevices failed', e));
+        }
     }
 
     // OnOff drives the camera's status LED. HomeKit binds its CameraOperatingModeIndicator
@@ -324,7 +335,11 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         // Single shared kill switch: any teardown source (kasa close, ffmpeg exit, RTSP client
         // disconnect, pump error) resolves it, and every owned resource registers a cleanup.
         const kill = new Deferred<void>();
-        kill.promise.finally(() => kasa.destroy());
+        this.activeStreamKills.add(kill);
+        kill.promise.finally(() => {
+            this.activeStreamKills.delete(kill);
+            kasa.destroy();
+        });
         kasa.body.on('close', () => kill.resolve());
         kasa.body.on('error', () => kill.resolve());
 
