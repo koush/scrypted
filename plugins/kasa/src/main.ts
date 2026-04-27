@@ -65,10 +65,30 @@ class KasaCameraSpotlight extends ScryptedDeviceBase implements OnOff {
     }
 }
 
+// Child device for the siren. Backed by smartlife.cam.ipcamera.siren.set_state. The
+// camera auto-stops after the duration set in the Kasa app (default 30 s), so the `on`
+// state shown in Scrypted may not reflect that auto-off until something polls again.
+class KasaCameraSiren extends ScryptedDeviceBase implements OnOff {
+    constructor(public camera: KasaCamera, nativeId: string) {
+        super(nativeId);
+    }
+
+    async turnOn(): Promise<void> {
+        await this.camera.linkie().setSirenState(true);
+        this.on = true;
+    }
+
+    async turnOff(): Promise<void> {
+        await this.camera.linkie().setSirenState(false);
+        this.on = false;
+    }
+}
+
 class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, Intercom, DeviceProvider, OnOff {
     private intercomSession?: KasaTalkSession;
     private intercomFfmpeg?: ChildProcess;
     private spotlight?: KasaCameraSpotlight;
+    private siren?: KasaCameraSiren;
 
     constructor(nativeId: string) {
         super(nativeId);
@@ -89,37 +109,55 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
         return `${this.nativeId}-spotlight`;
     }
 
+    private get sirenNativeId(): string {
+        return `${this.nativeId}-siren`;
+    }
+
     async refreshChildDevices(): Promise<void> {
         const { ip, username, password } = this.storageSettings.values;
         if (!ip || !username || !password)
             return;
 
         const linkie = this.linkie();
-        // Probe LED + spotlight sequentially. The Kasa iOS app issues LINKIE2 calls
-        // serially; firing them in parallel against the same camera occasionally drops one
-        // of the responses (likely camera-side request serialization).
+        // Probe each capability sequentially. The Kasa iOS app issues LINKIE2 calls
+        // serially; firing them in parallel against the same camera occasionally drops
+        // responses (likely camera-side request serialization).
         const ledState = await linkie.getLedStatus();
         const lampState = await linkie.getForceLampState();
+        const sirenState = await linkie.getSirenState();
 
         if (ledState !== undefined)
             this.on = ledState === 'on';
 
-        if (lampState === undefined)
-            return; // no spotlight on this camera
+        if (lampState !== undefined) {
+            await deviceManager.onDeviceDiscovered({
+                nativeId: this.spotlightNativeId,
+                name: `${this.name || 'Kasa Camera'} Spotlight`,
+                type: ScryptedDeviceType.Light,
+                interfaces: [ScryptedInterface.OnOff],
+                providerNativeId: this.nativeId,
+                // Inherit the camera's room so children show up next to it in the UI.
+                // Empty string would clear an existing room assignment, so pass undefined.
+                room: this.room || undefined,
+            });
+            if (!this.spotlight)
+                this.spotlight = new KasaCameraSpotlight(this, this.spotlightNativeId);
+            this.spotlight.on = lampState === 'on';
+        }
 
-        await deviceManager.onDeviceDiscovered({
-            nativeId: this.spotlightNativeId,
-            name: `${this.name || 'Kasa Camera'} Spotlight`,
-            type: ScryptedDeviceType.Light,
-            interfaces: [ScryptedInterface.OnOff],
-            providerNativeId: this.nativeId,
-            // Inherit the camera's room so the spotlight shows up next to it in the UI.
-            // Empty string would clear an existing room assignment, so pass undefined when blank.
-            room: this.room || undefined,
-        });
-        if (!this.spotlight)
-            this.spotlight = new KasaCameraSpotlight(this, this.spotlightNativeId);
-        this.spotlight.on = lampState === 'on';
+        if (sirenState !== undefined) {
+            await deviceManager.onDeviceDiscovered({
+                nativeId: this.sirenNativeId,
+                name: `${this.name || 'Kasa Camera'} Siren`,
+                type: ScryptedDeviceType.Switch,
+                interfaces: [ScryptedInterface.OnOff],
+                providerNativeId: this.nativeId,
+                room: this.room || undefined,
+            });
+            if (!this.siren)
+                this.siren = new KasaCameraSiren(this, this.sirenNativeId);
+            this.siren.on = sirenState === 'on';
+        }
     }
 
     async getDevice(nativeId: string): Promise<any> {
@@ -127,6 +165,11 @@ class KasaCamera extends ScryptedDeviceBase implements VideoCamera, Settings, In
             if (!this.spotlight)
                 this.spotlight = new KasaCameraSpotlight(this, this.spotlightNativeId);
             return this.spotlight;
+        }
+        if (nativeId === this.sirenNativeId) {
+            if (!this.siren)
+                this.siren = new KasaCameraSiren(this, this.sirenNativeId);
+            return this.siren;
         }
     }
 

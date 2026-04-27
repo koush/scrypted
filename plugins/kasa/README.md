@@ -11,6 +11,9 @@ Adds support for TP-Link Kasa cameras to Scrypted. The plugin:
 - Exposes the camera's spotlight (when present, e.g. KC420WS) as an `OnOff` child light
   device in the same room as the camera. Driven by the LINKIE2 control protocol on port
   10443.
+- Exposes the camera's siren (when present) as an `OnOff` child switch device, also in
+  the camera's room. Triggering it turns the siren on; the camera auto-stops after the
+  duration configured in the Kasa app (default 30 s).
 - Exposes the camera's **status LED** as the camera's own `OnOff` interface, so HomeKit's
   per-camera "Link Status Indicator" toggle drives the LED.
 
@@ -92,16 +95,18 @@ manual setup below.
   features. Wire format: HTTPS POST `/data/LINKIE2.json`, body `application/x-www-form-
   urlencoded` with a single `content=<base64(xor_ab(json))>` field. The XOR-AB autokey
   cipher is the same one used by Kasa's UDP/9999 discovery protocol.
-- On adoption (and whenever credentials change) the plugin probes two LINKIE2 endpoints
+- On adoption (and whenever credentials change) the plugin probes three LINKIE2 endpoints
   serially:
   - `smartlife.cam.ipcamera.dayNight.get_force_lamp_state` — if it returns `on`/`off`, a
     child `OnOff` light device named "<camera> Spotlight" is registered in the camera's
     room.
+  - `smartlife.cam.ipcamera.siren.get_state` — same pattern; produces a "<camera> Siren"
+    switch child device.
   - `smartlife.cam.ipcamera.led.get_status` — drives the camera's own `OnOff` so HomeKit
     can bind its `CameraOperatingModeIndicator` (a.k.a. "Status Light") characteristic to
     it. Enable **Link Status Indicator** in the HomeKit plugin's per-camera settings to
     activate the binding.
-- Toggling either light calls the matching `set_*` method with `{"value": "on"|"off"}`.
+- Toggling any of the three calls the matching `set_*` method with `{"value": "on"|"off"}`.
 
 ## Notes / limitations
 

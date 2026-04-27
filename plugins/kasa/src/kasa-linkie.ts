@@ -132,4 +132,33 @@ export class KasaLinkieClient {
         if (errCode !== 0)
             throw new Error(`led set_status err_code=${errCode}`);
     }
+
+    // Siren under smartlife.cam.ipcamera.siren. The camera auto-stops after the duration
+    // configured in the Kasa app (default 30 s); we just send on/off and let the camera
+    // handle the timer.
+
+    async getSirenState(): Promise<'on' | 'off' | undefined> {
+        try {
+            const r = await this.call({
+                'smartlife.cam.ipcamera.siren': { get_state: {} },
+            });
+            const v = r?.['smartlife.cam.ipcamera.siren']?.get_state?.value;
+            return v === 'on' || v === 'off' ? v : undefined;
+        }
+        catch (e) {
+            this.logger?.warn?.('kasa linkie get_state (siren) failed:', (e as Error).message);
+            return undefined;
+        }
+    }
+
+    async setSirenState(on: boolean): Promise<void> {
+        const r = await this.call({
+            'smartlife.cam.ipcamera.siren': {
+                set_state: { value: on ? 'on' : 'off' },
+            },
+        });
+        const errCode = r?.['smartlife.cam.ipcamera.siren']?.set_state?.err_code;
+        if (errCode !== 0)
+            throw new Error(`siren set_state err_code=${errCode}`);
+    }
 }
