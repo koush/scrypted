@@ -19,8 +19,10 @@ export async function createREPLServer(scrypted: ScryptedStatic, params: any, pl
         }
 
         while (filter) {
-            const { id } = nativeIds.get(filter);
-            const d = await systemManager.getDeviceById(id);
+            const entry = nativeIds.get(filter);
+            if (!entry)
+                break;
+            const d = await systemManager.getDeviceById(entry.id);
             chain.push(filter);
             filter = reversed.get(d!.providerId!);
         }
