@@ -24,7 +24,9 @@ export async function createREPLServer(scrypted: ScryptedStatic, params: any, pl
                 break;
             const d = await systemManager.getDeviceById(entry.id);
             chain.push(filter);
-            filter = reversed.get(d!.providerId!);
+            if (!d?.providerId)
+                break;
+            filter = reversed.get(d.providerId);
         }
 
         chain.reverse();
