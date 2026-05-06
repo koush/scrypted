@@ -1,8 +1,13 @@
 # Scrypted Fork-Spawn / VAAPI Resilience — Root Cause & Fixes
 
 **Date:** 2026-05-06  
-**Host:** debian @ 10.0.0.111 (i5-10500, 6C/12T, 16 GB RAM, Intel iGPU i915 KBL)  
-**Affected container:** `scrypted` (host networking, 8 GiB cap, GPU passthrough)
+**Context:** Multi-camera NVR deployments (6+ cameras) with Intel iGPU VAAPI hardware acceleration  
+**Issue:** Fork-spawn storms can exhaust container memory and trigger host-level OOM cascades
+
+> **Note on NVR Plugin Source**: The `@scrypted/nvr` plugin source code is not in the public `koush/scrypted` repository. This PR provides:
+> 1. **Server-level fork rate limiting** (in `server/src/plugin/fork-rate-limiter.ts`) - applicable to all plugins
+> 2. **External watchdog** (in `scripts/scrypted-fork-watchdog.py`) - practical solution that works with the closed-source NVR plugin
+> 3. **Architectural recommendations** for future NVR plugin improvements
 
 ---
 
@@ -125,3 +130,158 @@ Memory: 1.13 GiB / 8 GiB (steady)               ← was 12 GiB OOM
 - Remove `--device /dev/dri/*` from the recreate script.
 - Disable the watchdog without an alternative circuit breaker in place.
 - Re-enable `scrypted-homekit-fix.service` (deprecated 2026-04-10).
+
+---
+
+## 7. Server-level improvements (this PR)
+
+Since the `@scrypted/nvr` plugin source is not in the public repository, this PR provides complementary improvements:
+
+### 7.1 Generic fork rate limiter (`server/src/plugin/fork-rate-limiter.ts`)
+
+Provides plugin-agnostic fork-spawn protection with:
+- **Token bucket algorithm**: max N forks per time window (configurable via env)
+- **Exponential backoff**: `min(2^n × 500ms, 60s)` on repeated failures
+- **Per-plugin isolation**: one plugin's storm doesn't block others
+- **Environment config**:
+  ```sh
+  SCRYPTED_MAX_FORKS_PER_WINDOW=150  # default
+  SCRYPTED_FORK_WINDOW_MS=60000       # 60s
+  SCRYPTED_FORK_BACKOFF=true          # enable backoff
+  SCRYPTED_MAX_FORK_BACKOFF_MS=60000  # 60s max delay
+  ```
+
+**Usage** (future integration into plugin-host.ts):
+```typescript
+import { globalForkRateLimiter } from './fork-rate-limiter';
+
+// Before spawning fork
+const check = globalForkRateLimiter.checkAllowed(pluginId);
+if (!check.allowed) {
+    logger.warn(`Fork spawn blocked: ${check.reason}, retry in ${check.delayMs}ms`);
+    await sleep(check.delayMs);
+}
+
+// After spawn
+const forkStartTime = Date.now();
+worker.on('exit', (code) => {
+    const lived = Date.now() - forkStartTime;
+    const success = lived > 10000;  // lived >10s = success
+    globalForkRateLimiter.recordAttempt(pluginId, success);
+});
+```
+
+### 7.2 External watchdog (`scripts/scrypted-fork-watchdog.py`)
+
+Practical solution that works **today** without modifying closed-source plugins:
+- Monitors `docker logs -f scrypted` for `starting fork @scrypted/nvr` patterns
+- Per-camera limit: 30 spawns / 60s → HA notification
+- Aggregate limit: 150 spawns / 60s → controlled restart (prevents host OOM)
+- Survives Scrypted updates (no in-bundle patches)
+
+See §3.4 above for deployment.
+
+---
+
+## 8. Architectural recommendations for NVR plugin
+
+*These would require access to the `@scrypted/nvr` source code. Documented here for reference if the plugin becomes open-source or for discussion with maintainers.*
+
+### 8.1 Long-lived per-camera worker pool (highest impact)
+
+**Current**: Fork-per-event (motion, prebuffer, analysis) → 100+ spawns/min under load
+
+**Proposed**: One persistent `child_process.fork` per camera:
+```typescript
+class CameraWorkerPool {
+    private workers = new Map<string, ChildProcess>();
+
+    async getWorker(cameraId: string): Promise<ChildProcess> {
+        if (!this.workers.has(cameraId)) {
+            const worker = child_process.fork('libav-fork.nodejs.js', [cameraId]);
+            this.workers.set(cameraId, worker);
+            
+            // Recycle after N events or M hours to bound memory
+            worker.eventCount = 0;
+            worker.on('analysisComplete', () => {
+                if (++worker.eventCount > 1000) {
+                    this.recycleWorker(cameraId);
+                }
+            });
+        }
+        return this.workers.get(cameraId)!;
+    }
+}
+```
+
+**Benefits**:
+- Drops spawn rate from ~150/min to ~0.1/min (only on crash/recycle)
+- GPU contexts persist → no i915 GuC stall on every motion event
+- Memory more predictable (bounded by camera count, not event rate)
+
+### 8.2 Exit-code-aware backoff (medium impact)
+
+**Current**: All exits trigger immediate respawn
+
+**Proposed**: Distinguish clean teardown from crashes:
+```typescript
+worker.on('exit', (code, signal) => {
+    if (code === 0 || code === 1) {
+        // Clean teardown (disconnect RPC) → no backoff
+        respawn();
+    } else {
+        // Real crash → exponential backoff
+        const backoff = Math.min(Math.pow(2, failureCount) * 1000, 60000);
+        setTimeout(respawn, backoff);
+        failureCount++;
+        
+        // Reset after 5 min stability
+        setTimeout(() => failureCount = 0, 300000);
+    }
+});
+```
+
+### 8.3 Per-camera VAAPI pinning (low impact, high complexity)
+
+Track `(cameraId → vaapi failure count)`. After 3 failures in 60s:
+- Fall back to CPU decode for **that camera only** for 10 min
+- Other cameras continue using VAAPI
+- Retry after cooldown
+
+**Tradeoff**: More complex than server-level limiting, but isolates bad actors.
+
+### 8.4 VAAPI concurrency semaphore (low impact)
+
+Wrap `setupCodecContext` with async semaphore (size = 4):
+```typescript
+const vaapiSemaphore = new Semaphore(
+    parseInt(process.env.SCRYPTED_VAAPI_MAX_CONCURRENT || '4')
+);
+
+await vaapiSemaphore.acquire();
+try {
+    await setupCodecContext('vaapi', device);
+} finally {
+    vaapiSemaphore.release();
+}
+```
+
+Prevents KBL GuC overcommit, but the watchdog already mitigates the symptom.
+
+---
+
+## 9. Testing
+
+Manual testing on production deployment (i5-10500, 6 cameras, Intel iGPU):
+- **Before fixes**: 87–109 spawns/10min, 12 GiB OOM, bootloop every ~1h
+- **After external watchdog only**: 11 spawns/60s, 1.13 GiB steady, 7+ days uptime
+- **Server-level rate limiter**: Unit tested, integration pending (awaits NVR plugin refactor)
+
+---
+
+## 10. References
+
+- Issue: https://github.com/koush/scrypted/issues/2030
+- Intel i915 GuC hang: https://lore.kernel.org/intel-gfx/
+- Token bucket algorithm: https://en.wikipedia.org/wiki/Token_bucket
+- Exponential backoff (systemd): https://systemd.io/AUTOMATIC_RESTARTING/
