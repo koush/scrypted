@@ -25,6 +25,7 @@ import { prepareZip } from './runtime/node-worker-common';
 import { getBuiltinRuntimeHosts } from './runtime/runtime-host';
 import { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
 import { Deferred } from '../deferred';
+import { ForkGovernor, ForkGovernorRejected } from './fork-governor';
 
 const serverVersion = require('../../package.json').version;
 
@@ -217,12 +218,15 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
             const pluginRemoteAPI: PluginRemote = scrypted.pluginRemoteAPI;
 
-            scrypted.fork = (options) => {
-                let forkPeer: Promise<RpcPeer>;
-                let runtimeWorker: RuntimeWorker;
-                let nativeWorker: child_process.ChildProcess | worker_threads.Worker;
-                let clusterWorkerId: Promise<string> | undefined;
+            // ForkGovernor: per-plugin rate-limiter / circuit-breaker for sdk.fork().
+            // Protects the host (and the iGPU) from runaway fork-respawn loops in
+            // misbehaving plugins (see github.com/koush/scrypted/pull/2031).
+            const forkGovernor = new ForkGovernor({
+                pluginId,
+                log: (msg) => getPluginConsole()?.warn(`[fork-governor] ${msg}`),
+            });
 
+            scrypted.fork = (options) => {
                 const runtimeWorkerOptions: RuntimeWorkerOptions = {
                     packageJson,
                     env: undefined,
@@ -231,6 +235,51 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     unzippedPath,
                     zipHash,
                 };
+
+                const governorKey = ForkGovernor.resolveKey(options);
+
+                // Deferreds backing the lazy worker — populated once the governor
+                // releases us and the underlying spawn completes.
+                const runtimeWorkerDeferred = new Deferred<RuntimeWorker>();
+                const nativeWorkerDeferred = new Deferred<child_process.ChildProcess | worker_threads.Worker | undefined>();
+                const forkPeerDeferred = new Deferred<RpcPeer>();
+                const clusterWorkerIdDeferred = new Deferred<string | undefined>();
+
+                // Buffer event listeners attached before the worker exists.
+                const pendingListeners: { event: string; listener: (...args: any[]) => void }[] = [];
+                let terminateRequested = false;
+
+                // Kick off the governed spawn asynchronously. If beforeFork rejects
+                // (hard-limit), every consumer surface (result promise, listeners)
+                // gets a clean error.
+                const spawnPromise = (async () => {
+                    await forkGovernor.beforeFork(governorKey);
+                    if (terminateRequested)
+                        throw new Error('fork terminated before spawn');
+                    return doSpawn();
+                })();
+
+                spawnPromise.catch(e => {
+                    runtimeWorkerDeferred.reject(e);
+                    nativeWorkerDeferred.reject(e);
+                    forkPeerDeferred.reject(e);
+                    clusterWorkerIdDeferred.reject(e);
+                    if (e instanceof ForkGovernorRejected) {
+                        // Surface the rejection to anyone listening for 'error' so the
+                        // consumer can react without an unhandledRejection.
+                        for (const { event, listener } of pendingListeners) {
+                            if (event === 'error') {
+                                try { listener(e); } catch { /* ignore */ }
+                            }
+                        }
+                    }
+                });
+
+                function doSpawn(): { runtimeWorker: RuntimeWorker; nativeWorker?: child_process.ChildProcess | worker_threads.Worker; forkPeer: Promise<RpcPeer>; clusterWorkerId?: Promise<string> } {
+                let forkPeer: Promise<RpcPeer>;
+                let runtimeWorker!: RuntimeWorker;
+                let nativeWorker: child_process.ChildProcess | worker_threads.Worker | undefined;
+                let clusterWorkerId: Promise<string> | undefined;
 
                 // if running in a cluster, fork to a matching cluster worker only if necessary.
                 if (utilizesClusterForkWorker(options)) {
@@ -294,22 +343,57 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     forkPeer = Promise.resolve(localPeer);
                 }
 
-                const exitDeferred = new Deferred<string>();
-                runtimeWorker.on('exit', () => {
-                    exitDeferred.resolve('worker exited');
-                });
-                runtimeWorker.on('error', e => {
-                    exitDeferred.resolve('worker error' + e);
-                });
+                return { runtimeWorker, nativeWorker, forkPeer, clusterWorkerId };
+                } // end doSpawn
 
-                // thread workers inherit main console. pipe anything else.
-                if (!(runtimeWorker instanceof NodeThreadWorker)) {
-                    const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
-                    pipeWorkerConsole(runtimeWorker, console);
-                }
+                // Once spawnPromise resolves, populate deferreds, attach listeners,
+                // and register the spawn with the governor for exit-code tracking.
+                spawnPromise.then(({ runtimeWorker, nativeWorker, forkPeer, clusterWorkerId }) => {
+                    runtimeWorkerDeferred.resolve(runtimeWorker);
+                    nativeWorkerDeferred.resolve(nativeWorker);
+                    forkPeerDeferred.resolvePromise(forkPeer);
+                    if (clusterWorkerId)
+                        clusterWorkerIdDeferred.resolvePromise(clusterWorkerId);
+                    else
+                        clusterWorkerIdDeferred.resolve(undefined);
+
+                    // Re-attach any listeners buffered before spawn.
+                    for (const { event, listener } of pendingListeners)
+                        runtimeWorker.on(event as any, listener);
+                    if (terminateRequested)
+                        runtimeWorker.kill();
+
+                    // Track exit for the governor's crash counter.
+                    const spawnHandle = forkGovernor.registerSpawn(governorKey);
+                    let reportedExit = false;
+                    const reportExit = (code: number | null, signal: NodeJS.Signals | null) => {
+                        if (reportedExit) return;
+                        reportedExit = true;
+                        spawnHandle.onExit(code, signal);
+                    };
+                    if (runtimeWorker instanceof ChildProcessWorker && runtimeWorker.childProcess) {
+                        runtimeWorker.childProcess.on('exit', (code, signal) => reportExit(code, signal as NodeJS.Signals | null));
+                    }
+                    else {
+                        runtimeWorker.on('exit', () => reportExit(null, null));
+                        runtimeWorker.on('error', () => reportExit(1, null));
+                    }
+                }).catch(() => { /* errors already routed via deferreds */ });
+
+                const exitDeferred = new Deferred<string>();
+                spawnPromise.then(({ runtimeWorker }) => {
+                    runtimeWorker.on('exit', () => exitDeferred.resolve('worker exited'));
+                    runtimeWorker.on('error', e => exitDeferred.resolve('worker error' + e));
+
+                    // thread workers inherit main console. pipe anything else.
+                    if (!(runtimeWorker instanceof NodeThreadWorker)) {
+                        const console = options?.id ? getMixinConsole(options.id, options.nativeId) : undefined;
+                        pipeWorkerConsole(runtimeWorker, console);
+                    }
+                }).catch(e => exitDeferred.resolve('spawn rejected: ' + (e?.message || e)));
 
                 const result = (async () => {
-                    const threadPeer = await forkPeer;
+                    const threadPeer = await forkPeerDeferred.promise;
                     exitDeferred.promise.then(reason => {
                         threadPeer.kill(reason);
                     });
@@ -343,33 +427,56 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                     }
 
                     const forkOptions = Object.assign({}, zipOptions);
-                    forkOptions.clusterWorkerId = await clusterWorkerId || forkOptions.clusterWorkerId;
+                    const cwid = await clusterWorkerIdDeferred.promise;
+                    forkOptions.clusterWorkerId = cwid || forkOptions.clusterWorkerId;
                     forkOptions.fork = true;
                     forkOptions.main = options?.filename;
                     const forkZipAPI = new PluginZipAPI(() => zipAPI.getZip());
                     return remote.loadZip(packageJson, forkZipAPI, forkOptions)
                 })();
 
-                result.catch(() => runtimeWorker.kill());
+                result.catch(() => {
+                    runtimeWorkerDeferred.promise.then(rw => rw.kill()).catch(() => { });
+                });
 
                 const worker: ForkWorker = {
                     [Symbol.dispose]() {
                         worker.terminate();
                     },
                     on(event: string, listener: (...args: any[]) => void) {
-                        return runtimeWorker.on(event as any, listener);
+                        if (runtimeWorkerDeferred.finished) {
+                            // Spawn already complete — attach directly.
+                            runtimeWorkerDeferred.promise.then(rw => rw.on(event as any, listener)).catch(() => { });
+                        }
+                        else {
+                            // Buffer; the spawn-resolution handler will attach all of these.
+                            pendingListeners.push({ event, listener });
+                        }
                     },
-                    terminate: () => runtimeWorker.kill(),
+                    terminate: () => {
+                        terminateRequested = true;
+                        runtimeWorkerDeferred.promise.then(rw => rw.kill()).catch(() => { });
+                    },
                     removeListener(event, listener) {
-                        return runtimeWorker.removeListener(event as any, listener);
+                        const idx = pendingListeners.findIndex(p => p.event === event && p.listener === listener);
+                        if (idx >= 0)
+                            pendingListeners.splice(idx, 1);
+                        runtimeWorkerDeferred.promise.then(rw => rw.removeListener(event as any, listener)).catch(() => { });
                     },
-                    nativeWorker: nativeWorker!,
+                    get nativeWorker() {
+                        // Best-effort sync accessor — undefined until spawn resolves.
+                        return (nativeWorkerDeferred as any).resolved;
+                    },
                 };
+
+                // Mirror nativeWorker once available so the getter above returns it.
+                nativeWorkerDeferred.promise.then(nw => { (nativeWorkerDeferred as any).resolved = nw; }).catch(() => { });
+
                 return {
                     [Symbol.dispose]() {
                         worker.terminate();
                     },
-                    clusterWorkerId,
+                    clusterWorkerId: clusterWorkerIdDeferred.promise.then(v => v as string),
                     worker,
                     result,
                 };
