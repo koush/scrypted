@@ -59,17 +59,12 @@ export class FileRtspServer extends RtspServer {
                         d.resolve(fd);
                 });
                 const fd = await d.promise;
-                try {
-                    await fs.promises.rename(truncate, recordingFile);
-                    truncateWriteStream = fs.createWriteStream(undefined, {
-                        fd,
-                        highWaterMark,
-                    })
-                    // this.writeConsole?.log('truncating', truncate);
-                }
-                catch (e) {
-                    throw e;
-                }
+                await fs.promises.rename(truncate, recordingFile);
+                truncateWriteStream = fs.createWriteStream(undefined, {
+                    fd,
+                    highWaterMark,
+                });
+                // this.writeConsole?.log('truncating', truncate);
             }
             catch (e) {
                 this.writeConsole?.warn('RTSP WRITE truncate target removed', truncate, e);
@@ -79,6 +74,18 @@ export class FileRtspServer extends RtspServer {
         // everything after this point must be sync due to cleanup potentially causing dangling state.
         this.cleanup();
         this.segmentBytesWritten = 0;
+
+        if (!truncateWriteStream) {
+            // The initial mkdir may have been invalidated by the NVR pruner during the async
+            // truncation phase above. Re-ensure the target directory exists synchronously so
+            // the createWriteStream call below cannot ENOENT on a missing parent directory.
+            try {
+                fs.mkdirSync(path.dirname(recordingFile), { recursive: true });
+            }
+            catch (e) {
+                this.writeConsole?.warn('RTSP WRITE mkdir failed', recordingFile, e);
+            }
+        }
 
         this.writeStream = truncateWriteStream || fs.createWriteStream(recordingFile, {
             highWaterMark,
