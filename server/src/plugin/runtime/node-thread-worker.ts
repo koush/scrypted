@@ -102,10 +102,20 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
     kill(): void {
         if (!this.worker)
             return;
-        this.worker.terminate();
-        this.port.close();
+        const port = this.port;
+        const worker = this.worker;
         this.port = undefined!;
         this.worker = undefined!;
+        // Close the MessagePort first so the worker's `port.on('close', ...)` handler
+        // fires and the worker can exit cleanly via process.exit(). This drains any
+        // in-flight ArrayBuffer transfers, preventing V8 MAP_SHARED tmpfs pages from
+        // becoming unevictable in the cgroup (each leaked transfer accumulates ~1–2 MB
+        // of unevictable shmem; 8 000 crashes => 12 GB of shmem => OOM).
+        try { port.close(); } catch {}
+        // Fallback: forcibly terminate if the worker thread hasn't exited within 2 s.
+        const killTimer = setTimeout(() => worker.terminate(), 2000);
+        killTimer.unref();
+        worker.once('exit', () => clearTimeout(killTimer));
     }
 
     send(message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any): void {
