@@ -1,7 +1,7 @@
 import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoRecorder, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
+import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, LockState, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoRecorder, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
@@ -29,6 +29,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     onvifIntercom = new OnvifIntercom(this);
     hasSmartDetection: boolean;
+    autoLockTimeout: NodeJS.Timeout;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
@@ -40,6 +41,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
+
+        if (this.storage.getItem('enableDahuaLock') === 'true') {
+            this.lockState = LockState.Locked;
+        }
     }
 
     async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
@@ -377,6 +382,16 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
             ret.push(
                 {
+                    title: 'Auto-Lock Delay (Seconds)',
+                    key: 'dahuaAutoLockDelay',
+                    description: 'Time in seconds before the lock automatically re-engages.',
+                    type: 'number',
+                    value: this.storage.getItem('dahuaAutoLockDelay') || '5',
+                }
+            );
+
+            ret.push(
+                {
                     title: 'Multiple Call Buttons',
                     key: 'multipleCallIds',
                     description: 'Some Dahua Doorbells integrate multiple Call Buttons for apartment buildings.',
@@ -566,6 +581,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         super.putSetting(key, value);
 
+        if (key === 'enableDahuaLock' && value === 'true') {
+            this.lockState = LockState.Locked;
+        }
+
         this.updateDevice();
         this.updateDeviceInfo();
     }
@@ -691,15 +710,27 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async lock(): Promise<void> {
-        if (!this.client.lock()) {
+        const ok = await this.client.lock();
+        if (!ok) {
             this.console.error("Could not lock");
+            return;
         }
+        clearTimeout(this.autoLockTimeout);
+        this.lockState = LockState.Locked;
     }
 
     async unlock(): Promise<void> {
-        if (!this.client.unlock()) {
+        const ok = await this.client.unlock();
+        if (!ok) {
             this.console.error("Could not unlock");
+            return;
         }
+        this.lockState = LockState.Unlocked;
+        clearTimeout(this.autoLockTimeout);
+        const delay = parseFloat(this.storage.getItem('dahuaAutoLockDelay')) || 5;
+        this.autoLockTimeout = setTimeout(() => {
+            this.lockState = LockState.Locked;
+        }, delay * 1000);
     }
 }
 
