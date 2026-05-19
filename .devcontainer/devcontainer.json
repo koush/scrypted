@@ -1,0 +1,21 @@
+{
+  "name": "Scrypted Dev",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22-bookworm",
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
+  "forwardPorts": [10443, 11080],
+  "portsAttributes": {
+    "10443": { "label": "Scrypted HTTPS", "onAutoForward": "notify" },
+    "11080": { "label": "Scrypted HTTP", "onAutoForward": "notify" }
+  },
+  "mounts": [
+    "source=scrypted-dev-volume,target=/root/.scrypted,type=volume"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "ms-vscode.vscode-typescript-next"
+      ]
+    }
+  }
+}

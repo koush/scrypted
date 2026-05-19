@@ -38,7 +38,7 @@
    "dependencies": {
       "@koush/werift-src": "file:../../external/werift",
       "check-disk-space": "^3.4.0",
-      "hap-nodejs": "^1.1.0",
+      "hap-nodejs": "^1.2.0",
       "lodash": "^4.17.21",
       "mkdirp": "^3.0.1",
       "qrcode-svg": "^1.1.0"

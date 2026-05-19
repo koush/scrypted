@@ -33,7 +33,7 @@
     "@rollup/plugin-commonjs": "^28.0.9",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.1",
-    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.3.0",
     "@rollup/plugin-virtual": "^3.0.2",
     "@scrypted/auth-fetch": "^1.0.5",

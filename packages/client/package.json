@@ -22,8 +22,11 @@
     "@scrypted/types": "^0.5.55"
   },
   "dependencies": {
-    "engine.io-client": "^6.6.3",
+    "engine.io-client": "^6.6.4",
     "follow-redirects": "^1.15.9",
     "rimraf": "^6.0.1"
+  },
+  "overrides": {
+    "ws": "^8.20.1"
   }
 }
