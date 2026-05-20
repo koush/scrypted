@@ -29,6 +29,7 @@ const { deviceManager, endpointManager, systemManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
 const SCRYPTED_SERVER = localStorage.getItem('scrypted-server') || 'home.scrypted.app';
+const SCRYPTED_TUNNEL_SERVER = localStorage.getItem('scrypted-server') || 'tunnel.scrypted.app';
 const SCRYPTED_SERVER_PORT = 4001;
 
 const SCRYPTED_CLOUD_MESSAGE_PATH = '/_punch/cloudmessage';
@@ -847,7 +848,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 const query = qsparse(url.searchParams);
                 if (query.registration_secret === this.storageSettings.values.registrationSecret) {
                     res.writeHead(200);
-                    this.serverCallback(port, SCRYPTED_SERVER_PORT, SCRYPTED_SERVER);
+                    this.serverCallback(port, SCRYPTED_SERVER_PORT, SCRYPTED_TUNNEL_SERVER);
                 }
                 else {
                     res.writeHead(401);
@@ -950,7 +951,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     return;
                 backoff = Date.now();
                 const { address } = message;
-                const [serverHost, serverPort] = address?.split(':') || [SCRYPTED_SERVER, SCRYPTED_SERVER_PORT];
+                const [serverHost, serverPort] = address?.split(':') || [SCRYPTED_TUNNEL_SERVER, SCRYPTED_SERVER_PORT];
                 this.serverCallback(port, Number(serverPort), serverHost);
             }
         });
