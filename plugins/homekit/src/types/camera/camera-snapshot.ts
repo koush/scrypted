@@ -1,10 +1,12 @@
-import { sleep } from "@scrypted/common/src/sleep";
 import sdk, { AudioSensor, Camera, Intercom, Logger, MotionSensor, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
-import throttle from "lodash/throttle";
 import { ResourceRequestReason, SnapshotRequest, SnapshotRequestCallback } from "../../hap";
 import type { HomeKitPlugin } from "../../main";
 
 const { systemManager, mediaManager } = sdk;
+
+// hap-nodejs warns at 8s and gives up at 25s. Stay well under the warning threshold
+// so a hung camera never stalls the HomeKit plugin's event loop.
+const SNAPSHOT_TIMEOUT_MS = 6000;
 
 function recommendSnapshotPlugin(console: Console, log: Logger, message: string) {
     if (systemManager.getDeviceByName('@scrypted/snapshot'))
@@ -30,26 +32,33 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
 
     homekitPlugin.snapshotThrottles.set(device.id, takePicture);
 
+    // Race takePicture against a hard timeout so a hung camera can never stall
+    // the HomeKit plugin's event loop long enough to trigger hap-nodejs's slow/
+    // no-response warnings, which have been observed to crash the whole plugin.
+    function takePictureWithTimeout(request: SnapshotRequest): Promise<Buffer> {
+        return Promise.race([
+            takePicture(request),
+            new Promise<never>((_, reject) => {
+                const t = setTimeout(
+                    () => reject(new Error(`${device.name} snapshot timed out after ${SNAPSHOT_TIMEOUT_MS}ms`)),
+                    SNAPSHOT_TIMEOUT_MS,
+                );
+                // Don't let this timer prevent Node from exiting cleanly.
+                t.unref();
+            }),
+        ]);
+    }
+
     async function handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
         try {
             // non zero reason is for homekit secure video... or something else.
             if (request.reason) {
                 console.log('snapshot requested for reason:', request.reason);
-                callback(null, await takePicture(request));
+                callback(null, await takePictureWithTimeout(request));
                 return;
             }
 
-            // console.log(device.name, 'snapshot request', request);
-
-            // an idle Home.app will hit this endpoint every 10 seconds, and slow requests bog up the entire app.
-            // avoid slow requests by prefetching every 9 seconds.
-
-            // snapshots are requested em masse, so trigger them rather than wait for home to
-            // fetch everything serially.
-            // this call is not a bug, to force lodash to take a picture on the trailing edge,
-            // throttle must be called twice.
-
-            callback(null, await takePicture(request));
+            callback(null, await takePictureWithTimeout(request));
         }
         catch (e) {
             console.error('snapshot error', e);
