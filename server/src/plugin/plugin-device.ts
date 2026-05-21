@@ -294,6 +294,24 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any> {
             };
         }
         catch (e) {
+            // When canMixin throws "not implemented", the mixin provider plugin is
+            // loading or temporarily unavailable. Treat as passthrough (no error flag)
+            // to prevent an infinite rebuild loop:
+            //   error=true → ensureProxy merges old interfaces → setPluginDeviceState
+            //   sees a change → notifyPluginDeviceDescriptorChanged → rebuildMixinTable
+            //   → another canMixin call → throws again → repeat indefinitely.
+            // Returning error=undefined keeps the interface set stable so notify is
+            // never triggered and the loop stops naturally once the plugin is ready.
+            if ((e as Error)?.message?.includes('not implemented')) {
+                console.warn(`Mixin provider ${mixinId} canMixin threw "not implemented" for ${this.id} — treating as temporary passthrough.`);
+                return {
+                    passthrough: true,
+                    allInterfaces,
+                    interfaces: new Set<string>(),
+                    error: undefined!,
+                    proxy: undefined!,
+                };
+            }
             // on any error, do not advertise interfaces
             // on this mixin, so as to prevent total failure?
             // this has been the behavior for a while,
