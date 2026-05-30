@@ -127,9 +127,13 @@ class ClusterSetup:
             except:
                 pass
             finally:
-                self.clusterPeers.pop(clusterPeerKey)
+                self.clusterPeers.pop(clusterPeerKey, None)
                 peer.kill("cluster client killed")
                 writer.close()
+                try:
+                    await writer.wait_closed()
+                except:
+                    pass
 
         clusterRpcServerInfo = await cluster_listen_zero(handleClusterClient)
         self.clusterPort = clusterRpcServerInfo["port"]
@@ -182,7 +186,7 @@ class ClusterSetup:
                     )
                 )
             except:
-                self.clusterPeers.pop(clusterPeerKey)
+                self.clusterPeers.pop(clusterPeerKey, None)
                 raise
 
             async def run_loop():
@@ -191,7 +195,13 @@ class ClusterSetup:
                 except:
                     pass
                 finally:
-                    self.clusterPeers.pop(clusterPeerKey)
+                    self.clusterPeers.pop(clusterPeerKey, None)
+                    clusterPeer.kill("cluster peer killed")
+                    writer.close()
+                    try:
+                        await writer.wait_closed()
+                    except:
+                        pass
 
             asyncio.run_coroutine_threadsafe(run_loop(), self.loop)
             return clusterPeer
