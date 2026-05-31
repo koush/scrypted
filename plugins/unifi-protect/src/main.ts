@@ -166,7 +166,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     return;
 
                 const unifiCamera = unifiDevice as UnifiCamera;
-                if (payload.lastRing && unifiCamera.binaryState && payload.lastSeen > payload.lastRing + 25000) {
+                if (payload.lastRing && unifiCamera.binaryState && payload.lastSeen > payload.lastRing + unifiCamera.getRingTimeoutMs()) {
                     // something weird happened, lets set unset any binary sensor state
                     unifiCamera.binaryState = false;
                 }

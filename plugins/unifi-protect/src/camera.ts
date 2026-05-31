@@ -306,19 +306,27 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
     async getSettings(): Promise<Setting[]> {
         // const vsos = await this.getVideoStreamOptions();
-        return [
-            // {
-            //     title: 'Sensor Timeout',
-            //     key: 'sensorTimeout',
-            //     value: this.storage.getItem('sensorTimeout') || defaultSensorTimeout,
-            //     description: 'Time to wait in seconds before clearing the motion, doorbell button, or object detection state.',
-            // }
-        ];
+        const settings: Setting[] = [];
+        if (this.interfaces.includes(ScryptedInterface.BinarySensor)) {
+            settings.push({
+                title: 'Ring Timeout',
+                key: 'ringTimeout',
+                value: this.storage.getItem('ringTimeout') || '25',
+                description: 'Seconds before binaryState is cleared after a doorbell ring event.',
+                type: 'number',
+            });
+        }
+        return settings;
     }
 
     async putSetting(key: string, value: string | number | boolean) {
         this.storage.setItem(key, value?.toString() || '');
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+    }
+
+    getRingTimeoutMs(): number {
+        const val = parseFloat(this.storage.getItem('ringTimeout'));
+        return (isNaN(val) || val <= 0 ? 25 : val) * 1000;
     }
 
     resetDetectionTimeout() {
@@ -336,7 +344,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         clearTimeout(this.ringTimeout);
         this.ringTimeout = setTimeout(() => {
             this.binaryState = false;
-        }, MOTION_SENSOR_TIMEOUT);
+        }, this.getRingTimeoutMs());
     }
 
     async getSnapshot(options?: PictureOptions, suffix?: string): Promise<Buffer> {

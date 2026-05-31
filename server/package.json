@@ -10,7 +10,7 @@
     "body-parser": "^2.2.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.5.0",
-    "engine.io": "^6.6.4",
+    "engine.io": "^6.6.7",
     "express": "^5.1.0",
     "follow-redirects": "^1.15.9",
     "http-auth": "^4.2.1",
@@ -28,7 +28,10 @@
     "tslib": "^2.8.1",
     "typescript": "^5.8.3",
     "whatwg-mimetype": "^4.0.0",
-    "ws": "^8.18.2"
+    "ws": "^8.20.1"
+  },
+  "overrides": {
+    "ws": "^8.20.1"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",
