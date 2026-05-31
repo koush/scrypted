@@ -1,0 +1,62 @@
+{
+   "Action": "Cross",
+   "Class": "Normal",
+   "CountInGroup": 1,
+   "DetectRegion": [
+      [
+         455,
+         260
+      ],
+      [
+         3586,
+         260
+      ],
+      [
+         3768,
+         7580
+      ],
+      [
+         382,
+         7451
+      ]
+   ],
+   "Direction": "Enter",
+   "EventID": 10181,
+   "GroupID": 0,
+   "Name": "Rule1",
+   "Object": {
+      "Action": "Appear",
+      "BoundingBox": [
+         2856,
+         1280,
+         3880,
+         4880
+      ],
+      "Center": [
+         3368,
+         3080
+      ],
+      "Confidence": 0,
+      "LowerBodyColor": [
+         0,
+         0,
+         0,
+         0
+      ],
+      "MainColor": [
+         0,
+         0,
+         0,
+         0
+      ],
+      "ObjectID": 863,
+      "ObjectType": "Human",
+      "RelativeID": 0,
+      "Speed": 0
+   },
+   "PTS": 43380319830.0,
+   "RuleID": 2,
+   "Track": [],
+   "UTC": 1711446999,
+   "UTCMS": 701
+}

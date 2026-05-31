@@ -1,0 +1,1 @@
+../../onvif/src/onvif-intercom.ts

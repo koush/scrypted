@@ -1,0 +1,42 @@
+{
+   "name": "@scrypted/wyze",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "wyze"
+   ],
+   "scrypted": {
+      "name": "Wyze Plugin",
+      "runtime": "python",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider",
+         "Settings"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin"
+      ],
+      "labels": {
+         "require": [
+            "linux"
+         ]
+      }
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "version": "0.0.57"
+}

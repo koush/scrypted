@@ -1,0 +1,40 @@
+{
+   "name": "@scrypted/scrypted-remote",
+   "version": "0.0.1",
+   "description": "Scrypted Remote Plugin",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "remote"
+   ],
+   "scrypted": {
+      "name": "Scrypted Remote Plugin",
+      "type": "DeviceCreator",
+      "interfaces": [
+         "DeviceProvider",
+         "DeviceCreator"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/client": "file:../../packages/client",
+      "@scrypted/sdk": "file:../../sdk",
+      "uuid": "^9.0.0"
+   },
+   "devDependencies": {
+      "@types/node": "^17.0.24",
+      "@types/uuid": "^9.0.1"
+   }
+}

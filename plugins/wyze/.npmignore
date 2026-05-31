@@ -1,0 +1,12 @@
+.DS_Store
+out/
+node_modules/
+*.map
+fs
+src
+.vscode
+dist/*.js
+__pycache__
+docker-wyze-bridge
+.devcontainer
+.venv

@@ -1,0 +1,60 @@
+ARG BASE="noble-lite"
+FROM ghcr.io/koush/scrypted-common:${BASE}
+
+ENV SCRYPTED_DOCKER_FLAVOR="router"
+
+# tools
+RUN apt -y update && apt -y install nano net-tools dnsutils dnsmasq vlan bridge-utils netplan.io nftables isc-dhcp-client cron
+RUN rm -f /etc/systemd/system/multi-user.target.wants/dnsmasq.service
+RUN rm -f /etc/systemd/system/sysinit.target.wants/systemd-resolved.service
+
+# go + caddy
+RUN GO_VERSION=1.25.1 && ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then GOARCH="amd64"; \
+    elif [ "$ARCH" = "arm64" ]; then GOARCH="arm64"; \
+    elif [ "$ARCH" = "armhf" ]; then GOARCH="armv6l"; \
+    else echo "Unsupported architecture: $ARCH" && exit 1; fi && \
+    curl -LO "https://go.dev/dl/go${GO_VERSION}.linux-${GOARCH}.tar.gz" && \
+    tar -C /usr/local -xzf "go${GO_VERSION}.linux-${GOARCH}.tar.gz" && \
+    rm "go${GO_VERSION}.linux-${GOARCH}.tar.gz"
+ENV PATH=$PATH:/usr/local/go/bin
+RUN apt install -y debian-keyring debian-archive-keyring apt-transport-https
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/caddy/xcaddy/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-xcaddy-archive-keyring.gpg
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/caddy/xcaddy/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-xcaddy.list
+RUN apt -y update
+RUN apt -y install xcaddy
+RUN xcaddy build --with github.com/caddy-dns/cloudflare --output /usr/local/bin/caddy
+
+# nftables
+COPY ./router/scrypted-nftables.service /etc/systemd/system
+RUN systemctl enable scrypted-nftables
+RUN bash -c 'echo include \"/etc/nftables.d/*.conf\"\; > /etc/nftables.conf'
+RUN mkdir -p /etc/nftables.d
+COPY ./router/01-scrypted.conf /etc/nftables.d
+
+# ipv6 forwarding
+COPY ./router/scrypted-ip-forwarding.service /etc/systemd/system
+RUN systemctl enable scrypted-ip-forwarding
+
+# install turn server, but disable it too set it up on a per interface basis.
+RUN apt -y update && apt -y install coturn && systemctl disable coturn && rm /usr/lib/systemd/system/coturn.service
+
+# install usbmuxd for iphone tethering
+# ensure the pairing info stays in persistent storage
+RUN apt -y update && apt -y install usbmuxd && rm /usr/lib/systemd/system/usbmuxd.service && ln -sf /server/volume/plugins/\@scrypted/router/usbmuxd /var/lib/lockdown
+
+WORKDIR /
+# cache bust
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+ARG SCRYPTED_INSTALL_VERSION="latest"
+RUN test -n "$SCRYPTED_INSTALL_VERSION"
+RUN npx -y scrypted@latest install-server ${SCRYPTED_INSTALL_VERSION}
+
+COPY ./router/scrypted-dhcp-watcher.service /etc/systemd/system/scrypted-dhcp-watcher.service
+RUN systemctl enable scrypted-dhcp-watcher
+
+COPY ./router/scrypted.service /etc/systemd/system/scrypted.service
+RUN systemctl enable scrypted
+
+WORKDIR /
+CMD ["/sbin/init"]

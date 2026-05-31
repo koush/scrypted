@@ -1,0 +1,12 @@
+.DS_Store
+out/
+node_modules/
+*.map
+fs
+src
+.vscode
+dist/*.js
+dist/*.txt
+__pycache__
+all_models
+.venv

@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<env:Envelope>
+    <env:Body>
+        <tr2:GetProfilesResponse>
+            <tr2:Profiles token="Profile_1" fixed="true">
+                <tr2:Name>mainStream</tr2:Name>
+                <tr2:Configurations>
+                    <tr2:VideoSource token="VideoSourceToken">
+                        <tt:Name>VideoSourceConfig</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:SourceToken>VideoSource_1</tt:SourceToken>
+                        <tt:Bounds x="0" y="0" width="3840" height="2160"></tt:Bounds>
+                    </tr2:VideoSource>
+                    <tr2:AudioSource token="AudioSourceConfigToken">
+                        <tt:Name>AudioSourceConfig</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:SourceToken>AudioSourceChannel</tt:SourceToken>
+                    </tr2:AudioSource>
+                    <tr2:VideoEncoder token="VideoEncoderToken_1" GovLength="60" Profile="Main">
+                        <tt:Name>VideoEncoder_1</tt:Name>
+                        <tt:UseCount>1</tt:UseCount>
+                        <tt:Encoding>H264</tt:Encoding>
+                        <tt:Resolution>
+                            <tt:Width>3840</tt:Width>
+                            <tt:Height>2160</tt:Height>
+                        </tt:Resolution>
+                        <tt:RateControl ConstantBitRate="false">
+                            <tt:FrameRateLimit>20.000000</tt:FrameRateLimit>
+                            <tt:BitrateLimit>2048</tt:BitrateLimit>
+                        </tt:RateControl>
+                        <tt:Multicast>
+                            <tt:Address>
+                                <tt:Type>IPv4</tt:Type>
+                                <tt:IPv4Address>0.0.0.0</tt:IPv4Address>
+                            </tt:Address>
+                            <tt:Port>8600</tt:Port>
+                            <tt:TTL>128</tt:TTL>
+                            <tt:AutoStart>false</tt:AutoStart>
+                        </tt:Multicast>
+                        <tt:Quality>5.000000</tt:Quality>
+                    </tr2:VideoEncoder>
+                    <tr2:AudioEncoder token="MainAudioEncoderToken">
+                        <tt:Name>AudioEncoderConfig</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:Encoding>PCMU</tt:Encoding>
+                        <tt:Multicast>
+                            <tt:Address>
+                                <tt:Type>IPv4</tt:Type>
+                                <tt:IPv4Address>0.0.0.0</tt:IPv4Address>
+                            </tt:Address>
+                            <tt:Port>8602</tt:Port>
+                            <tt:TTL>128</tt:TTL>
+                            <tt:AutoStart>false</tt:AutoStart>
+                        </tt:Multicast>
+                        <tt:Bitrate>64</tt:Bitrate>
+                        <tt:SampleRate>8</tt:SampleRate>
+                    </tr2:AudioEncoder>
+                    <tr2:Analytics token="VideoAnalyticsToken">
+                        <tt:Name>VideoAnalyticsName</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:AnalyticsEngineConfiguration>
+                            <tt:AnalyticsModule Name="MyCellMotionModule" Type="tt:CellMotionEngine">
+                                <tt:Parameters>
+                                    <tt:SimpleItem Name="Sensitivity" Value="60" />
+                                    <tt:ElementItem Name="Layout">
+                                        <tt:CellLayout Columns="22" Rows="15">
+                                            <tt:Transformation>
+                                                <tt:Translate x="-1.000000" y="-1.000000" />
+                                                <tt:Scale x="0.090909" y="0.133333" />
+                                            </tt:Transformation>
+                                        </tt:CellLayout>
+                                    </tt:ElementItem>
+                                </tt:Parameters>
+                            </tt:AnalyticsModule>
+                            <tt:AnalyticsModule Name="MyTamperDetecModule"
+                                Type="extxsd:TamperEngine">
+                                <tt:Parameters>
+                                    <tt:SimpleItem Name="Sensitivity" Value="0" />
+                                    <tt:ElementItem Name="Transformation">
+                                        <tt:Transformation>
+                                            <tt:Translate x="-1.000000" y="-1.000000" />
+                                            <tt:Scale x="0.002841" y="0.004167" />
+                                        </tt:Transformation>
+                                    </tt:ElementItem>
+                                    <tt:ElementItem Name="Field">
+                                        <tt:PolygonConfiguration>
+                                            <tt:Polygon>
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="480" />
+                                                <tt:Point x="704" y="480" />
+                                                <tt:Point x="704" y="0" />
+                                            </tt:Polygon>
+                                        </tt:PolygonConfiguration>
+                                    </tt:ElementItem>
+                                </tt:Parameters>
+                            </tt:AnalyticsModule>
+                        </tt:AnalyticsEngineConfiguration>
+                        <tt:RuleEngineConfiguration>
+                            <tt:Rule Name="MyMotionDetectorRule" Type="tt:CellMotionDetector">
+                                <tt:Parameters>
+                                    <tt:SimpleItem Name="MinCount" Value="5" />
+                                    <tt:SimpleItem Name="AlarmOnDelay" Value="1000" />
+                                    <tt:SimpleItem Name="AlarmOffDelay" Value="1000" />
+                                    <tt:SimpleItem Name="ActiveCells" Value="2P8AAA==" />
+                                </tt:Parameters>
+                            </tt:Rule>
+                            <tt:Rule Name="MyTamperDetectorRule" Type="extxsd:TamperDetector">
+                                <tt:Parameters>
+                                    <tt:ElementItem Name="Field">
+                                        <tt:PolygonConfiguration>
+                                            <tt:Polygon>
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="0" />
+                                            </tt:Polygon>
+                                        </tt:PolygonConfiguration>
+                                    </tt:ElementItem>
+                                </tt:Parameters>
+                            </tt:Rule>
+                        </tt:RuleEngineConfiguration>
+                    </tr2:Analytics>
+                </tr2:Configurations>
+            </tr2:Profiles>
+            <tr2:Profiles token="Profile_2" fixed="true">
+                <tr2:Name>subStream</tr2:Name>
+                <tr2:Configurations>
+                    <tr2:VideoSource token="VideoSourceToken">
+                        <tt:Name>VideoSourceConfig</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:SourceToken>VideoSource_1</tt:SourceToken>
+                        <tt:Bounds x="0" y="0" width="3840" height="2160"></tt:Bounds>
+                    </tr2:VideoSource>
+                    <tr2:AudioSource token="AudioSourceConfigToken">
+                        <tt:Name>AudioSourceConfig</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:SourceToken>AudioSourceChannel</tt:SourceToken>
+                    </tr2:AudioSource>
+                    <tr2:VideoEncoder token="VideoEncoderToken_2" GovLength="60" Profile="Main">
+                        <tt:Name>VideoEncoder_2</tt:Name>
+                        <tt:UseCount>1</tt:UseCount>
+                        <tt:Encoding>H264</tt:Encoding>
+                        <tt:Resolution>
+                            <tt:Width>640</tt:Width>
+                            <tt:Height>360</tt:Height>
+                        </tt:Resolution>
+                        <tt:RateControl ConstantBitRate="false">
+                            <tt:FrameRateLimit>30.000000</tt:FrameRateLimit>
+                            <tt:BitrateLimit>256</tt:BitrateLimit>
+                        </tt:RateControl>
+                        <tt:Multicast>
+                            <tt:Address>
+                                <tt:Type>IPv4</tt:Type>
+                                <tt:IPv4Address>0.0.0.0</tt:IPv4Address>
+                            </tt:Address>
+                            <tt:Port>8606</tt:Port>
+                            <tt:TTL>128</tt:TTL>
+                            <tt:AutoStart>false</tt:AutoStart>
+                        </tt:Multicast>
+                        <tt:Quality>3.000000</tt:Quality>
+                    </tr2:VideoEncoder>
+                    <tr2:AudioEncoder token="MainAudioEncoderToken">
+                        <tt:Name>AudioEncoderConfig</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:Encoding>PCMU</tt:Encoding>
+                        <tt:Multicast>
+                            <tt:Address>
+                                <tt:Type>IPv4</tt:Type>
+                                <tt:IPv4Address>0.0.0.0</tt:IPv4Address>
+                            </tt:Address>
+                            <tt:Port>8602</tt:Port>
+                            <tt:TTL>128</tt:TTL>
+                            <tt:AutoStart>false</tt:AutoStart>
+                        </tt:Multicast>
+                        <tt:Bitrate>64</tt:Bitrate>
+                        <tt:SampleRate>8</tt:SampleRate>
+                    </tr2:AudioEncoder>
+                    <tr2:Analytics token="VideoAnalyticsToken">
+                        <tt:Name>VideoAnalyticsName</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:AnalyticsEngineConfiguration>
+                            <tt:AnalyticsModule Name="MyCellMotionModule" Type="tt:CellMotionEngine">
+                                <tt:Parameters>
+                                    <tt:SimpleItem Name="Sensitivity" Value="60" />
+                                    <tt:ElementItem Name="Layout">
+                                        <tt:CellLayout Columns="22" Rows="15">
+                                            <tt:Transformation>
+                                                <tt:Translate x="-1.000000" y="-1.000000" />
+                                                <tt:Scale x="0.090909" y="0.133333" />
+                                            </tt:Transformation>
+                                        </tt:CellLayout>
+                                    </tt:ElementItem>
+                                </tt:Parameters>
+                            </tt:AnalyticsModule>
+                            <tt:AnalyticsModule Name="MyTamperDetecModule"
+                                Type="extxsd:TamperEngine">
+                                <tt:Parameters>
+                                    <tt:SimpleItem Name="Sensitivity" Value="0" />
+                                    <tt:ElementItem Name="Transformation">
+                                        <tt:Transformation>
+                                            <tt:Translate x="-1.000000" y="-1.000000" />
+                                            <tt:Scale x="0.002841" y="0.004167" />
+                                        </tt:Transformation>
+                                    </tt:ElementItem>
+                                    <tt:ElementItem Name="Field">
+                                        <tt:PolygonConfiguration>
+                                            <tt:Polygon>
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="480" />
+                                                <tt:Point x="704" y="480" />
+                                                <tt:Point x="704" y="0" />
+                                            </tt:Polygon>
+                                        </tt:PolygonConfiguration>
+                                    </tt:ElementItem>
+                                </tt:Parameters>
+                            </tt:AnalyticsModule>
+                        </tt:AnalyticsEngineConfiguration>
+                        <tt:RuleEngineConfiguration>
+                            <tt:Rule Name="MyMotionDetectorRule" Type="tt:CellMotionDetector">
+                                <tt:Parameters>
+                                    <tt:SimpleItem Name="MinCount" Value="5" />
+                                    <tt:SimpleItem Name="AlarmOnDelay" Value="1000" />
+                                    <tt:SimpleItem Name="AlarmOffDelay" Value="1000" />
+                                    <tt:SimpleItem Name="ActiveCells" Value="2P8AAA==" />
+                                </tt:Parameters>
+                            </tt:Rule>
+                            <tt:Rule Name="MyTamperDetectorRule" Type="extxsd:TamperDetector">
+                                <tt:Parameters>
+                                    <tt:ElementItem Name="Field">
+                                        <tt:PolygonConfiguration>
+                                            <tt:Polygon>
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="0" />
+                                            </tt:Polygon>
+                                        </tt:PolygonConfiguration>
+                                    </tt:ElementItem>
+                                </tt:Parameters>
+                            </tt:Rule>
+                        </tt:RuleEngineConfiguration>
+                    </tr2:Analytics>
+                </tr2:Configurations>
+            </tr2:Profiles>
+            <tr2:Profiles token="Profile_3" fixed="true">
+                <tr2:Name>thirdStream</tr2:Name>
+                <tr2:Configurations>
+                    <tr2:VideoSource token="VideoSourceToken">
+                        <tt:Name>VideoSourceConfig</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:SourceToken>VideoSource_1</tt:SourceToken>
+                        <tt:Bounds x="0" y="0" width="3840" height="2160"></tt:Bounds>
+                    </tr2:VideoSource>
+                    <tr2:AudioSource token="AudioSourceConfigToken">
+                        <tt:Name>AudioSourceConfig</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:SourceToken>AudioSourceChannel</tt:SourceToken>
+                    </tr2:AudioSource>
+                    <tr2:VideoEncoder token="VideoEncoderToken_3" GovLength="60" Profile="Main">
+                        <tt:Name>VideoEncoder_3</tt:Name>
+                        <tt:UseCount>1</tt:UseCount>
+                        <tt:Encoding>H264</tt:Encoding>
+                        <tt:Resolution>
+                            <tt:Width>1280</tt:Width>
+                            <tt:Height>720</tt:Height>
+                        </tt:Resolution>
+                        <tt:RateControl ConstantBitRate="false">
+                            <tt:FrameRateLimit>30.000000</tt:FrameRateLimit>
+                            <tt:BitrateLimit>512</tt:BitrateLimit>
+                        </tt:RateControl>
+                        <tt:Multicast>
+                            <tt:Address>
+                                <tt:Type>IPv4</tt:Type>
+                                <tt:IPv4Address>0.0.0.0</tt:IPv4Address>
+                            </tt:Address>
+                            <tt:Port>8612</tt:Port>
+                            <tt:TTL>128</tt:TTL>
+                            <tt:AutoStart>false</tt:AutoStart>
+                        </tt:Multicast>
+                        <tt:Quality>3.000000</tt:Quality>
+                    </tr2:VideoEncoder>
+                    <tr2:AudioEncoder token="MainAudioEncoderToken">
+                        <tt:Name>AudioEncoderConfig</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:Encoding>PCMU</tt:Encoding>
+                        <tt:Multicast>
+                            <tt:Address>
+                                <tt:Type>IPv4</tt:Type>
+                                <tt:IPv4Address>0.0.0.0</tt:IPv4Address>
+                            </tt:Address>
+                            <tt:Port>8602</tt:Port>
+                            <tt:TTL>128</tt:TTL>
+                            <tt:AutoStart>false</tt:AutoStart>
+                        </tt:Multicast>
+                        <tt:Bitrate>64</tt:Bitrate>
+                        <tt:SampleRate>8</tt:SampleRate>
+                    </tr2:AudioEncoder>
+                    <tr2:Analytics token="VideoAnalyticsToken">
+                        <tt:Name>VideoAnalyticsName</tt:Name>
+                        <tt:UseCount>3</tt:UseCount>
+                        <tt:AnalyticsEngineConfiguration>
+                            <tt:AnalyticsModule Name="MyCellMotionModule" Type="tt:CellMotionEngine">
+                                <tt:Parameters>
+                                    <tt:SimpleItem Name="Sensitivity" Value="60" />
+                                    <tt:ElementItem Name="Layout">
+                                        <tt:CellLayout Columns="22" Rows="15">
+                                            <tt:Transformation>
+                                                <tt:Translate x="-1.000000" y="-1.000000" />
+                                                <tt:Scale x="0.090909" y="0.133333" />
+                                            </tt:Transformation>
+                                        </tt:CellLayout>
+                                    </tt:ElementItem>
+                                </tt:Parameters>
+                            </tt:AnalyticsModule>
+                            <tt:AnalyticsModule Name="MyTamperDetecModule"
+                                Type="extxsd:TamperEngine">
+                                <tt:Parameters>
+                                    <tt:SimpleItem Name="Sensitivity" Value="0" />
+                                    <tt:ElementItem Name="Transformation">
+                                        <tt:Transformation>
+                                            <tt:Translate x="-1.000000" y="-1.000000" />
+                                            <tt:Scale x="0.002841" y="0.004167" />
+                                        </tt:Transformation>
+                                    </tt:ElementItem>
+                                    <tt:ElementItem Name="Field">
+                                        <tt:PolygonConfiguration>
+                                            <tt:Polygon>
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="480" />
+                                                <tt:Point x="704" y="480" />
+                                                <tt:Point x="704" y="0" />
+                                            </tt:Polygon>
+                                        </tt:PolygonConfiguration>
+                                    </tt:ElementItem>
+                                </tt:Parameters>
+                            </tt:AnalyticsModule>
+                        </tt:AnalyticsEngineConfiguration>
+                        <tt:RuleEngineConfiguration>
+                            <tt:Rule Name="MyMotionDetectorRule" Type="tt:CellMotionDetector">
+                                <tt:Parameters>
+                                    <tt:SimpleItem Name="MinCount" Value="5" />
+                                    <tt:SimpleItem Name="AlarmOnDelay" Value="1000" />
+                                    <tt:SimpleItem Name="AlarmOffDelay" Value="1000" />
+                                    <tt:SimpleItem Name="ActiveCells" Value="2P8AAA==" />
+                                </tt:Parameters>
+                            </tt:Rule>
+                            <tt:Rule Name="MyTamperDetectorRule" Type="extxsd:TamperDetector">
+                                <tt:Parameters>
+                                    <tt:ElementItem Name="Field">
+                                        <tt:PolygonConfiguration>
+                                            <tt:Polygon>
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="0" />
+                                                <tt:Point x="0" y="0" />
+                                            </tt:Polygon>
+                                        </tt:PolygonConfiguration>
+                                    </tt:ElementItem>
+                                </tt:Parameters>
+                            </tt:Rule>
+                        </tt:RuleEngineConfiguration>
+                    </tr2:Analytics>
+                </tr2:Configurations>
+            </tr2:Profiles>
+        </tr2:GetProfilesResponse>
+    </env:Body>
+</env:Envelope>

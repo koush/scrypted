@@ -1,0 +1,41 @@
+{
+   "name": "@scrypted/tapo",
+   "version": "0.0.22",
+   "description": "Tapo Camera Plugin for Scrypted",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "tsc": "tsc"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "tapo",
+      "camera"
+   ],
+   "scrypted": {
+      "name": "Tapo Camera Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "crc-32": "^1.2.2"
+   },
+   "devDependencies": {
+      "@types/node": "^20.10.8",
+      "ts-node": "^10.9.1"
+   }
+}

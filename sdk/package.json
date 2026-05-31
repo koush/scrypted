@@ -1,0 +1,64 @@
+{
+  "name": "@scrypted/sdk",
+  "version": "0.5.59",
+  "description": "",
+  "main": "dist/src/index.js",
+  "exports": {
+    ".": "./dist/src/index.js",
+    "./acl": "./dist/src/acl.js",
+    "./promise-debounce": "./dist/src/promise-debounce.js",
+    "./storage-settings": "./dist/src/storage-settings.js",
+    "./settings-mixin": "./dist/src/settings-mixin.js"
+  },
+  "scripts": {
+    "prepublishOnly": "npm run build && cd types && npm version patch && npm publish",
+    "prebuild": "cd types && npm run build",
+    "build": "rimraf dist && tsc",
+    "webpack": "webpack-cli --config webpack.config.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "scrypted-package-json": "./bin/cli.js",
+    "scrypted-changelog": "./bin/cli.js",
+    "scrypted-setup-project": "./bin/cli.js",
+    "scrypted-webpack": "./bin/cli.js",
+    "scrypted-deploy-debug": "./bin/cli.js",
+    "scrypted-deploy": "./bin/cli.js",
+    "scrypted-debug": "./bin/cli.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@babel/preset-typescript": "^7.27.1",
+    "@rollup/plugin-commonjs": "^28.0.9",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@rollup/plugin-virtual": "^3.0.2",
+    "@scrypted/auth-fetch": "^1.0.5",
+    "adm-zip": "^0.5.16",
+    "babel-loader": "^10.0.0",
+    "babel-plugin-const-enum": "^1.2.0",
+    "ncp": "^2.0.0",
+    "openai": "^6.1.0",
+    "raw-loader": "^4.0.2",
+    "rimraf": "^6.0.1",
+    "rollup": "^4.52.5",
+    "tmp": "^0.2.3",
+    "ts-loader": "^9.5.4",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.3",
+    "webpack": "^5.99.9",
+    "webpack-bundle-analyzer": "^4.10.2"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/ncp": "^2.0.8",
+    "@types/node": "^24.9.2",
+    "@types/tmp": "^0.2.6",
+    "ts-node": "^10.9.2",
+    "typedoc": "^0.28.14"
+  },
+  "types": "dist/src/index.d.ts"
+}

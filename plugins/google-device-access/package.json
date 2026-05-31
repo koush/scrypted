@@ -1,0 +1,53 @@
+{
+   "name": "@scrypted/google-device-access",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "google",
+      "nest",
+      "dropcam"
+   ],
+   "scrypted": {
+      "name": "Google Device Access",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "OauthClient",
+         "DeviceProvider",
+         "HttpRequestHandler",
+         "Settings"
+      ],
+      "pluginDependencies": [
+         "@scrypted/snapshot",
+         "@scrypted/webrtc",
+         "@scrypted/cloud",
+         "@scrypted/prebuffer-mixin"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@scrypted/common": "file:../../common",
+      "@googleapis/smartdevicemanagement": "^1.0.0",
+      "axios": "^1.4.0",
+      "client-oauth2": "^4.3.3",
+      "lodash": "^4.17.21"
+   },
+   "devDependencies": {
+      "@types/debug": "^4.1.8",
+      "@types/lodash": "^4.14.195",
+      "@types/node": "^20.4.1"
+   },
+   "version": "0.0.99"
+}

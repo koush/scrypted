@@ -1,0 +1,51 @@
+{
+   "name": "@scrypted/zwave",
+   "version": "0.1.10",
+   "description": "Z-Wave USB Controller for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "zwave"
+   ],
+   "scrypted": {
+      "name": "Z-Wave Controller",
+      "type": "DeviceProvider",
+      "realfs": true,
+      "interfaces": [
+         "DeviceProvider",
+         "Settings"
+      ],
+      "runtime": "node",
+      "labels": {
+         "require": [
+            "zwave"
+         ]
+      }
+   },
+   "dependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/lodash": "^4.14.168",
+      "lodash": "^4.17.21"
+   },
+   "devDependencies": {
+      "@types/node": "^18.15.11"
+   },
+   "optionalDependencies": {
+      "zwave-js": "^12.13.0"
+   }
+}

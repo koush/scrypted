@@ -1,0 +1,54 @@
+{
+   "name": "@scrypted/coreml",
+   "description": "Scrypted CoreML Object Detection",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "coreml",
+      "neural",
+      "object",
+      "detect",
+      "detection",
+      "people",
+      "person"
+   ],
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "scrypted": {
+      "name": "CoreML Object Detection",
+      "pluginDependencies": [
+         "@scrypted/objectdetector"
+      ],
+      "runtime": "python",
+      "type": "API",
+      "interfaces": [
+         "ScryptedSystemDevice",
+         "DeviceCreator",
+         "Settings",
+         "DeviceProvider",
+         "ClusterForkInterface",
+         "ObjectDetection",
+         "ObjectDetectionPreview"
+      ],
+      "labels": {
+         "require": [
+            "@scrypted/coreml"
+         ]
+      }
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "version": "0.1.98"
+}

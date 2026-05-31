@@ -1,0 +1,51 @@
+name: Build changed plugins
+
+on:
+#   push:
+#     branches: ["main"]
+#     paths: ["plugins/**"]
+#   pull_request:
+#     paths: ["plugins/**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:  
+            fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Set up base packages
+        run: ./npm-install.sh
+
+      - name: Build changed plugins
+        run: |
+            # Get the list of changed directories in /plugins
+            changed_dirs=$(git diff --name-only HEAD^ HEAD ./plugins | awk -F/ '{print $2}' | uniq)
+            
+            # Loop through each changed directory
+            for dir in $changed_dirs; do
+                pushd "./plugins/$dir"
+
+                if [[ "$dir" == "core" ]]; then
+                  # core plugin requires ui to be built
+                  pushd "./ui"
+                  echo "plugins/$dir/ui > npm install"
+                  npm install
+                  echo "plugins/$dir/ui > npm run build"
+                  npm run build
+                  popd
+                fi
+
+                echo "plugins/$dir > npm install"
+                npm install
+                echo "plugins/$dir > npm run build"
+                npm run build
+                popd
+            done

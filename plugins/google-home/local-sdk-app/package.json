@@ -1,0 +1,36 @@
+{
+    "private": true,
+    "dependencies": {
+        "@google/local-home-sdk": "^1.5.0",
+        "axios": "^0.21.1"
+    },
+    "devDependencies": {
+        "array.prototype.flat": "^1.2.3",
+        "ava": "^3.4.0",
+        "express": "^4.17.1",
+        "ts-loader": "^7.0.5",
+        "ts-node": "^8.10.2",
+        "tslint": "^6.1.2",
+        "typescript": "^3.9.5",
+        "webpack": "^4.41.6",
+        "webpack-cli": "^3.3.11",
+        "webpack-dev-middleware": "^3.7.2"
+    },
+    "scripts": {
+        "compile": "tsc --noEmit",
+        "test": "ava test.ts",
+        "lint": "tslint --project .",
+        "build": "npm run build-web && npm run build-node",
+        "build-web": "webpack --config webpack.config.web.js",
+        "build-node": "webpack --config webpack.config.node.js",
+        "start": "node serve.js"
+    },
+    "ava": {
+        "extensions": [
+            "ts"
+        ],
+        "require": [
+            "ts-node/register"
+        ]
+    }
+}

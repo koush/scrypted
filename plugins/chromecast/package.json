@@ -1,0 +1,50 @@
+{
+   "name": "@scrypted/chromecast",
+   "version": "0.1.58",
+   "description": "Send video, audio, and text to speech notifications to Chromecast and Google Home devices",
+   "author": "Scrypted",
+   "license": "Apache-2.0",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "cast",
+      "chromecast",
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "Chromecast Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider"
+      ],
+      "pluginDependencies": [
+         "@scrypted/webrtc",
+         "@scrypted/cloud"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@scrypted/common": "file:../../common",
+      "castv2-promise": "^1.0.0",
+      "memoize-one": "^5.1.1",
+      "mime": "^2.5.2",
+      "multicast-dns": "^7.2.3"
+   },
+   "devDependencies": {
+      "@types/mime": "^2.0.3",
+      "@types/multicast-dns": "^7.2.1",
+      "@types/node": "^16.9.0"
+   }
+}

@@ -1,0 +1,48 @@
+{
+   "name": "@scrypted/unifi-protect",
+   "version": "0.1.3",
+   "description": "Unifi Protect Plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "rollup": true,
+      "name": "Unifi Protect Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceDiscovery",
+         "DeviceProvider",
+         "Settings"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin"
+      ]
+   },
+   "devDependencies": {
+      "@types/node": "^22.15.29",
+      "@types/ws": "^8.18.1"
+   },
+   "dependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "axios": "^1.12.2",
+      "unifi-protect": "^4.27.5",
+      "ws": "^8.18.3"
+   }
+}

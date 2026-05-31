@@ -1,0 +1,6 @@
+out/
+*.map
+fs
+src
+.vscode
+dist/*.js

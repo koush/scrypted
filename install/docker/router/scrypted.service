@@ -1,0 +1,24 @@
+[Unit]
+Description=Scrypted
+After=network.target
+
+[Service]
+WorkingDirectory=/server
+ExecStart=/bin/sh -c "ulimit -c 0; exec npm exec scrypted-serve"
+Restart=always
+RestartSec=5
+
+Environment="SCRYPTED_INSTALL_ENVIRONMENT=docker"
+Environment="SCRYPTED_CAN_RESTART=true"
+Environment="SCRYPTED_VOLUME=/server/volume"
+Environment="SCRYPTED_INSTALL_PATH=/server"
+Environment="SCRYPTED_PYTHON_PATH=/usr/bin/python3"
+Environment="SCRYPTED_PYTHON312_PATH=/usr/bin/python3.12"
+Environment="SCRYPTED_DOCKER_FLAVOR=lite"
+Environment="DEBIAN_FRONTEND=noninteractive"
+Environment="NODE_OPTIONS=--dns-result-order=ipv4first"
+Environment="SCRYPTED_BASE_VERSION=20250101"
+Environment="SHELL=/bin/bash"
+
+[Install]
+WantedBy=multi-user.target

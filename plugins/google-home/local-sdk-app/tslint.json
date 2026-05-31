@@ -1,0 +1,14 @@
+{
+    "defaultSeverity": "error",
+    "extends": [
+        "tslint:recommended"
+    ],
+    "rules": {
+      "no-console": false,
+      "no-bitwise": false,
+      "object-literal-sort-keys": [
+        true,
+        "match-declaration-order-only"
+      ]
+    }
+}

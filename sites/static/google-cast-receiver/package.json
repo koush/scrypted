@@ -1,0 +1,17 @@
+{
+  "scripts": {
+    "build": "webpack-cli --devtool inline-source-map --mode production -o js --entry ./dist/docs/plugins/google-home/cast-receiver/src/cast.js",
+    "prebuild": "rimraf js && rimraf dist && tsc"
+  },
+  "dependencies": {
+    "@scrypted/common": "file:../../../../common",
+    "@scrypted/sdk": "file:../../../../sdk",
+    "@scrypted/server": "file:../../../../server",
+    "typescript": "^4.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.18",
+    "rimraf": "^3.0.2",
+    "webpack-cli": "^4.10.0"
+  }
+}

@@ -1,0 +1,55 @@
+{
+   "name": "@scrypted/homekit",
+   "version": "1.2.65",
+   "description": "HomeKit Plugin for Scrypted",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "scrypted-changelog && NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-changelog": "scrypted-changelog",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-readme": "scrypted-readme"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "apple",
+      "homekit"
+   ],
+   "scrypted": {
+      "name": "HomeKit",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "ScryptedSystemDevice",
+         "ScryptedSettings",
+         "MixinProvider",
+         "Settings",
+         "DeviceProvider"
+      ],
+      "babel": true,
+      "realfs": true
+   },
+   "dependencies": {
+      "@koush/werift-src": "file:../../external/werift",
+      "check-disk-space": "^3.4.0",
+      "hap-nodejs": "^1.1.0",
+      "lodash": "^4.17.21",
+      "mkdirp": "^3.0.1",
+      "qrcode-svg": "^1.1.0"
+   },
+   "devDependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/debug": "^4.1.12",
+      "@types/lodash": "^4.17.7",
+      "@types/node": "^22.18.0",
+      "@types/qrcode-svg": "^1.1.5",
+      "@types/url-parse": "^1.4.11"
+   }
+}

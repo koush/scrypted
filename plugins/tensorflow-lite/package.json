@@ -1,0 +1,63 @@
+{
+   "name": "@scrypted/tensorflow-lite",
+   "description": "Scrypted Tensorflow Lite Object Detection",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "tensorflow",
+      "coral",
+      "tpu",
+      "edge",
+      "motion",
+      "object",
+      "detect",
+      "detection",
+      "people",
+      "person"
+   ],
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "scrypted": {
+      "name": "Tensorflow Lite Object Detection",
+      "pluginDependencies": [
+         "@scrypted/objectdetector"
+      ],
+      "runtime": "python",
+      "pythonVersion": {
+         "default": "3.9",
+         "darwin": {
+            "arm64": "3.10"
+         },
+         "win32": {
+            "x64": "3.9"
+         }
+      },
+      "type": "API",
+      "interfaces": [
+         "Settings",
+         "ClusterForkInterface",
+         "ObjectDetection",
+         "ObjectDetectionPreview"
+      ],
+      "labels": {
+         "require": [
+            "@scrypted/tensorflow-lite"
+         ]
+      }
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "version": "0.1.78"
+}

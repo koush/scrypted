@@ -1,0 +1,50 @@
+{
+   "name": "@scrypted/prebuffer-mixin",
+   "version": "0.10.66",
+   "description": "Video Stream Rebroadcast, Prebuffer, and Management Plugin for Scrypted.",
+   "author": "Scrypted",
+   "license": "Apache-2.0",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "rebroadcast"
+   ],
+   "scrypted": {
+      "name": "Rebroadcast Plugin",
+      "type": "API",
+      "interfaces": [
+         "Settings",
+         "MixinProvider",
+         "BufferConverter"
+      ],
+      "pluginDependencies": [
+         "@scrypted/webrtc",
+         "@scrypted/snapshot"
+      ],
+      "realfs": true
+   },
+   "dependencies": {
+      "@koush/werift-src": "file:../../external/werift",
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "h264-sps-parser": "^0.2.1",
+      "semver": "^7.3.7"
+   },
+   "devDependencies": {
+      "@types/node": "^22.13.14",
+      "@types/semver": "^7.3.12"
+   }
+}

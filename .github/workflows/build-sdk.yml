@@ -1,0 +1,25 @@
+name: Build SDK
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["sdk/**"]
+  pull_request:
+    paths: ["sdk/**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./sdk
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.4.1
+      - run: npm ci
+      - run: npm run build

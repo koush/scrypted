@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+// install portable python if the SCRYPTED_PYTHON_PATH variable is unset.
+// this variable will be set for docker and lxc environments.
+if (!process.env.SCRYPTED_PYTHON_PATH) {
+    require('./packaged-python').installScryptedServerRequirements();
+}

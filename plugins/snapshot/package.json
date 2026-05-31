@@ -1,0 +1,46 @@
+{
+   "name": "@scrypted/snapshot",
+   "version": "0.2.68",
+   "description": "Snapshot Plugin for Scrypted",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "snapshot",
+      "camera"
+   ],
+   "scrypted": {
+      "realfs": true,
+      "name": "Snapshot Plugin",
+      "type": "API",
+      "interfaces": [
+         "Settings",
+         "MixinProvider",
+         "BufferConverter",
+         "DeviceProvider",
+         "HttpRequestHandler"
+      ]
+   },
+   "dependencies": {
+      "@types/node": "^22.10.2",
+      "sharp": "^0.33.5",
+      "whatwg-mimetype": "^4.0.0"
+   },
+   "devDependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/whatwg-mimetype": "^3.0.2"
+   }
+}

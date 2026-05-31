@@ -1,0 +1,19 @@
+{
+  "name": "@scrypted/deferred",
+  "version": "0.0.8",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "tsc --outDir dist",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.8.3"
+  }
+}

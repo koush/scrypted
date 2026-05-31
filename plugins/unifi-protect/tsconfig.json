@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "module": "es2022",
+        "target": "ES2021",
+        "resolveJsonModule": true,
+        "moduleResolution": "bundler",
+        "esModuleInterop": true,
+        "sourceMap": true
+    },
+    "include": [
+        "src/**/*",
+        "../../common/src/**/*",
+        "../../server/src/**/sleep.ts",
+        "../../server/src/**/media-helpers.ts"
+    ]
+}

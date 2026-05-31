@@ -1,0 +1,7 @@
+
+{
+    "scrypted.debugHost": "127.0.0.1",
+    "python.analysis.extraPaths": [
+        "./node_modules/@scrypted/sdk/types/scrypted_python"
+    ]
+}

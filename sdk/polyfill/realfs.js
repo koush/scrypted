@@ -1,0 +1,1 @@
+const realfs = __non_webpack_require__('realfs'); module.exports = realfs;

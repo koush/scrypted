@@ -1,0 +1,37 @@
+{
+   "name": "@scrypted/diagnostics",
+   "version": "0.0.30",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "diagnostics"
+   ],
+   "scrypted": {
+      "name": "Diagnostics",
+      "type": "API",
+      "interfaces": [
+         "Settings"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "sharp": "^0.33.5"
+   },
+   "devDependencies": {
+      "@types/node": "^22.18.8"
+   }
+}

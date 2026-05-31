@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [[ "${SCRYPTED_DOCKER_AVAHI}" != "true" ]]; then
+  echo "SCRYPTED_DOCKER_AVAHI != true, not starting dbus-daemon" >/dev/stderr
+  while true
+  do
+    sleep 1000
+  done
+fi
+
+echo "Starting dbus..."
+exec dbus-daemon --system --nofork

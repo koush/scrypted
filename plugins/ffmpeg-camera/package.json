@@ -1,0 +1,47 @@
+{
+   "name": "@scrypted/ffmpeg-camera",
+   "version": "0.0.23",
+   "description": "FFmpeg Camera Plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "ffmpeg",
+      "camera"
+   ],
+   "scrypted": {
+      "name": "FFmpeg Camera Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "ScryptedSystemDevice",
+         "ScryptedDeviceCreator",
+         "DeviceProvider",
+         "DeviceCreator"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin",
+         "@scrypted/snapshot"
+      ]
+   },
+   "devDependencies": {
+      "@types/node": "^20.10.8"
+   },
+   "dependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk"
+   }
+}

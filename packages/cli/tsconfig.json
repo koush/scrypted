@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+      "module": "Node16",
+      "target": "esnext",
+      "noImplicitAny": true,
+      "outDir": "./dist",
+      "esModuleInterop": true,
+      "sourceMap": true,
+      "inlineSources": true,
+      "declaration": true,
+      "moduleResolution": "Node16",
+      "strict": true,
+      "strictPropertyInitialization": false,
+      "strictNullChecks": false,
+    },
+  "include": [
+      "src/**/*"
+  ],
+}

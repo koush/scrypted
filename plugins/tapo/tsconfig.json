@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "outDir": "build",
+        "module": "Node16",
+        "target": "ES2021",
+        "resolveJsonModule": true,
+        "moduleResolution": "Node16",
+        "esModuleInterop": true,
+        "sourceMap": true
+    },
+    "include": [
+        "src/**/*",
+    ]
+}

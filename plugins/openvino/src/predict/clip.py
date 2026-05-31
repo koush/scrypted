@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+import asyncio
+import base64
+from typing import Tuple
+
+import scrypted_sdk
+from transformers import CLIPProcessor
+
+from predict import PredictPlugin
+
+
+class ClipEmbedding(PredictPlugin, scrypted_sdk.TextEmbedding, scrypted_sdk.ImageEmbedding):
+    def __init__(self, plugin: PredictPlugin, nativeId: str):
+        super().__init__(nativeId=nativeId, plugin=plugin)
+
+        hf_id = "openai/clip-vit-base-patch32"
+
+        self.inputwidth = 224
+        self.inputheight = 224
+
+        self.labels = {}
+        self.loop = asyncio.get_event_loop()
+        self.minThreshold = 0.5
+
+        try:
+           self.model = self.initModel()
+        except Exception as e:
+            self.print("Error initializing CLIP model:", e)
+            raise
+
+        self.processor = None
+        self.print("Loading CLIP processor from local cache.")
+        try:
+            self.processor = CLIPProcessor.from_pretrained(
+                hf_id,
+                local_files_only=True,
+            )
+            self.print("Loaded CLIP processor from local cache.")
+        except Exception:
+            self.print("CLIP processor not available in local cache yet.")
+
+        asyncio.ensure_future(self.refreshClipProcessor(hf_id), loop=self.loop)
+
+    async def refreshClipProcessor(self, hf_id: str):
+        try:
+            self.print("Refreshing CLIP processor cache (online).")
+            processor = await asyncio.to_thread(
+                CLIPProcessor.from_pretrained,
+                hf_id,
+            )
+            self.processor = processor
+            self.print("Refreshed CLIP processor cache.")
+        except Exception:
+            self.print("CLIP processor cache refresh failed.")
+
+    def initModel(self):
+        pass
+
+    async def getImageEmbedding(self, input):
+        detections = await super().detectObjects(input, {
+            "settings": {
+                "pad": True,
+            }
+        })
+        return detections["detections"][0]["embedding"]
+    
+    async def detectObjects(self, mediaObject, session = None):
+        ret = await super().detectObjects(mediaObject, session)
+        embedding = ret["detections"][0]['embedding']
+        ret["detections"][0]['embedding'] = base64.b64encode(embedding).decode("utf-8")
+        return ret
+
+    # width, height, channels
+    def get_input_details(self) -> Tuple[int, int, int]:
+        return (self.inputwidth, self.inputheight, 3)
+
+    def get_input_size(self) -> Tuple[float, float]:
+        return (self.inputwidth, self.inputheight)
+
+    def get_input_format(self) -> str:
+        return "rgb"

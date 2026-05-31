@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [[ "${SCRYPTED_DOCKER_AVAHI}" != "true" ]]; then
+  echo "SCRYPTED_DOCKER_AVAHI != true, not starting avahi-daemon" >/dev/stderr
+  while true
+  do
+    sleep 1000
+  done
+fi
+
+until [ -e /var/run/dbus/system_bus_socket ]; do
+  echo "Waiting for dbus..."
+  sleep 1s
+done
+echo "Starting Avahi daemon..."
+exec avahi-daemon --no-chroot -f /etc/avahi/avahi-daemon.conf

@@ -1,0 +1,8 @@
+{
+  "entryPoints": [
+    "./src/types.input.ts"
+  ],
+  "json": "./gen/schema.json",
+  "name": "Scrypted Schema",
+  "tsconfig": "./tsconfig.typedoc.json"
+}

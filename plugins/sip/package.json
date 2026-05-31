@@ -1,0 +1,49 @@
+{
+   "name": "@scrypted/sip",
+   "version": "0.0.11",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "cross-env NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "sip"
+   ],
+   "scrypted": {
+      "name": "SIP Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "ScryptedSystemDevice",
+         "ScryptedDeviceCreator",
+         "DeviceProvider",
+         "DeviceCreator"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin",
+         "@scrypted/snapshot"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "@slyoldfox/sip": "^0.0.6-1",
+      "pick-port": "^1.0.0",
+      "rxjs": "^7.8.1",
+      "sdp": "^3.0.3",
+      "stun": "^2.1.0"
+   },
+   "devDependencies": {
+      "@types/node": "^20.11.30",
+      "cross-env": "^7.0.3"
+   }
+}

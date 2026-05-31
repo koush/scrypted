@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+const path = require('path');
+const mainPath = path.join(__dirname, '../dist/scrypted-main.js');
+require(mainPath);

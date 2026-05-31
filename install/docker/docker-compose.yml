@@ -1,0 +1,191 @@
+# The Scrypted docker-compose.yml file typically resides at:
+# ~/.scrypted/docker-compose.yml
+
+
+# Scrypted NVR Storage (Optional Network Volume: Part 1 of 3)
+# Example volumes SMB (CIFS) and NFS.
+# Uncomment only one.
+# volumes:
+#     nvr:
+#         driver_opts:
+#             type: cifs
+#             o: username=[username],password=[password],vers=3.0,file_mode=0777,dir_mode=0777 
+#             device: //[ip-address]/[path-to-directory]
+#     nvr:
+#         driver_opts:
+#             type: "nfs"
+#             o: "addr=[ip-address],nolock,soft,rw"
+#             device: ":[path-to-directory]"
+
+services:
+    scrypted:
+        # LXC usage only
+        # lxc privileged: true
+
+        environment:
+            # Scrypted NVR Storage (Part 2 of 3)
+
+            # Uncomment the next line to configure the NVR plugin to store recordings
+            # use the /nvr directory within the container. This can also be configured
+            # within the plugin manually.
+            # The drive or network share will ALSO need to be configured in the volumes
+            # section below.
+            # - SCRYPTED_NVR_VOLUME=/nvr
+
+            - SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION=Bearer ${WATCHTOWER_HTTP_API_TOKEN:-env_missing_fallback}
+            - SCRYPTED_WEBHOOK_UPDATE=http://localhost:10444/v1/update
+
+            # LXC usage only
+            # lxc - SCRYPTED_INSTALL_ENVIRONMENT=lxc-docker
+
+            # Avahi is used by the HomeKit plugin for mDNS advertisement.
+            # Two options depending on your network_mode:
+            #
+            # Option A — host networking (network_mode: host, the default):
+            #   SCRYPTED_DOCKER_AVAHI=true is required. The HomeKit plugin binds
+            #   UDP port 5353 directly; with host networking this conflicts with
+            #   any system avahi-daemon. This variable makes Scrypted run its own
+            #   internal avahi (via dbus) instead.
+            #   You must stop/disable the host avahi-daemon before enabling this:
+            #     sudo systemctl disable --now avahi-daemon avahi-daemon.socket
+            #   To preserve host mDNS services (e.g. Time Machine), mount the
+            #   host services dir into the container (see volumes section below).
+            #   Do NOT use the /var/run/dbus or /var/run/avahi-daemon/socket
+            #   volume mounts with this option — they are incompatible.
+            # - SCRYPTED_DOCKER_AVAHI=true
+            #
+            # Option B — bridge networking only:
+            #   Leave SCRYPTED_DOCKER_AVAHI commented out and instead mount the
+            #   host avahi socket (see volumes section below). Scrypted will
+            #   register mDNS services via the host avahi daemon over D-Bus
+            #   without needing to bind port 5353 directly.
+            #   This does NOT work with host networking — use Option A instead.
+
+        # NVIDIA (Part 1 of 2)
+        # nvidia runtime: nvidia
+
+        # NVIDIA (Part 2 of 2) - Use NVIDIA image, and remove subsequent default image.
+        # Valid images:
+        # ghcr.io/koush/scrypted
+        # ghcr.io/koush/scrypted:nvidia
+        # ghcr.io/koush/scrypted:intel
+        # ghcr.io/koush/scrypted:lite
+        image: ghcr.io/koush/scrypted
+
+        volumes:
+            # Scrypted NVR Storage (Part 3 of 3)
+
+            # Modify to add the additional volume for Scrypted NVR.
+            # The following example would mount the /mnt/media/video path on the host
+            # to the /nvr path inside the docker container.
+            # - /mnt/media/video:/nvr
+
+            # Or use a network mount from one of the CIFS/NFS examples at the top of this file.
+            # - type: volume
+            #   source: nvr
+            #   target: /nvr
+            #   volume:
+            #     nocopy: true
+
+            # Avahi Option B (bridge networking only): use host avahi daemon.
+            # Scrypted registers mDNS services over D-Bus via the host socket.
+            # Requires avahi-daemon running on the host and apparmor:unconfined
+            # (see security_opt below). Not compatible with SCRYPTED_DOCKER_AVAHI=true
+            # or with host networking — see environment section above.
+            # - /var/run/dbus:/var/run/dbus
+            # - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
+
+            # Avahi Option A (host networking + SCRYPTED_DOCKER_AVAHI=true):
+            # Mount host avahi service definitions so Scrypted's internal avahi
+            # advertises them (e.g. Time Machine, custom services).
+            # - /etc/avahi/services:/etc/avahi/services:ro
+
+            # Default volume for the Scrypted database. Typically should not be changed.
+            # The volume will be placed relative to this docker-compose.yml.
+            - ./volume:/server/volume
+
+            # LXC usage only
+            # lxc - /var/run/docker.sock:/var/run/docker.sock
+            # lxc - /root/.scrypted/docker-compose.yml:/root/.scrypted/docker-compose.yml
+            # lxc - /root/.scrypted/docker-compose.sh:/root/.scrypted/docker-compose.sh
+            # lxc - /root/.scrypted/.env:/root/.scrypted/.env
+            # lxc - /mnt:/mnt
+
+        # Required for Avahi Option B (bridge networking + host avahi socket).
+        # Without this, AppArmor blocks the container's D-Bus access to avahi.
+        # Not needed for Option A (SCRYPTED_DOCKER_AVAHI=true).
+        # security_opt:
+        #     - apparmor:unconfined
+        devices: [
+            # uncomment the common systems devices to pass
+            # them through to docker.
+
+            # all usb devices, such as coral tpu
+            # "/dev/bus/usb:/dev/bus/usb",
+
+            # hardware accelerated video decoding, opencl, etc.
+            # "/dev/dri:/dev/dri",
+
+            # AMD GPU
+            # "/dev/kfd:/dev/kfd",
+
+            # uncomment below as necessary.
+            # zwave usb serial device
+
+            # "/dev/ttyACM0:/dev/ttyACM0",
+
+            # coral PCI devices
+            # "/dev/apex_0:/dev/apex_0",
+            # "/dev/apex_1:/dev/apex_1",
+        ]
+
+        container_name: scrypted
+        restart: unless-stopped
+        network_mode: host
+
+        # logging is noisy and will unnecessarily wear on flash storage.
+        # scrypted has per device in memory logging that is preferred.
+        # enable the log file if enhanced debugging is necessary.
+        logging:
+            driver: "none"
+            # driver: "json-file"
+            # options:
+            #     max-size: "10m"
+            #     max-file: "10"
+        labels:
+            - "com.centurylinklabs.watchtower.scope=scrypted"
+
+        # Use global DNS servers to avoid issues with some local DNS servers.
+        # particularly with npm registry, etc.
+        dns:
+            - ${SCRYPTED_DNS_SERVER_0:-1.1.1.1}
+            - ${SCRYPTED_DNS_SERVER_1:-8.8.8.8}
+
+    # watchtower manages updates for Scrypted.
+    watchtower:
+        environment:
+            - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_HTTP_API_TOKEN:-env_missing_fallback}
+            - WATCHTOWER_HTTP_API_UPDATE=true
+            - WATCHTOWER_SCOPE=scrypted
+            - WATCHTOWER_HTTP_API_PERIODIC_POLLS=${WATCHTOWER_HTTP_API_PERIODIC_POLLS:-true}
+        image: nickfedor/watchtower
+        container_name: scrypted-watchtower
+        restart: unless-stopped
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        labels:
+            - "com.centurylinklabs.watchtower.scope=scrypted"
+        ports:
+            # The auto update port 10444 can be configured
+            # Must match the port in the auto update url above.
+            - 10444:8080
+        # check for updates once an hour (interval is in seconds)
+        command: --interval 3600 --cleanup --scope scrypted
+
+        # Use global DNS servers to avoid issues with some local DNS servers.
+        # particularly with npm registry, etc.
+        dns:
+            - ${SCRYPTED_DNS_SERVER_0:-1.1.1.1}
+            - ${SCRYPTED_DNS_SERVER_1:-8.8.8.8}
+        # LXC usage only
+        # lxc profiles: ["disabled"]

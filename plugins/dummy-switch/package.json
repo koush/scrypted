@@ -1,0 +1,44 @@
+{
+   "name": "@scrypted/dummy-switch",
+   "description": "Scrypted Dummy Switch plugin. Create virtual switches, locks, and start/stops that run scripts, trigger motion, and press buttons when toggled.",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "dummy",
+      "switch",
+      "shell",
+      "script"
+   ],
+   "scrypted": {
+      "name": "Dummy Switch Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "ScryptedSystemDevice",
+         "ScryptedDeviceCreator",
+         "DeviceProvider",
+         "DeviceCreator"
+      ]
+   },
+   "dependencies": {
+      "@types/node": "^16.6.1",
+      "axios": "^1.3.6"
+   },
+   "devDependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "version": "0.0.25"
+}

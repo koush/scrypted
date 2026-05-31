@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+
+if [ "$SCRYPTED_LXC" ]
+then
+    export SERVICE_USER="root"
+    export SCRYPTED_NONINTERACTIVE="true"
+fi
+
+if [ -z "$SERVICE_USER" ]
+then
+    echo "Scrypted SERVICE_USER environment variable was not specified. Service will not be installed."
+    exit 0
+fi
+
+function readyn() {
+    echo
+    echo
+    if [ ! -z "$SCRYPTED_NONINTERACTIVE" ]
+    then
+        yn="y"
+        return
+    fi
+
+    while true; do
+        read -p "$1 (y/n) " yn
+        case $yn in
+            [Yy]* ) break;;
+            [Nn]* ) break;;
+            * ) echo "Please answer yes or no. (y/n)";;
+        esac
+    done
+}
+
+if [ "$SERVICE_USER" == "root" ]
+then
+    readyn "Scrypted will store its files in the root user home directory. Running as a non-root user is recommended. Are you sure?"
+    if [ "$yn" == "n" ]
+    then
+        exit 1
+    fi
+fi
+
+echo "Stopping local service if it is running..."
+systemctl stop scrypted.service 2> /dev/null
+systemctl disable scrypted.service 2> /dev/null
+
+USER_HOME=$(eval echo ~$SERVICE_USER)
+SCRYPTED_HOME=$USER_HOME/.scrypted
+mkdir -p $SCRYPTED_HOME
+# remove various things from a previous local install.
+rm -rf $SCRYPTED_HOME/node_modules
+rm -rf $SCRYPTED_HOME/install.json
+rm -rf $SCRYPTED_HOME/package.json
+rm -rf $SCRYPTED_HOME/package-lock.json
+
+# must get this value as grep returns non zero if empty
+HAS_NVIDIA=$(lspci | grep -i nvidia)
+
+set -e
+cd $SCRYPTED_HOME
+
+readyn "Install Docker?"
+
+if [ "$yn" == "y" ]
+then
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+    usermod -aG docker $SERVICE_USER
+fi
+
+WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum | head -c 32)
+echo "WATCHTOWER_HTTP_API_TOKEN=$WATCHTOWER_HTTP_API_TOKEN" > $SCRYPTED_HOME/.env
+# remove the following line from .env to disable autoupdates.
+# this is not recommended.
+echo "WATCHTOWER_HTTP_API_PERIODIC_POLLS=true" >> $SCRYPTED_HOME/.env
+
+DOCKER_COMPOSE_YML=$SCRYPTED_HOME/docker-compose.yml
+curl -s https://raw.githubusercontent.com/koush/scrypted/main/install/docker/docker-compose.yml > $DOCKER_COMPOSE_YML
+echo "Created $DOCKER_COMPOSE_YML"
+
+if [ -z "$SCRYPTED_LXC" ]
+then
+    if [ -e /dev/dri ]
+    then
+        sed -i 's/'#' "\/dev\/dri/"\/dev\/dri/g' $DOCKER_COMPOSE_YML
+    fi
+    if [ -e /dev/kfd ]
+    then
+        sed -i 's/'#' "\/dev\/kfd/"\/dev\/kfd/g' $DOCKER_COMPOSE_YML
+    fi
+else
+    # uncomment lxc specific stuff
+    sed -i 's/'#' lxc //g' $DOCKER_COMPOSE_YML
+    # never restart, systemd will handle it
+    sed -i 's/restart: unless-stopped/restart: no/g' $DOCKER_COMPOSE_YML
+
+    sudo systemctl stop apparmor || true
+    sudo apt -y purge apparmor || true
+fi
+
+if [ ! -z "$HAS_NVIDIA" ]
+then
+    readyn "NVIDIA GPU detected. Use NVIDIA image for GPU acceleration?"
+    if [ "$yn" == "y" ]
+    then
+        readyn "NVIDIA image requires the NVIDIA Drivers and Container Toolkit to be installed. This script can install them for you. Install NVIDIA Drivers and Container Toolkit for GPU acceleration?"
+        if [ "$yn" == "y" ]
+        then
+            curl -fsSL https://raw.githubusercontent.com/koush/scrypted/main/install/docker/install-nvidia-container-toolkit.sh -o install-nvidia-container-toolkit.sh
+            chmod +x install-nvidia-container-toolkit.sh
+            ./install-nvidia-container-toolkit.sh
+            rm install-nvidia-container-toolkit.sh
+        fi
+        sed -i 's/'#' nvidia //g' $DOCKER_COMPOSE_YML
+        sed -i 's/ghcr.io\/koush\/scrypted/ghcr.io\/koush\/scrypted:nvidia/g' $DOCKER_COMPOSE_YML
+    fi
+fi
+
+readyn "Enable avahi for HomeKit discovery? This is recommended for reliable HomeKit pairing."
+if [ "$yn" == "y" ]
+then
+    # With network_mode: host (the default), the HomeKit plugin binds UDP port
+    # 5353 directly. This conflicts with a running system avahi-daemon.
+    # The correct setup is SCRYPTED_DOCKER_AVAHI=true, which makes Scrypted
+    # run its own internal avahi. The host avahi-daemon must be stopped.
+    sudo apt-get -y install avahi-daemon
+    sed -i 's/'#' - SCRYPTED_DOCKER_AVAHI=true/- SCRYPTED_DOCKER_AVAHI=true/g' $DOCKER_COMPOSE_YML
+    # Uncomment the avahi services mount so Scrypted's internal avahi picks up
+    # host service definitions (e.g. Time Machine, Samba).
+    sed -i 's/'#' - \/etc\/avahi\/services/- \/etc\/avahi\/services/g' $DOCKER_COMPOSE_YML
+    # Stop and disable the host avahi-daemon — Scrypted now owns port 5353.
+    sudo systemctl disable --now avahi-daemon avahi-daemon.socket 2>/dev/null || true
+    sed -i 's/'#' security_opt:/security_opt:/g' $DOCKER_COMPOSE_YML
+    sed -i 's/'#'     - apparmor:unconfined/    - apparmor:unconfined/g' $DOCKER_COMPOSE_YML
+fi
+
+echo "Setting permissions on $SCRYPTED_HOME"
+chown -R $SERVICE_USER $SCRYPTED_HOME || true
+
+set +e
+
+echo "docker compose down"
+sudo -u $SERVICE_USER docker compose down 2> /dev/null
+echo "docker compose rm -rf"
+sudo -u $SERVICE_USER docker rm -f /scrypted /scrypted-watchtower 2> /dev/null
+
+set -e
+
+echo "docker compose pull"
+sudo -u $SERVICE_USER docker compose pull
+
+if [ -z "$SCRYPTED_LXC" ]
+then
+    echo "docker compose up -d"
+    sudo -u $SERVICE_USER docker compose up -d
+else
+    export DOCKER_COMPOSE_SH=$SCRYPTED_HOME/docker-compose.sh
+
+    curl https://raw.githubusercontent.com/koush/scrypted/main/install/proxmox/docker-compose.sh > $DOCKER_COMPOSE_SH
+
+    chmod +x $DOCKER_COMPOSE_SH
+
+    cat > /etc/systemd/system/scrypted.service <<EOT
+[Unit]
+Description=Scrypted service
+After=network.target
+
+[Service]
+User=root
+Group=root
+Type=simple
+ExecStart=$DOCKER_COMPOSE_SH
+Restart=always
+RestartSec=3
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
+EOT
+
+    systemctl daemon-reload
+    systemctl enable scrypted.service
+    systemctl restart scrypted.service
+fi
+
+echo
+echo
+echo
+echo
+echo "Scrypted is now running at: https://localhost:10443/"
+echo "Note that it is https and that you'll be asked to approve/ignore the website certificate."
+echo
+echo
+echo "Optional:"
+echo "Scrypted NVR Recording storage directory can be configured with an additional script located at:"
+echo "https://docs.scrypted.app/scrypted-nvr/storage/docker.html"

@@ -1,0 +1,1 @@
+../../../../sdk/dist/src/settings-mixin.d.ts

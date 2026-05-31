@@ -1,0 +1,10 @@
+FROM ghcr.io/koush/scrypted-common
+
+WORKDIR /
+COPY . .
+
+WORKDIR /server
+RUN npm install
+RUN npm run build
+
+CMD npm run serve-no-build

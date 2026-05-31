@@ -1,0 +1,11 @@
+[Unit]
+Description=Scrypted DHCP Watcher
+After=network.target
+
+[Service]
+ExecStart=/etc/dhcp/scrypted-dhcp-watcher
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

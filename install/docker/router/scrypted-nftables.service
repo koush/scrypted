@@ -1,0 +1,18 @@
+[Unit]
+Description=nftables
+Documentation=man:nft(8) http://wiki.nftables.org
+After=network.target
+Conflicts=shutdown.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+StandardInput=null
+ProtectSystem=full
+ProtectHome=true
+ExecStart=/usr/sbin/nft -f /etc/nftables.conf
+ExecReload=/usr/sbin/nft -f /etc/nftables.conf
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,50 @@
+{
+   "name": "@scrypted/rknn",
+   "description": "Scrypted Rockchip NPU Object Detection",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "rknn",
+      "rockchip",
+      "npu",
+      "motion",
+      "object",
+      "detect",
+      "detection",
+      "people",
+      "person"
+   ],
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "scrypted": {
+      "name": "Rockchip NPU Object Detection",
+      "pluginDependencies": [
+         "@scrypted/objectdetector"
+      ],
+      "runtime": "python",
+      "pythonVersion": {
+         "default": "3.10"
+      },
+      "type": "API",
+      "interfaces": [
+         "ObjectDetection",
+         "ObjectDetectionPreview",
+         "DeviceProvider"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "version": "0.1.3"
+}

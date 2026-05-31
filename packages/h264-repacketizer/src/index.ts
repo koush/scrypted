@@ -1,0 +1,1 @@
+../../../plugins/homekit/src/types/camera/h264-packetizer.ts

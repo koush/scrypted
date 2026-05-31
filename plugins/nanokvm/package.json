@@ -1,0 +1,44 @@
+{
+   "name": "@scrypted/nanokvm",
+   "version": "0.0.7",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "scrypted": {
+      "babel": true,
+      "name": "NanoKVM",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider",
+         "DeviceCreator"
+      ]
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "kvm",
+      "nanokvm",
+      "sipeed"
+   ],
+   "dependencies": {
+      "@scrypted/common": "../../common",
+      "@scrypted/sdk": "../../sdk",
+      "crypto-js": "^4.2.0",
+      "ws": "^8.18.1"
+   },
+   "devDependencies": {
+      "@types/crypto-js": "^4.2.2",
+      "@types/node": "^22.13.10",
+      "@types/ws": "^8.18.0"
+   }
+}

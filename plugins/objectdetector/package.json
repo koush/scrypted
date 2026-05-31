@@ -1,0 +1,57 @@
+{
+   "name": "@scrypted/objectdetector",
+   "version": "0.1.77",
+   "description": "Scrypted Video Analysis Plugin. Installed alongside a detection service like OpenCV or TensorFlow.",
+   "author": "Scrypted",
+   "license": "Apache-2.0",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "tensorflow",
+      "tpu",
+      "motion",
+      "object",
+      "detect",
+      "detection",
+      "face",
+      "recognition",
+      "people",
+      "person"
+   ],
+   "scrypted": {
+      "name": "Video Analysis Plugin",
+      "type": "API",
+      "interfaces": [
+         "ScryptedSystemDevice",
+         "ScryptedDeviceCreator",
+         "DeviceCreator",
+         "DeviceProvider",
+         "Settings",
+         "MixinProvider"
+      ],
+      "realfs": true
+   },
+   "peerDependencies": {
+      "@scrypted/types": "^0.5.55"
+   },
+   "dependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "devDependencies": {
+      "@types/node": "^22.19.0"
+   }
+}

@@ -1,0 +1,1 @@
+const sharp = __non_webpack_require__('sharp'); module.exports = sharp;

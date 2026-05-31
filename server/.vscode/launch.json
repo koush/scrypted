@@ -1,0 +1,138 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "autoAttachChildProcesses": false,
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Program",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "preLaunchTask": "npm: build",
+            "program": "${workspaceFolder}/bin/scrypted-serve",
+            "runtimeArgs": [
+                "--trace-warnings",
+                "--nolazy",
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "env": {
+                "SCRYPTED_CAN_RESTART": "true",
+                "DYLD_LIBRARY_PATH": "/usr/local/lib",
+                // "SCRYPTED_DEFAULT_AUTHENTICATION": "demo",
+                // force usage of system python because brew python is 3.11
+                // which has no wheels for coreml tools or tflite-runtime
+                // "SCRYPTED_PYTHON_PATH": "/opt/homebrew/bin/python3.11",
+                "SCRYPTED_PYTHON310_PATH": "/opt/homebrew/bin/python3.10",
+                // "SCRYPTED_PORTABLE_PYTHON": "true",
+                // "SCRYPTED_SHARED_WORKER": "true",
+                // "SCRYPTED_DISABLE_AUTHENTICATION": "true",
+                // "DEBUG": "*",
+            }
+        },
+
+        {
+            // "autoAttachChildProcesses": false,
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Cluster Server",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "preLaunchTask": "npm: build",
+            "program": "${workspaceFolder}/bin/scrypted-serve",
+            "runtimeArgs": [
+                "--trace-warnings",
+                "--nolazy",
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "env": {
+                "SCRYPTED_CLUSTER_WORKER_NAME": "Macaroni 1",
+                "SCRYPTED_CLUSTER_LABELS": "@scrypted/coreml,compute",
+                "SCRYPTED_DISABLE_CLUSTER_SERVER_TRUST": "true",
+                "SCRYPTED_CLUSTER_MODE": "server",
+                "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",
+                "SCRYPTED_CLUSTER_SECRET": "swordfish",
+                "SCRYPTED_CAN_RESTART": "true",
+                "SCRYPTED_VOLUME": "/Users/koush/.scrypted-cluster/volume-server",
+            }
+        },
+
+        {
+            // "autoAttachChildProcesses": false,
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Cluster Client",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/bin/scrypted-serve",
+            "runtimeArgs": [
+                "--trace-warnings",
+                "--nolazy",
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "env": {
+                "SCRYPTED_PYTHON310_PATH": "/opt/homebrew/bin/python3.10",
+                "DYLD_LIBRARY_PATH": "/usr/local/lib",
+                "SCRYPTED_CAN_RESTART": "true",
+                "SCRYPTED_VOLUME": "/Users/koush/.scrypted-cluster/volume-client",
+            }
+        },
+        {
+            // "autoAttachChildProcesses": false,
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Docker Cluster Client",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/bin/scrypted-serve",
+            "runtimeArgs": [
+                "--trace-warnings",
+                "--nolazy",
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "env": {
+                "SCRYPTED_CLUSTER_LABELS": "openvino",
+                "SCRYPTED_CLUSTER_MODE": "client",
+                "SCRYPTED_CLUSTER_SERVER": "192.168.2.124",
+                "SCRYPTED_CLUSTER_ADDRESS": "192.168.215.19",
+                "SCRYPTED_CLUSTER_SECRET": "swordfish",
+                "SCRYPTED_CAN_RESTART": "true",
+                "SCRYPTED_VOLUME": "/cluster/volume",
+            }
+        },
+    ]
+}

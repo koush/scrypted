@@ -1,0 +1,6 @@
+# needed by libav to_ndarray
+numpy>=1.16.2
+
+av>=10.0.0
+
+Pillow>=5.4.1

@@ -1,0 +1,62 @@
+from __future__ import annotations
+
+import asyncio
+import os
+
+import numpy as np
+
+import openvino as ov
+from common import async_infer
+from predict.text_recognize import TextRecognition
+
+textDetectPrepare, textDetectPredict = async_infer.create_executors("TextDetect")
+textRecognizePrepare, textRecognizePredict = async_infer.create_executors(
+    "TextRecognize"
+)
+
+
+class OpenVINOTextRecognition(TextRecognition):
+    def downloadModel(self, model: str):
+        ovmodel = "best"
+        model_path = self.downloadHuggingFaceModelLocalFallback(model)
+        xmlFile = os.path.join(model_path, f"{ovmodel}.xml")
+        if "vgg" in model:
+            model = self.plugin.core.read_model(xmlFile)
+            # this reshape causes a crash on GPU but causes a crash if NOT used with NPU...
+            # on older systems skipping the reshape does not crash, but does throw na exception which is recoverable.
+            if "NPU" in self.plugin.mode:
+                model.reshape([1, 1, 64, 384])
+            return self.plugin.core.compile_model(model, self.plugin.mode)
+        else:
+            model = self.plugin.core.read_model(xmlFile)
+            model.reshape([1, 3, 640, 640])
+            return self.plugin.core.compile_model(model, self.plugin.mode)
+
+    async def predictDetectModel(self, input: np.ndarray):
+        def predict():
+            infer_request = self.detectModel.create_infer_request()
+            im = ov.Tensor(array=input)
+            input_tensor = im
+            infer_request.set_input_tensor(input_tensor)
+            output_tensors = infer_request.infer()
+            ret = output_tensors[0]
+            return ret
+
+        ret = await asyncio.get_event_loop().run_in_executor(
+            textDetectPredict, lambda: predict()
+        )
+        return ret
+
+    async def predictTextModel(self, input: np.ndarray):
+        def predict():
+            im = ov.Tensor(array=input.astype(np.float32))
+            infer_request = self.textModel.create_infer_request()
+            infer_request.set_input_tensor(im)
+            output_tensors = infer_request.infer()
+            ret = output_tensors[0]
+            return ret
+
+        ret = await asyncio.get_event_loop().run_in_executor(
+            textDetectPredict, lambda: predict()
+        )
+        return ret

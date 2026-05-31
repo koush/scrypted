@@ -1,0 +1,36 @@
+name: Test
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["install/**", ".github/workflows/test.yml"]
+  pull_request:
+    paths: ["install/**", ".github/workflows/test.yml"]
+  workflow_dispatch:
+  
+jobs:
+  test_local:
+    name: Test local installation on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-14, macos-13, windows-latest]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Parse latest server release
+        id: parse_server
+        shell: bash
+        run: |
+          VERSION=$(cat ./server/package-lock.json | jq -r '.version')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Will test @scrypted/server@$VERSION"
+
+      - name: Install scrypted server
+        uses: scryptedapp/setup-scrypted@v0.0.2
+        with:
+          branch: ${{ github.sha }}
+          version: ${{ steps.parse_server.outputs.version }}

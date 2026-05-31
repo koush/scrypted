@@ -1,0 +1,6 @@
+.DS_Store
+out/
+node_modules/
+dist/
+.venv
+all_models*
