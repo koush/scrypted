@@ -779,13 +779,21 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         if (url.protocol !== 'rtmp:') {
             url.username = this.storage.getItem('username');
             url.password = this.storage.getItem('password') || '';
-        } else {
-            const params = url.searchParams;
-            for (const [k, v] of Object.entries(this.client.parameters)) {
-                params.set(k, v);
-            }
+            return url.toString();
         }
-        return url.toString();
+        // The Reolink RTMP server does not percent-decode query parameter
+        // values - it compares the raw bytes from the URL against the stored
+        // password. URLSearchParams.set() percent-encodes values when the URL
+        // is serialised (WHATWG application/x-www-form-urlencoded), which
+        // corrupts passwords containing characters such as '!', '#', '+',
+        // space, etc. Append the credential parameters as raw bytes so the
+        // password is delivered to the camera exactly as the user entered it.
+        // See #1509 for the same class of issue on the HTTP API path.
+        const sep = rtspUrl.includes('?') ? '&' : '?';
+        const extras = Object.entries(this.client.parameters)
+            .map(([k, v]) => `${k}=${v}`)
+            .join('&');
+        return rtspUrl + sep + extras;
     }
 
     async createVideoStream(vso: UrlMediaStreamOptions): Promise<MediaObject> {
