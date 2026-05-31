@@ -82,7 +82,7 @@ export class ClusterForkService {
         const fork: ClusterForkParam = await worker.fork;
 
         const forkResultPromise = fork(options.runtime!, runtimeWorkerOptions, peerLiveness, getZip);
-        options.id! ||= this.runtime.findPluginDevice(runtimeWorkerOptions.packageJson.name)!._id;
+        options.id! ||= this.runtime.findPluginDevice(runtimeWorkerOptions.packageJson.name)?._id;
 
         // the server is responsible for killing the forked process when the requestor is killed.
         // minimizes lifecycle management duplication in python and node.
