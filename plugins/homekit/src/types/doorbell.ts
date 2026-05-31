@@ -1,4 +1,4 @@
-import sdk, { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import sdk, { BinarySensor, Lock, LockState, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
 import { addSupportedType, DummyDevice, supportedTypes } from '../common';
 import { Characteristic, CharacteristicEventTypes, Service, StatelessProgrammableSwitch } from '../hap';
 import { makeAccessory } from './common';
@@ -50,6 +50,45 @@ addSupportedType({
             .on(CharacteristicEventTypes.GET, callback => callback(null, null));
 
         service.setPrimaryService(true);
+
+        if (device.interfaces.includes(ScryptedInterface.Lock)) {
+            const lockDevice = device as ScryptedDevice & Lock;
+            const lockService = accessory.addService(Service.LockMechanism, device.name);
+
+            const toCurrentState = () => lockDevice.lockState === LockState.Locked
+                ? Characteristic.LockCurrentState.SECURED
+                : Characteristic.LockCurrentState.UNSECURED;
+
+            const toTargetState = () => lockDevice.lockState === LockState.Locked
+                ? Characteristic.LockTargetState.SECURED
+                : Characteristic.LockTargetState.UNSECURED;
+
+            lockService.getCharacteristic(Characteristic.LockCurrentState)
+                .on(CharacteristicEventTypes.GET, callback => callback(null, toCurrentState()));
+
+            lockService.getCharacteristic(Characteristic.LockTargetState)
+                .on(CharacteristicEventTypes.GET, callback => callback(null, toTargetState()))
+                .on(CharacteristicEventTypes.SET, (value, callback) => {
+                    callback();
+                    value === Characteristic.LockTargetState.UNSECURED
+                        ? lockDevice.unlock()
+                        : lockDevice.lock();
+                    setTimeout(() => {
+                        const cs = value === Characteristic.LockTargetState.UNSECURED
+                            ? Characteristic.LockCurrentState.UNSECURED
+                            : Characteristic.LockCurrentState.SECURED;
+                        lockService.updateCharacteristic(Characteristic.LockCurrentState, cs);
+                        lockService.updateCharacteristic(Characteristic.LockTargetState, value);
+                    }, 150);
+                });
+
+            device.listen({ event: ScryptedInterface.Lock, watch: false }, () => {
+                lockService.updateCharacteristic(Characteristic.LockCurrentState, toCurrentState());
+                lockService.updateCharacteristic(Characteristic.LockTargetState, toTargetState());
+            });
+
+            service.addLinkedService(lockService);
+        }
 
         return accessory;
     }
