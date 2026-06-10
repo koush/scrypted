@@ -33,8 +33,9 @@ export async function createRTCPeerConnectionSource(options: {
     mediaStreamOptions: ResponseMediaStreamOptions,
     startRTCSignalingSession: (session: RTCSignalingSession) => Promise<RTCSessionControl | undefined>,
     maximumCompatibilityMode: boolean,
+    disableOpus?: boolean,
 }): Promise<RTCPeerConnectionPipe> {
-    const { mediaStreamOptions, startRTCSignalingSession, mixinId, nativeId, maximumCompatibilityMode } = options;
+    const { mediaStreamOptions, startRTCSignalingSession, mixinId, nativeId, maximumCompatibilityMode, disableOpus } = options;
     const console = mixinId ? sdk.deviceManager.getMixinConsole(mixinId, nativeId) : sdk.deviceManager.getDeviceConsole(nativeId);
 
     const { clientPromise, port } = await listenZeroSingleClient('127.0.0.1');
@@ -67,9 +68,12 @@ export async function createRTCPeerConnectionSource(options: {
             const ret = new RTCPeerConnection({
                 bundlePolicy: setup.configuration?.bundlePolicy as BundlePolicy,
                 codecs: {
-                    audio: [
-                        ...requiredAudioCodecs,
-                    ],
+                    // When disableOpus is set, offer only G.711 so the camera/server transcodes the
+                    // audio server-side instead of forwarding raw Opus. Works around cameras (e.g.
+                    // some Ring doorbells) whose direct WebRTC Opus decodes with crackle.
+                    audio: disableOpus
+                        ? requiredAudioCodecs.filter(c => c.mimeType.toLowerCase() !== 'audio/opus')
+                        : [...requiredAudioCodecs],
                     video: [
                         requiredVideoCodec,
                     ],

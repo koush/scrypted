@@ -37,7 +37,14 @@ function delayWorkerExit(f: ReturnType<WebRTCPlugin['createTrackedFork']>) {
 }
 
 class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
-    storageSettings = new StorageSettings(this, {});
+    storageSettings = new StorageSettings(this, {
+        disableOpusAudio: {
+            title: 'Disable Opus Audio',
+            description: 'Enable this if the camera has crackly or distorted audio. Uses G.711 audio instead of Opus, which fixes the audio on some cameras (such as certain Ring doorbells). Audio quality will be slightly lower.',
+            type: 'boolean',
+            defaultValue: false,
+        },
+    });
     webrtcIntercom: Promise<Intercom>;
 
     constructor(public plugin: WebRTCPlugin, options: SettingsMixinDeviceOptions<RTCSignalingClient & RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
@@ -172,6 +179,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
                 mediaStreamOptions: this.createVideoStreamOptions(),
                 startRTCSignalingSession: (session) => this.mixinDevice.startRTCSignalingSession(session),
                 maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
+                disableOpus: this.storageSettings.values.disableOpusAudio,
             });
 
             this.webrtcIntercom = getIntercom();
@@ -723,6 +731,7 @@ export async function fork() {
             mediaStreamOptions: ResponseMediaStreamOptions,
             startRTCSignalingSession: (session: RTCSignalingSession) => Promise<RTCSessionControl | undefined>,
             maximumCompatibilityMode: boolean,
+            disableOpus?: boolean,
         }): Promise<RTCPeerConnectionPipe> {
             try {
                 const ret = await createRTCPeerConnectionSource({
@@ -731,6 +740,7 @@ export async function fork() {
                     mediaStreamOptions: options.mediaStreamOptions,
                     startRTCSignalingSession: (session) => options.startRTCSignalingSession(session),
                     maximumCompatibilityMode: options.maximumCompatibilityMode,
+                    disableOpus: options.disableOpus,
                 });
                 ret.pcClose().finally(() => delayProcessExit());
                 return ret;
