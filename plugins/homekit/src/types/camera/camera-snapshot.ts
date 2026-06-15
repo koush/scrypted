@@ -25,7 +25,18 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
                 height: request.height,
             },
         })
-        return await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
+        if (!media)
+            throw new Error(`${device.name} snapshot provider returned no media`);
+        const buffer = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
+        homekitPlugin.diagnostics.lastSnapshotByDevice.set(device.id, {
+            deviceId: device.id,
+            deviceName: device.name,
+            at: Date.now(),
+            status: 'success',
+            width: request.width,
+            height: request.height,
+        });
+        return buffer;
     }
 
     homekitPlugin.snapshotThrottles.set(device.id, takePicture);
@@ -53,6 +64,13 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
         }
         catch (e) {
             console.error('snapshot error', e);
+            homekitPlugin.diagnostics.lastSnapshotByDevice.set(device.id, {
+                deviceId: device.id,
+                deviceName: device.name,
+                at: Date.now(),
+                status: 'error',
+                reason: e?.message || String(e),
+            });
             recommendSnapshotPlugin(console, homekitPlugin.log, `${device.name} encountered an error while retrieving a new snapshot. Consider installing the Snapshot Plugin to show the most recent snapshot. origin:/#/component/plugin/install/@scrypted/snapshot}`);
             callback(e);
         }

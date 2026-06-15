@@ -24,6 +24,16 @@ export interface RtcpTimeoutDiag {
     at: number;
 }
 
+export interface SnapshotDiag {
+    deviceId: string;
+    deviceName?: string;
+    at: number;
+    status: 'success' | 'error';
+    reason?: string;
+    width?: number;
+    height?: number;
+}
+
 export interface RecordingSessionDiag {
     key: string;
     deviceId: string;
@@ -37,6 +47,7 @@ export interface RecordingSessionDiag {
     negotiatedAudioCodec?: string;
     firstFragmentKeyframe?: boolean | 'unknown';
     saveRecordings: boolean;
+    ffmpegWarnings: string[];
 }
 
 export interface RecordingResultDiag extends RecordingSessionDiag {
@@ -55,6 +66,7 @@ export interface DiagnosticsState {
     bridgePublish: BridgePublishDiag;
     activeStreamSessions: Map<string, StreamSessionDiag>;
     lastRtcpTimeout?: RtcpTimeoutDiag;
+    lastSnapshotByDevice: Map<string, SnapshotDiag>;
     activeRecordingSessions: Map<string, RecordingSessionDiag>;
     lastRecordingResult?: RecordingResultDiag;
     completedRecordingCount: number;
@@ -67,6 +79,7 @@ export function createDiagnosticsState(): DiagnosticsState {
             at: Date.now(),
         },
         activeStreamSessions: new Map(),
+        lastSnapshotByDevice: new Map(),
         activeRecordingSessions: new Map(),
         completedRecordingCount: 0,
     };
@@ -117,6 +130,15 @@ function appendMap<T>(lines: string[], entries: Iterable<T>, formatter: (entry: 
     }
     if (!count)
         lines.push('- none');
+}
+
+function appendFfmpegWarnings(lines: string[], warnings: string[]) {
+    if (!warnings?.length)
+        return;
+    lines.push('  FFmpeg warnings:');
+    for (const warning of warnings) {
+        lines.push(`  - ${warning}`);
+    }
 }
 
 function getDeviceName(id: string) {
@@ -188,6 +210,14 @@ export async function buildDiagnosticsReport(plugin: HomeKitPlugin): Promise<str
     appendSection(lines, 'HomeKit Connections');
     appendMap(lines, plugin.seenConnections, address => address);
 
+    appendSection(lines, 'Last Snapshot Results');
+    appendMap(lines, state.lastSnapshotByDevice.values(), snapshot => {
+        const name = snapshot.deviceName || snapshot.deviceId;
+        if (snapshot.status === 'success')
+            return `${name}: success, requested ${snapshot.width}x${snapshot.height}, at=${formatTime(snapshot.at)}`;
+        return `${name}: error, ${valueOrUnknown(snapshot.reason)}, at=${formatTime(snapshot.at)}`;
+    });
+
     appendSection(lines, 'Standalone Accessories');
     appendMap(lines, plugin.standalones, ([id]) => `${getDeviceName(id) || id} (${id})`);
 
@@ -207,10 +237,15 @@ export async function buildDiagnosticsReport(plugin: HomeKitPlugin): Promise<str
     }
 
     appendSection(lines, 'Active HKSV Recordings');
-    appendMap(lines, state.activeRecordingSessions.values(), recording => {
+    let activeRecordingCount = 0;
+    for (const recording of state.activeRecordingSessions.values()) {
         const duration = Date.now() - recording.startedAt;
-        return `${recording.deviceName || recording.deviceId}: key=${recording.key}, path=${recording.path}, fragments=${recording.fragments}, bytes=${formatBytes(recording.fragmentBytes)}, lastFragment=${formatTime(recording.lastFragmentAt)}, duration=${formatDuration(duration)}, video=${valueOrUnknown(recording.negotiatedVideoCodec)}, audio=${valueOrUnknown(recording.negotiatedAudioCodec)}, saveRecordings=${recording.saveRecordings}`;
-    });
+        lines.push(`- ${recording.deviceName || recording.deviceId}: key=${recording.key}, path=${recording.path}, fragments=${recording.fragments}, bytes=${formatBytes(recording.fragmentBytes)}, lastFragment=${formatTime(recording.lastFragmentAt)}, duration=${formatDuration(duration)}, video=${valueOrUnknown(recording.negotiatedVideoCodec)}, audio=${valueOrUnknown(recording.negotiatedAudioCodec)}, saveRecordings=${recording.saveRecordings}`);
+        appendFfmpegWarnings(lines, recording.ffmpegWarnings);
+        activeRecordingCount++;
+    }
+    if (!activeRecordingCount)
+        lines.push('- none');
 
     appendSection(lines, 'Last Completed HKSV Recording');
     lines.push(`Completed since plugin start: ${state.completedRecordingCount}`);
@@ -226,6 +261,7 @@ export async function buildDiagnosticsReport(plugin: HomeKitPlugin): Promise<str
         lines.push(`Save Recordings: ${result.saveRecordings}`);
         lines.push(`Last Fragment: ${formatTime(result.lastFragmentAt)}`);
         lines.push(`Ended: ${formatTime(result.endedAt)}`);
+        appendFfmpegWarnings(lines, result.ffmpegWarnings);
         if (result.error)
             lines.push(`Error: ${result.error}`);
     }

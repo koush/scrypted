@@ -257,6 +257,21 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         negotiatedAudioCodec: audioCodec,
         firstFragmentKeyframe: 'unknown',
         saveRecordings,
+        ffmpegWarnings: [],
+    });
+    const warningRe = /Timestamps are unset|Non-monotonic DTS|invalid timestamp|queue input is backward/;
+    session.cp?.stderr?.on('data', (data: Buffer) => {
+        const recordingDiag = homekitPlugin.diagnostics.activeRecordingSessions.get(recordingDiagKey);
+        if (!recordingDiag)
+            return;
+        for (const line of data.toString().split('\n')) {
+            const warning = line.trim();
+            if (!warningRe.test(warning))
+                continue;
+            recordingDiag.ffmpegWarnings.push(warning);
+            if (recordingDiag.ffmpegWarnings.length > 10)
+                recordingDiag.ffmpegWarnings.shift();
+        }
     });
     let recordingFile: Writable;
     const saveFragment = async (i: number, fragment: Buffer) => {
