@@ -244,6 +244,20 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
     }
 
     const start = Date.now();
+    const recordingDiagKey = `${device.id}-${start}`;
+    homekitPlugin.diagnostics.activeRecordingSessions.set(recordingDiagKey, {
+        key: recordingDiagKey,
+        deviceId: device.id,
+        deviceName: device.name,
+        startedAt: start,
+        fragments: 0,
+        fragmentBytes: 0,
+        path: needsFFmpeg ? 'ffmpeg' : 'direct-tcp',
+        negotiatedVideoCodec: videoCodec,
+        negotiatedAudioCodec: audioCodec,
+        firstFragmentKeyframe: 'unknown',
+        saveRecordings,
+    });
     let recordingFile: Writable;
     const saveFragment = async (i: number, fragment: Buffer) => {
         if (!saveRecordings)
@@ -290,6 +304,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
     }, maxVideoDuration);
 
     let pending: Buffer[] = [];
+    let recordingError: string;
     try {
         let i = 0;
         // if ffmpeg is being used to parse a prebuffered stream that is NOT mp4 (despite our request),
@@ -349,6 +364,12 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
                 saveFragment(i, fragment);
                 pending = [];
                 console.log(`motion fragment #${++i} sent. size:`, fragment.length);
+                const recordingDiag = homekitPlugin.diagnostics.activeRecordingSessions.get(recordingDiagKey);
+                if (recordingDiag) {
+                    recordingDiag.fragments = i;
+                    recordingDiag.fragmentBytes += fragment.length;
+                    recordingDiag.lastFragmentAt = Date.now();
+                }
                 const wasLast = isLast;
                 const recordingPacket: RecordingPacket = {
                     data: fragment,
@@ -361,10 +382,23 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         }
     }
     catch (e) {
+        recordingError = e?.message || String(e);
         console.log(`motion recording error ${e}`);
     }
     finally {
         console.log(`motion recording finished`);
+        const recordingDiag = homekitPlugin.diagnostics.activeRecordingSessions.get(recordingDiagKey);
+        if (recordingDiag) {
+            const endedAt = Date.now();
+            homekitPlugin.diagnostics.completedRecordingCount++;
+            homekitPlugin.diagnostics.lastRecordingResult = {
+                ...recordingDiag,
+                durationMs: endedAt - recordingDiag.startedAt,
+                endedAt,
+                error: recordingError,
+            };
+            homekitPlugin.diagnostics.activeRecordingSessions.delete(recordingDiagKey);
+        }
         clearTimeout(videoTimeout);
         cleanupPipes();
         recordingFile?.end();

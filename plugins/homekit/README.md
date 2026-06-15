@@ -6,6 +6,14 @@ The HomeKit Plugin bridges compatible devices in Scrypted to HomeKit.
 
 You can use the admin page provided by your camera manufacturer to configure codec settings as required by HomeKit. It is highly recommended to configure the codec settings for *all* the camera substreams by using the [Scrypted Codec Settings guide](https://github.com/koush/scrypted/wiki/Codec-Settings). This will yield optimal local and remote streaming reliability.
 
+## HomeKit Diagnostics
+
+The HomeKit plugin settings include a Diagnostics section with a read-only snapshot of the current bridge, network, live streaming, and HomeKit Secure Video state.
+
+Use this first when pairing, live streaming, or recording is acting inconsistently. It shows the mDNS advertiser, bind addresses, recently connected HomeKit clients, active live streams, recent RTCP timeouts, active HKSV recording sessions, the last completed HKSV recording, saved HKSV debug clip size, and whether accessories are bridged or standalone.
+
+If `Save Recordings` debug mode is enabled on a camera, the diagnostics report will call that out so the saved clips do not quietly fill the Scrypted volume.
+
 ## Troubleshooting
 
 ### HomeKit Secure Video Not Recording

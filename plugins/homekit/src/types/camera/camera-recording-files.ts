@@ -11,6 +11,57 @@ export interface HksvVideoClip extends VideoClip {
     fragments: number;
 }
 
+export interface HksvClipStorageStats {
+    clipCount: number;
+    totalBytes: number;
+    scannedAt: number;
+}
+
+const hksvClipStatsTtl = 60000;
+let hksvClipStatsCache: HksvClipStorageStats;
+let hksvClipStatsCacheExpires = 0;
+
+export function clearHksvClipStorageStatsCache() {
+    hksvClipStatsCacheExpires = 0;
+}
+
+export async function getHksvClipStorageStats(): Promise<HksvClipStorageStats> {
+    const now = Date.now();
+    if (hksvClipStatsCache && now < hksvClipStatsCacheExpires)
+        return hksvClipStatsCache;
+
+    let clipCount = 0;
+    let totalBytes = 0;
+    try {
+        const savePath = await getSavePath();
+        const allFiles = await fs.promises.readdir(savePath);
+        const jsonFiles = allFiles.filter(file => file.endsWith('.json'));
+        clipCount = jsonFiles.length;
+
+        for (const jsonFile of jsonFiles) {
+            const hksvId = jsonFile.slice(0, -'.json'.length);
+            try {
+                const { id, startTime } = parseHksvId(hksvId);
+                const { mp4Path } = await getCameraRecordingFiles(id, startTime);
+                const stat = await fs.promises.stat(mp4Path);
+                totalBytes += stat.size;
+            }
+            catch (e) {
+            }
+        }
+    }
+    catch (e) {
+    }
+
+    hksvClipStatsCache = {
+        clipCount,
+        totalBytes,
+        scannedAt: now,
+    };
+    hksvClipStatsCacheExpires = now + hksvClipStatsTtl;
+    return hksvClipStatsCache;
+}
+
 export async function nukeClips() {
     const savePath = await getSavePath();
     await fs.promises.rm(savePath, { recursive: true, force: true });

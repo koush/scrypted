@@ -7,12 +7,14 @@ import { getScryptedServerAddresses } from "./address-override";
 import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
+import { buildDiagnosticsReport, createDiagnosticsState, DiagnosticsState } from './diagnostics';
 import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, HAPStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
 import { createHAPUsernameStorageSettingsDict, getRandomPort as createRandomPort, getHAPUUID, logConnections, typeToCategory } from './hap-utils';
 import { HOMEKIT_MIXIN, HomekitMixin } from './homekit-mixin';
 import { addAccessoryDeviceInfo } from './info';
 import { randomPinCode } from './pincode';
 import './types';
+import { clearHksvClipStorageStatsCache } from './types/camera/camera-recording-files';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { reorderDevicesByProvider } from './util';
 import { VideoClipsMixinProvider } from './video-clips-provider';
@@ -65,6 +67,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     videoClips: VideoClipsMixinProvider;
     videoClipsId: string;
     cameraMixins = new Map<string, CameraMixin>();
+    diagnostics: DiagnosticsState = createDiagnosticsState();
     storageSettings = new StorageSettings(this, {
         ...createHAPUsernameStorageSettingsDict(this, undefined),
         portOverride: {
@@ -117,6 +120,31 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             type: 'boolean',
             defaultValue: true,
         },
+        diagnosticsReport: {
+            group: 'Diagnostics',
+            title: 'HomeKit Diagnostics',
+            type: 'html',
+            readonly: true,
+            noStore: true,
+            onGet: async () => {
+                try {
+                    const report = await buildDiagnosticsReport(this);
+                    return {
+                        defaultValue: report,
+                    };
+                }
+                catch (e) {
+                    return {
+                        defaultValue: `<pre>Diagnostics unavailable: ${String(e)}</pre>`,
+                    };
+                }
+            },
+        },
+        refreshDiagnostics: {
+            group: 'Diagnostics',
+            title: 'Refresh Diagnostics',
+            type: 'button',
+        },
     });
     mergedDevices = new Set<string>();
 
@@ -158,6 +186,11 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     }
 
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
+        if (key === 'refreshDiagnostics') {
+            clearHksvClipStorageStatsCache();
+            return;
+        }
+
         await this.storageSettings.putSetting(key, value);
 
         if (key === this.storageSettings.keys.portOverride) {
@@ -376,9 +409,23 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             bind,
         };
 
+        this.diagnostics.bridgePublish = {
+            state: 'pending',
+            at: Date.now(),
+        };
         this.bridge.publish(publishInfo, true).then(() => {
+            this.diagnostics.bridgePublish = {
+                state: 'published',
+                at: Date.now(),
+            };
             this.storageSettings.values.qrCode = new QRCode(this.bridge.setupURI()).svg();
             logConnections(this.console, this.bridge, this.seenConnections);
+        }).catch(e => {
+            this.diagnostics.bridgePublish = {
+                state: 'error',
+                error: String(e),
+                at: Date.now(),
+            };
         });
 
         systemManager.listen(async (eventSource, eventDetails, eventData) => {

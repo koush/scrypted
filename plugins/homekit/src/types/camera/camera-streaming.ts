@@ -53,6 +53,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     if (!session)
                         return;
                     sessions.delete(sessionID);
+                    homekitPlugin.diagnostics.activeStreamSessions.delete(sessionID);
 
                     console.log(`streaming session killed, duration: ${Math.round((Date.now() - streamingSessionStartTime) / 1000)}s`);
                     session.killed = true;
@@ -140,6 +141,14 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             };
 
             sessions.set(request.sessionID, session);
+            homekitPlugin.diagnostics.activeStreamSessions.set(request.sessionID, {
+                sessionId: request.sessionID,
+                deviceId: device.id,
+                deviceName: device.name,
+                targetAddress: session.prepareRequest.targetAddress,
+                sourceAddress,
+                startedAt: streamingSessionStartTime,
+            });
 
             const response: PrepareStreamResponse = {
                 video: {
@@ -233,6 +242,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             const videoReturnRtcpReady = waitRtcp
                 ? timeoutPromise(1000, once(session.videoReturn, 'message')).catch(() => {
                     console.warn('Video RTCP Packet timed out. There may be a network (routing/firewall) issue preventing the Apple device sending UDP packets back to Scrypted.');
+                    homekitPlugin.diagnostics.lastRtcpTimeout = {
+                        deviceId: device.id,
+                        deviceName: device.name,
+                        at: Date.now(),
+                    };
                 })
                 : undefined;
             session.videoReturnRtcpReady = videoReturnRtcpReady;
@@ -302,6 +316,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             const mediaObject = await device.getVideoStream(mediaOptions);
             const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
+            const streamDiag = homekitPlugin.diagnostics.activeStreamSessions.get(request.sessionID);
+            if (streamDiag) {
+                streamDiag.negotiatedVideoCodec = videoInput.mediaStreamOptions?.video?.codec;
+                streamDiag.negotiatedAudioCodec = videoInput.mediaStreamOptions?.audio?.codec || mediaOptions.audio?.codec;
+            }
             let mediaStreamFeedback: MediaStreamFeedback;
             try {
                 // homekit mtu is unusable. webrtc uses 1200 due to weird cell networks, vpns, etc.
