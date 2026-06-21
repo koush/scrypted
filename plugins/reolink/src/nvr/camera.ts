@@ -161,6 +161,14 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             title: 'Use ONVIF for Two-Way Audio',
             type: 'boolean',
         },
+        useOnvifDetection: {
+            subgroup: 'Advanced',
+            title: 'Use ONVIF for Object Detection',
+            description: "Subscribe to the hub's ONVIF event stream (push) for motion/object detection instead of polling. Recommended for battery cameras that sleep, which polling cannot reliably catch.",
+            type: 'boolean',
+            immediate: true,
+            onPut: async () => await this.nvrDevice.ensureOnvifEvents(),
+        },
         prebufferSet: {
             type: 'boolean',
             hide: true
@@ -505,9 +513,38 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     createOnvifClient() {
-        const { username, password, httpPort, ipAddress } = this.nvrDevice.storageSettings.values;
-        const address = `${ipAddress}:${httpPort}`;
+        const { username, password, onvifPort, ipAddress } = this.nvrDevice.storageSettings.values;
+        // Reolink ONVIF runs on a dedicated port (onvifPort, default 8000), not the api.cgi port.
+        const address = `${ipAddress}:${onvifPort}`;
         return connectCameraAPI(address, username, password, this.getLogger(), undefined);
+    }
+
+    // Called by the NVR device's hub-level ONVIF event router when an event for this
+    // camera's channel arrives. Sets debounced motion using the same motionTimeout timer
+    // and score:1 convention as processEvents() (which is skipped while ONVIF is the
+    // motion source for this camera, so the two never race on motionDetected).
+    triggerOnvifMotion(className?: string) {
+        const logger = this.getLogger();
+        if (this.storageSettings.values.debugEvents)
+            logger.log(`ONVIF motion (ch ${this.getRtspChannel()})${className ? ' class=' + className : ''}`);
+        this.motionDetected = true;
+        this.motionTimeout && clearTimeout(this.motionTimeout);
+        this.motionTimeout = setTimeout(() => this.motionDetected = false, (this.storageSettings.values.motionTimeout || 20) * 1000);
+        if (className) {
+            // Only surface object detections if this camera actually advertises this
+            // class (same gate as getDeviceInterfaces / the polled path); avoids emitting
+            // on an interface the device doesn't provide, or a class it doesn't support.
+            // getObjectTypes() reads cached AI state.
+            this.getObjectTypes().then(({ classes }) => {
+                if (!classes.includes(className))
+                    return;
+                const od: ObjectsDetected = {
+                    timestamp: Date.now(),
+                    detections: [{ className, score: 1 }],
+                };
+                sdk.deviceManager.onDeviceEvent(this.nativeId, ScryptedInterface.ObjectDetector, od);
+            }).catch(() => { });
+        }
     }
 
     async processEvents(events: EventsResponse) {
@@ -518,7 +555,10 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             logger.debug(`Events received: ${JSON.stringify(events)}`);
         }
 
-        if (events.motion !== this.motionDetected) {
+        // When ONVIF push is the motion source for this camera, ignore the polled motion
+        // state (unreliable for sleeping battery cams, and it would race triggerOnvifMotion's
+        // timer). triggerOnvifMotion drives motionDetected in that case.
+        if (!this.storageSettings.values.useOnvifDetection && events.motion !== this.motionDetected) {
             if (events.motion) {
 
                 this.motionDetected = true;
@@ -676,7 +716,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         // 2: support main/sub stream
 
         const abilities = this.getAbilities();
-        const { channelInfo } = this.getDeviceData();
+        const { channelInfo } = this.getDeviceData() ?? {};
 
         const live = abilities?.live?.ver;
         const [rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub] = streams;
@@ -684,7 +724,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
 
         const mainEncType = abilities?.mainEncType?.ver;
 
-        const isHomeHub = this.nvrDevice.info.model === 'Reolink Home Hub';
+        const isHomeHub = this.nvrDevice.info.model?.startsWith('Reolink Home Hub');
         if (isHomeHub) {
             streams.push(...[rtspMain, rtspSub]);
         } else if (live === 2) {
@@ -702,7 +742,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             streams.push(rtmpMain, rtmpExt, rtmpSub, rtspMain, rtspSub);
         }
 
-        if (channelInfo.typeInfo &&
+        if (channelInfo?.typeInfo &&
             [
                 "Reolink TrackMix PoE",
                 "Reolink TrackMix WiFi",
