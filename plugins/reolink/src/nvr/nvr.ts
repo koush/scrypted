@@ -4,6 +4,7 @@ import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { DevInfo } from "../probe";
 import { ReolinkNvrCamera } from "./camera";
 import { DeviceInputData, ReolinkNvrClient } from "./api";
+import { connectCameraAPI, OnvifCameraAPI } from "../onvif-api";
 
 export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, DeviceDiscovery, DeviceProvider, Reboot {
     storageSettings = new StorageSettings(this, {
@@ -53,6 +54,14 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             type: 'number',
             onPut: async () => await this.reinit()
         },
+        onvifPort: {
+            subgroup: 'Advanced',
+            title: 'ONVIF Port',
+            placeholder: '8000',
+            defaultValue: 8000,
+            type: 'number',
+            onPut: async () => await this.reinit()
+        },
         abilities: {
             json: true,
             hide: true,
@@ -85,6 +94,12 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
     lastDevicesStatusCheck = undefined;
     cameraNativeMap = new Map<string, ReolinkNvrCamera>();
     processing = false;
+    onvifClient: OnvifCameraAPI;
+    onvifEmitter: ReturnType<OnvifCameraAPI['listenEvents']>;
+    onvifStarting = false;
+    // Bumped by stopOnvifEvents() so an in-flight startOnvifEvents() still awaiting the
+    // network can detect it was torn down and abandon itself instead of resurrecting.
+    onvifGeneration = 0;
 
     constructor(nativeId: string, plugin: ReolinkProvider) {
         super(nativeId);
@@ -106,6 +121,9 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
 
     async reinit() {
         this.client = undefined;
+        // Tear the ONVIF subscription down too so address/onvifPort changes take effect;
+        // the device interval restarts it on the next tick via ensureOnvifEvents().
+        await this.stopOnvifEvents();
         // await this.init();
     }
 
@@ -115,6 +133,10 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
         const logger = this.getLogger();
 
         setInterval(async () => {
+            // Start the hub-level ONVIF push subscription once cameras are loaded and
+            // at least one has "Use ONVIF for Object Detection" enabled. No-op once running.
+            this.ensureOnvifEvents().catch(() => { });
+
             if (this.processing || !client) {
                 return;
             }
@@ -255,6 +277,109 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             );
         }
         return this.client;
+    }
+
+    async ensureOnvifEvents() {
+        const someCameraWantsOnvif = [...this.cameraNativeMap.values()]
+            .some(c => c?.storageSettings?.values?.useOnvifDetection);
+        if (someCameraWantsOnvif)
+            await this.startOnvifEvents();
+        else
+            await this.stopOnvifEvents();
+    }
+
+    async stopOnvifEvents() {
+        // Nothing running and no start in flight -> nothing to tear down. (Avoids bumping
+        // onvifGeneration on every idle 1s tick when no camera wants ONVIF.)
+        if (!this.onvifClient && !this.onvifEmitter && !this.onvifStarting)
+            return;
+        // Invalidate any in-flight start (onvifStarting) so it abandons rather than
+        // resurrecting a subscription, even before it has assigned onvifClient.
+        this.onvifGeneration++;
+        try { await this.onvifClient?.unsubscribe(); } catch (e) { }
+        this.onvifEmitter = undefined;
+        this.onvifClient = undefined;
+    }
+
+    async startOnvifEvents() {
+        if (this.onvifEmitter || this.onvifStarting)
+            return;
+        this.onvifStarting = true;
+        const generation = this.onvifGeneration;
+        const logger = this.getLogger();
+        // Held locally (not in this.onvifClient) until the subscription is fully
+        // established, so an error after connect still has a handle to unsubscribe.
+        let client: OnvifCameraAPI;
+        try {
+            const { ipAddress, onvifPort, username, password } = this.storageSettings.values;
+            const address = `${ipAddress}:${onvifPort}`;
+            client = await connectCameraAPI(address, username, password, logger, undefined);
+            try { await client.supportsEvents(); } catch (e) { }
+            // createSubscription() (createPullPointSubscription) is what starts the onvif
+            // library's PullMessages loop; that loop both delivers events and keeps the
+            // subscription alive, so it is not explicitly renewed. listenEvents() below only
+            // attaches handlers to that loop's emissions. This mirrors the established
+            // onvif-events.ts pattern (createSubscription -> listenEvents).
+            // KNOWN LIMITATION (follow-up): there is no plugin-level liveness watchdog. If
+            // the library's pull loop wedges on a non-retryable error, onvifEmitter/onvifClient
+            // stay set and ensureOnvifEvents() considers it healthy, so it is never restarted.
+            // For sleeping battery cameras this is hard to distinguish from a legitimately
+            // quiet channel; revisit before depending on this as the sole motion source.
+            await client.createSubscription();
+            const emitter = client.listenEvents();
+            emitter.on('onvifChannelEvent', (motion: boolean, className: string | undefined, channel: number) => {
+                try {
+                    this.routeOnvifEvent(motion, className, channel);
+                } catch (e) {
+                    logger.error('error routing onvif event', e);
+                }
+            });
+            emitter.on('data', (xml: string) => {
+                if (this.storageSettings.values.debugEvents)
+                    logger.log(`ONVIF raw: ${xml}`);
+            });
+            // A teardown (stopOnvifEvents) raced this start; abandon it rather than
+            // resurrecting a subscription that was meant to be torn down.
+            if (generation !== this.onvifGeneration) {
+                try { await client.unsubscribe(); } catch (e) { }
+                return;
+            }
+            this.onvifClient = client;
+            this.onvifEmitter = emitter;
+            logger.log('Hub-level ONVIF event subscription started');
+        } catch (e) {
+            // The 1s device interval calls ensureOnvifEvents() again, so a failed start
+            // is retried on the next tick; tear down the connected-but-unstored client
+            // (the leak source) and clean up the partial state here.
+            logger.error('Failed to start hub ONVIF events, will retry', e);
+            try { await client?.unsubscribe(); } catch (e2) { }
+            this.onvifEmitter = undefined;
+            this.onvifClient = undefined;
+        } finally {
+            this.onvifStarting = false;
+        }
+    }
+
+    // Routes an interpreted ONVIF push event (see OnvifCameraAPI.listenEvents) to the
+    // camera on the matching channel. The ONVIF Source token's numeric value equals the
+    // camera's stored rtspChannel (verified on a Home Hub Pro: token 001 -> rtspChannel 1
+    // / Front Door, 005 -> rtspChannel 5 / Gate Area), so they are compared directly. This
+    // is distinct from the RTSP stream-path index, which is rtspChannel + 1.
+    routeOnvifEvent(motion: boolean, className: string | undefined, channel: number) {
+        // Defensive: the emit side (onvif-api) only fires onvifChannelEvent when the channel
+        // is set and motion||class is present, so these guards are normally unreachable; kept
+        // so routeOnvifEvent stays safe if called from another path in the future.
+        if (channel === undefined || channel === null)
+            return;
+        if (!motion && !className)
+            return;
+
+        const target = [...this.cameraNativeMap.values()].find(c =>
+            c
+            && Number(c.storageSettings.values.rtspChannel) === channel
+            && c.storageSettings.values.useOnvifDetection);
+
+        target?.triggerOnvifMotion(className);
     }
 
     updateDeviceInfo(devInfo: DevInfo) {
