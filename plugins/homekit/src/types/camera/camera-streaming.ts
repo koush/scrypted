@@ -378,6 +378,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                             url: rtspUrl,
                             // this may not work if homekit is using aac to deliver audio, since 
                             inputArguments: [
+                                '-rtsp_transport', 'tcp',
                                 "-acodec", isOpus ? "libopus" : "libfdk_aac",
                                 '-i', rtspUrl,
                             ],
