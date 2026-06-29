@@ -859,14 +859,18 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             // for now fall back to old behavior which will be removed at a later date.
         }
 
-        const { id, mac, anonymousDeviceId, host } = device;
+        const { id, mac, anonymousDeviceId } = device;
         const idMaps = this.storageSettings.values.idMaps;
 
-        // try to find an existing nativeId given the mac and anonymous device id
+        // Try to find an existing nativeId using stable hardware identifiers.
+        // Do NOT match on host/IP: DHCP reassigns addresses, so a recycled IP
+        // would bind a newly provisioned camera to an unrelated camera's
+        // nativeId. The subsequent cleanDict() then clobbers the original
+        // camera's mac/anonymousDeviceId entries, collapsing two cameras onto
+        // a single device (and losing the other from the device list).
         const found = (mac && idMaps.mac?.[mac])
             || (anonymousDeviceId && idMaps.anonymousDeviceId?.[anonymousDeviceId])
             || (id && idMaps.id?.[id])
-            || (host && idMaps.host?.[host])
             ;
 
         // use the found id if one exists (device got provisioned a new id), otherwise use the id provided by the device.
@@ -889,24 +893,19 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         // Clean existing mappings before adding new ones
         idMaps.mac ||= {};
         idMaps.anonymousDeviceId ||= {};
-        idMaps.host ||= {};
         idMaps.id ||= {};
         idMaps.nativeId ||= {};
 
         cleanDict(idMaps.mac);
         cleanDict(idMaps.anonymousDeviceId);
-        cleanDict(idMaps.host);
         cleanDict(idMaps.id);
 
-        // map the mac, host, and anonymous device id to the native id.
+        // map the mac and anonymous device id to the native id.
         if (mac) {
             idMaps.mac[mac] = nativeId;
         }
         if (anonymousDeviceId) {
             idMaps.anonymousDeviceId[anonymousDeviceId] = nativeId;
-        }
-        if (host) {
-            idMaps.host[host] = nativeId;
         }
 
         // map the id and native id to each other.
