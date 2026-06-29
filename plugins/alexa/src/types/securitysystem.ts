@@ -2,7 +2,7 @@ import { EventDetails, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Se
 import { DiscoveryEndpoint, DiscoveryCapability, ChangeReport, Report, StateReport, DisplayCategory, ChangePayload, Property } from "../alexa";
 import { supportedTypes } from ".";
 
-function getArmState(mode: SecuritySystemMode): string {
+export function getArmState(mode: SecuritySystemMode): string {
     switch(mode) {
         case SecuritySystemMode.AwayArmed:
             return 'ARMED_AWAY';
@@ -54,12 +54,10 @@ supportedTypes.set(ScryptedDeviceType.SecuritySystem, {
                             return {
                                 "value": getArmState(mode)
                             }
-                        }),
-                        "supportedAuthorizationTypes": [
-                          {
-                            "type": "FOUR_DIGIT_PIN"
-                          }
-                        ]
+                        })
+                        // Scrypted's SecuritySystem interface has no PIN concept, so we do not
+                        // advertise supportedAuthorizationTypes. Advertising FOUR_DIGIT_PIN would
+                        // cause Alexa to send a PIN we have no way to validate.
                     }
                  } as DiscoveryCapability
             );

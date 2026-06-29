@@ -63,14 +63,14 @@ export async function sendCameraEvent (eventSource: ScryptedDevice & MotionSenso
                     name: 'ObjectDetection'
                 },
                 payload: {
-                    "events": [eventData.detections.map(detection => {
+                    "events": eventData.detections.map(detection => {
                         let event = {
                             "eventIdentifier": eventData.eventId,
                             "imageNetClass": detection.className,
                             "timeOfSample": new Date(eventData.timestamp).toISOString(),
                             "uncertaintyInMilliseconds": 500
                         };
-                        
+
                         if (detection.id) {
                             event["objectIdentifier"] = detection.id;
                         }
@@ -80,7 +80,7 @@ export async function sendCameraEvent (eventSource: ScryptedDevice & MotionSenso
                         }
 
                         return event;
-                    })]
+                    })
                 }
             }
         } as Partial<ObjectDetectionEvent>;
