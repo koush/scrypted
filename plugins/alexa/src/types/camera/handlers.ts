@@ -6,6 +6,14 @@ import { alexaDeviceHandlers } from "../../handlers";
 import { Response, WebRTCAnswerGeneratedForSessionEvent, WebRTCSessionConnectedEvent, WebRTCSessionDisconnectedEvent } from '../../alexa'
 import { Deferred } from '@scrypted/common/src/deferred';
 
+// Whether Alexa camera sessions are allowed to use TURN relays. Set by the plugin from its
+// storage settings (see main.ts). When true, TURN usage defers to the WebRTC plugin's own
+// "Use TURN Servers" setting; when false, TURN is force-disabled for Alexa sessions only.
+export let useTurnServer = true;
+export function setUseTurnServer(value: boolean) {
+    useTurnServer = value ?? true;
+}
+
 export class AlexaSignalingSession implements RTCSignalingSession {
     constructor(public response: AlexaHttpResponse, public directive: any) {
         this.options = this.createOptions();
@@ -28,12 +36,24 @@ export class AlexaSignalingSession implements RTCSignalingSession {
                 sdp: this.directive.payload.offer.value,
             },
             disableTrickle: true,
-            disableTurn: true,
-            // this could be a low resolution screen, no way of knowning, so never send a 1080p stream
+            // Alexa sessions are proxied (Scrypted's server negotiates with the Alexa cloud) and
+            // frequently cross NATs, where a TURN relay is the only path that connects. Since
+            // trickle ICE is disabled, all candidates ship in the initial SDP, so omitting the
+            // relay candidate leaves a NAT-blocked session with no fallback. By default we leave
+            // TURN enabled, deferring to the WebRTC plugin's own "Use TURN Servers" setting (the
+            // same behavior as the Google Home integration). Disabling it here force-disables TURN
+            // for Alexa sessions only.
+            disableTurn: !useTurnServer,
+            // Alexa's InitiateSessionWithOffer directive carries no display hint (only sessionId
+            // and the SDP offer), so we cap rather than match the endpoint. 1080p lets larger
+            // displays (Echo Show 15, Fire TV) render sharply while the transcoder still clamps
+            // width and falls back to 720p for sessions that can't negotiate H.264 High. We avoid
+            // an uncapped (e.g. 4K) source stream, which would waste bandwidth and slow the
+            // connection on smaller Echo devices.
             screen: {
                 devicePixelRatio: 1,
-                width: 1280,
-                height: 720
+                width: 1920,
+                height: 1080
             }
         };
 

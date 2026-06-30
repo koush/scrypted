@@ -114,13 +114,19 @@ export async function sendCameraEvent (eventSource: ScryptedDevice & MotionSenso
 };
 
 export async function getCameraCapabilities(device: ScryptedDevice): Promise<DiscoveryCapability[]> {
+    // Only advertise full-duplex (two-way) audio when the camera can actually receive audio,
+    // i.e. it implements the Intercom interface. Advertising full duplex on a one-way camera
+    // makes Alexa set up a return mic path that goes nowhere, degrading the connect experience.
+    // Half-duplex cameras send an 'a=sendonly' answer during negotiation.
+    const isFullDuplexAudioSupported = device.interfaces.includes(ScryptedInterface.Intercom);
+
     const capabilities = [
         {
             "type": "AlexaInterface",
             "interface": "Alexa.RTCSessionController",
             "version": "3",
             "configuration": {
-                "isFullDuplexAudioSupported": true,
+                isFullDuplexAudioSupported,
             }
         } as DiscoveryCapability
     ];

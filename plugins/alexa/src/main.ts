@@ -6,6 +6,7 @@ import { supportedTypes } from './types';
 import { v4 as createMessageId } from 'uuid';
 import { ChangeReport, Discovery, DiscoveryEndpoint } from './alexa';
 import { alexaHandlers, alexaDeviceHandlers } from './handlers';
+import { setUseTurnServer } from './types/camera/handlers';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -59,6 +60,15 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             type: 'boolean',
             defaultValue: false,
         },
+        useTurnServer: {
+            title: "Use TURN Servers",
+            description: "Allow camera streams to relay through a TURN server when a direct connection can't be established. Alexa streams cross networks and usually need this. Disable only if your server is directly reachable and you want to force peer-to-peer connections.",
+            type: 'boolean',
+            defaultValue: true,
+            onPut(oldValue: boolean, newValue: boolean) {
+                setUseTurnServer(newValue);
+            }
+        },
     });
 
     accessToken: Promise<string>;
@@ -69,6 +79,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         super(nativeId);
 
         DEBUG = this.storageSettings.values.debug ?? false;
+        setUseTurnServer(this.storageSettings.values.useTurnServer);
 
         alexaHandlers.set('Alexa.Authorization/AcceptGrant', this.onAlexaAuthorization);
         alexaHandlers.set('Alexa.Discovery/Discover', this.onDiscoverEndpoints);
