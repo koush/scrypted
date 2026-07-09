@@ -52,7 +52,7 @@ class EioRpcTransport(rpc_reader.RpcTransport):
 
         asyncio.run_coroutine_threadsafe(send(), self.loop)
 
-    def writeJSON(self, json, reject):
+    def writeSerialized(self, json, reject):
         return self.writeBuffer(json, reject)
 
 
@@ -96,8 +96,9 @@ async def connect_scrypted_client(
         peer.params["print"] = print
 
         def callback(api, pluginId, hostInfo):
+            cluster_setup = plugin_remote.ClusterSetup(transport.loop, peer)
             remote = plugin_remote.PluginRemote(
-                peer, api, pluginId, hostInfo, transport.loop
+                cluster_setup, api, pluginId, hostInfo, transport.loop
             )
             wrapped = remote.setSystemState
 
