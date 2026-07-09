@@ -159,8 +159,8 @@ class EventRegistry(object):
             events = set()
             self.listeners[token] = events
         callback = ensure_not_coroutine(callback)
-        self.listeners[id].add(callback)
-        return EventListenerRegisterImpl(lambda: self.listeners[id].remove(callback))
+        events.add(callback)
+        return EventListenerRegisterImpl(lambda: events.discard(callback))
 
     def notify(
         self,
@@ -649,6 +649,7 @@ class PluginRemote:
     ):
         self.systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}
         self.nativeIds: Mapping[str, DeviceStorage] = {}
+        self.systemManager: SystemManager = None
         self.mediaManager: MediaManager
         self.clusterManager: ClusterManager
         self.consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
@@ -1113,18 +1114,18 @@ class PluginRemote:
 
     async def notify(self, id, eventDetails: EventDetails, value):
         property = eventDetails.get("property")
-        if property:
-            state = None
-            if self.systemState:
-                state = self.systemState.get(id, None)
-                if not state:
-                    print("state not found for %s" % id)
-                    return
-                state[property] = value
-                # systemManager.events.notify(id, eventTime, eventInterface, property, value.value, changed);
-        else:
-            # systemManager.events.notify(id, eventTime, eventInterface, property, value, changed);
-            pass
+        if property and not eventDetails.get("mixinId"):
+            state = self.systemState.get(id, None) if self.systemState else None
+            if not state:
+                print("state not found for %s" % id)
+                return
+            state[property] = value
+            if self.systemManager:
+                self.systemManager.events.notifyEventDetails(
+                    id, eventDetails, value.get("value", None) if value else None
+                )
+        elif self.systemManager:
+            self.systemManager.events.notifyEventDetails(id, eventDetails, value)
 
     async def ioEvent(self, id, event, message=None):
         pass
