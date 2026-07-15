@@ -40,3 +40,9 @@ By default the login request and the engine.io connection skip TLS
 certificate verification, since Scrypted servers use self-signed certificates
 out of the box. To control TLS (or connection pooling), pass your own
 `login_session` and a pre-built `EioRpcTransport(loop, http_session=...)`.
+
+Session ownership: a `login_session` you pass is only borrowed for the login
+request and is never closed. An `http_session` passed to `EioRpcTransport`
+becomes owned by the transport — `transport.close()` closes it along with the
+engine.io connection and background tasks — so don't share that session with
+anything else.
