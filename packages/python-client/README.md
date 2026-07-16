@@ -48,6 +48,17 @@ loop.run_until_complete(main(loop))
 `SCRYPTED_BASE_URL`, `SCRYPTED_USERNAME`, and `SCRYPTED_PASSWORD` environment
 variables.
 
+[examples/light.py](examples/light.py) is the Python equivalent of
+[packages/client/examples/light.ts](../client/examples/light.ts) — it turns a
+named light on and back off:
+
+```bash
+SCRYPTED_USERNAME=admin SCRYPTED_PASSWORD=swordfish python examples/light.py "Office Dimmer"
+```
+
+It works both with `pip install scrypted-sdk` and directly from a repo
+checkout with only `requirements.txt` installed.
+
 By default the login request and the engine.io connection skip TLS
 certificate verification, since Scrypted servers use self-signed certificates
 out of the box. To control TLS (or connection pooling), pass your own
