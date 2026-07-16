@@ -20,14 +20,10 @@ from io import StringIO
 from pathlib import Path
 from typing import Any, Callable, Coroutine, Optional, Set, Tuple, TypedDict
 
-import cluster_labels
-import plugin_console
-import plugin_volume as pv
 import rpc
 import rpc_reader
 import scrypted_python.scrypted_sdk.types
 from cluster_setup import ClusterSetup
-from plugin_pip import install_with_pip, need_requirements, remove_pip_dirs
 from scrypted_python.scrypted_sdk import PluginFork, ScryptedStatic
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 EventDetails,
@@ -722,6 +718,13 @@ class PluginRemote:
             raise
 
     async def loadZipWrapped(self, packageJson, zipAPI: Any, zipOptions: dict):
+        # plugin host modules, unused (and not installed) when this module is
+        # consumed by a client via the scrypted-sdk package
+        import cluster_labels
+        import plugin_console
+        import plugin_volume as pv
+        from plugin_pip import install_with_pip, need_requirements, remove_pip_dirs
+
         await self.clusterSetup.initializeCluster(zipOptions)
 
         sdk = ScryptedStatic()

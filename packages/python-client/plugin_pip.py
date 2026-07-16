@@ -1,1 +1,0 @@
-../../server/python/plugin_pip.py

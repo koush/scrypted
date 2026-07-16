@@ -1,1 +1,0 @@
-../../server/python/cluster_labels.py
