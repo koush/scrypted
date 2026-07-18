@@ -1,14 +1,20 @@
 import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
-import { createBindZero } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, createBindZero, reserveUdpPort } from '@scrypted/common/src/listen-cluster';
+import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { getSpsPps } from '@scrypted/common/src/sdp-utils';
-import { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
+import sdk, { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
+import child_process from 'child_process';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { RtpTrack, RtpTracks, startRtpForwarderProcess } from '../../../../webrtc/src/rtp-forwarders';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../../hap';
 import { getDebugMode } from './camera-debug-mode-storage';
 import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
+import { getOpusFrameDuration } from './opus-repacketizer';
 import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
 
 export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, ffmpegInput: FFmpegInput, session: CameraStreamingSession) {
@@ -139,9 +145,14 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // homekit live streaming is extremely picky about audio audio packet time.
     // not sending packets of the correct duration will result in mute or choppy audio.
     // the packet time parameter is different between LAN and LTE.
-    let opusFramesPerPacket = request.audio.packet_time / 20;
 
     const noAudio = mso?.audio === null;
+    // if ffmpeg ends up transcoding Opus audio (debug mode, AAC-ELD, or non copyable stream),
+    // it must decode with libopus: ffmpeg's native Opus decoder does not apply the soft clip
+    // recommended by the Opus spec and hard clips content authored above 0 dBFS (e.g. some
+    // Ring doorbells) into loud crackling. harmless when the audio is codec copied.
+    if (!noAudio && mso?.audio?.codec?.toLowerCase() === 'opus')
+        ffmpegInput.inputArguments = ['-c:a', 'libopus', ...ffmpegInput.inputArguments || []];
     if (noAudio) {
         // no op...
     }
@@ -181,7 +192,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 {
                     audioPacketTime: session.startRequest.audio.packet_time,
                     audioSampleRate: session.startRequest.audio.sample_rate,
-                    framesPerPacket: opusFramesPerPacket,
                 }
             );
 
@@ -189,8 +199,140 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 audioSender.sendRtcp();
             };
 
+            // SILK and Hybrid mode Opus (TOC config < 16, e.g. from Ring doorbells) routinely
+            // synthesizes samples above 0 dBFS. The Opus spec recommends decoders soft clip such
+            // content back into range (opus_pcm_soft_clip), but HomeKit's decoder does not, and
+            // instead hard clips it, which is audible as loud crackling. Additionally, frames
+            // longer than the negotiated packet time (e.g. 60ms frames vs 20ms LAN packet time)
+            // can not be repacketized without a reencode, and HomeKit mutes them. Such streams
+            // are lazily rerouted through an ffmpeg transcoder: libopus performs the spec soft
+            // clip on decode, and the reencoded audio is in range at the correct packet time.
+            // CELT streams at a compatible frame duration are forwarded untouched.
+            let transcoding = false;
+            let transcoderFailed = false;
+            let transcoderSend: (rtp: Buffer) => void;
+            let pendingRtp: Buffer[] = [];
+
+            const startOpusSoftClipTranscoder = async (sourcePayloadType: number) => {
+                const pt = session.startRequest.audio.pt;
+
+                // register cleanup before any await: a stream torn down during startup must
+                // still reap the sockets, temp dir, and child process created so far.
+                const cleanups: (() => void)[] = [];
+                let closed = false;
+                const cleanup = () => {
+                    closed = true;
+                    while (cleanups.length)
+                        cleanups.pop()?.();
+                };
+                session.audioReturn.on('close', cleanup);
+
+                // ffmpeg binds the input port itself, so probe a free port and release it.
+                const inputPort = await reserveUdpPort();
+
+                const outputBind = await createBindZero();
+                cleanups.push(() => closeQuiet(outputBind.server));
+
+                const sdpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'opus-softclip-'));
+                cleanups.push(() => void fs.promises.rm(sdpDir, { recursive: true, force: true }).catch(() => { }));
+                const sdpPath = path.join(sdpDir, 'audio.sdp');
+                await fs.promises.writeFile(sdpPath, [
+                    'v=0',
+                    'o=- 0 0 IN IP4 127.0.0.1',
+                    's=scrypted-opus-softclip',
+                    'c=IN IP4 127.0.0.1',
+                    't=0 0',
+                    // the sdp must declare the payload type of the source stream, which may
+                    // differ from the payload type HAP requested for the output.
+                    `m=audio ${inputPort} RTP/AVP ${sourcePayloadType}`,
+                    `a=rtpmap:${sourcePayloadType} opus/48000/2`,
+                ].join('\n'));
+
+                const args = [
+                    '-hide_banner',
+                    '-protocol_whitelist', 'file,crypto,udp,rtp',
+                    '-analyzeduration', '0',
+                    '-probesize', '512',
+                    '-acodec', 'libopus',
+                    '-f', 'sdp',
+                    '-i', sdpPath,
+                    '-vn',
+                    // the soft clipped decode peaks at exactly 0 dBFS, and reencoding full scale
+                    // audio overshoots again (codec ripple), which HomeKit would hard clip. leave
+                    // ~2 dB of encoder headroom so the reencoded peaks stay in range.
+                    '-af', 'volume=0.8',
+                    '-acodec', 'libopus',
+                    '-application', 'lowdelay',
+                    '-frame_duration', request.audio.packet_time.toString(),
+                    '-ar', `${request.audio.sample_rate}k`,
+                    '-b:a', `${request.audio.max_bit_rate}k`,
+                    '-bufsize', `${request.audio.max_bit_rate * 4}k`,
+                    '-ac', `${request.audio.channel}`,
+                    '-payload_type', pt.toString(),
+                    '-f', 'rtp',
+                    `rtp://127.0.0.1:${outputBind.port}`,
+                ];
+
+                const cp = child_process.spawn(await sdk.mediaManager.getFFmpegPath(), args);
+                ffmpegLogInitialOutput(console, cp);
+                cleanups.push(() => safeKillFFmpeg(cp));
+                cp.on('exit', () => fs.promises.rm(sdpDir, { recursive: true, force: true }).catch(() => { }));
+
+                outputBind.server.on('message', data => {
+                    const packet = RtpPacket.deSerialize(data);
+                    if (packet.header.payloadType !== pt)
+                        return;
+                    audioSender.sendRtp(packet);
+                });
+
+                // give ffmpeg a moment to parse the sdp and bind the input port.
+                await new Promise(resolve => setTimeout(resolve, 250));
+
+                if (closed)
+                    throw new Error('stream closed during opus transcoder startup');
+
+                return (rtp: Buffer) => outputBind.server.send(rtp, inputPort, '127.0.0.1');
+            };
+
             onRtp = function (rtp) {
-                audioSender.sendRtp(RtpPacket.deSerialize(rtp));
+                if (transcoding) {
+                    if (transcoderSend)
+                        transcoderSend(rtp);
+                    else if (pendingRtp.length < 500)
+                        pendingRtp.push(rtp);
+                    return;
+                }
+
+                const packet = RtpPacket.deSerialize(rtp);
+                if (!packet.payload.length)
+                    return;
+
+                // opus encoders may switch mode or frame duration mid-stream, so the copy path
+                // checks the TOC of every packet, not just the first.
+                const config = packet.payload[0] >> 3;
+                const frameDuration = getOpusFrameDuration(packet.payload[0]);
+                if (!transcoderFailed && (config < 16 || frameDuration > request.audio.packet_time)) {
+                    transcoding = true;
+                    console.warn(`opus TOC config ${config} (${config < 16 ? 'SILK/Hybrid' : 'CELT'}), frame duration ${frameDuration}ms, packet time ${request.audio.packet_time}ms: transcoding through libopus to apply the Opus spec soft clip.`);
+                    startOpusSoftClipTranscoder(packet.header.payloadType).then(send => {
+                        transcoderSend = send;
+                        for (const pending of pendingRtp)
+                            transcoderSend(pending);
+                        pendingRtp = [];
+                    }).catch(e => {
+                        // degraded audio through the copy path beats a mute stream.
+                        console.error('opus soft clip transcoder failed to start, falling back to codec copy', e);
+                        transcoderFailed = true;
+                        transcoding = false;
+                        for (const pending of pendingRtp)
+                            audioSender.sendRtp(RtpPacket.deSerialize(pending));
+                        pendingRtp = [];
+                    });
+                    pendingRtp.push(rtp);
+                    return;
+                }
+
+                audioSender.sendRtp(packet);
             };
         }
         else {

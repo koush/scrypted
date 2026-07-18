@@ -145,6 +145,10 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
     const audioCodec = ffmpegInput.mediaStreamOptions?.audio?.codec;
     const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
     const isDefinitelyNotAAC = !audioCodec || audioCodec.toLowerCase().indexOf('aac') === -1;
+    // Recordings transcode Opus to AAC. ffmpeg's native Opus decoder does not apply the
+    // soft clip recommended by the Opus spec, and hard-clips content authored above 0 dBFS
+    // (e.g. some Ring doorbells), baking crackle into the recording. Always decode with libopus.
+    const isOpus = audioCodec?.toLowerCase() === 'opus';
     const needsFFmpeg = debugMode.video || debugMode.video
         || !ffmpegInput.url.startsWith('tcp://')
         || ffmpegInput.container !== 'mp4'
@@ -176,6 +180,10 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
             }
         }
 
+        // force the libopus decoder (before the input) so Opus authored above 0 dBFS is
+        // soft-clipped per spec instead of hard-clipped by ffmpeg's native Opus decoder.
+        if (isOpus)
+            inputArguments.push('-c:a', 'libopus');
         inputArguments.push(...ffmpegInput.inputArguments);
 
         if (noAudio) {

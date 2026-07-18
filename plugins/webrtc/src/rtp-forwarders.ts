@@ -349,6 +349,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         inputArguments = [
                             '-analyzeduration', '0',
                             '-probesize', '512',
+                            // ffmpeg's native Opus decoder does not apply the spec's soft-clip and
+                            // hard-clips content authored above 0 dBFS. libopus decodes it correctly.
+                            ...(audioSection.codec === 'opus' ? ['-c:a', 'libopus'] : []),
                             '-i', `rtsp://${audioClient.host}:${audioClient.port}`,
                         ];
                     }

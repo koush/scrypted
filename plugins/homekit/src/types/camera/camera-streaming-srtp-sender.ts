@@ -20,7 +20,6 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     audioOptions?: {
         audioPacketTime: number,
         audioSampleRate: AudioStreamingSamplerate,
-        framesPerPacket: number,
     }) {
     const srtpSession = new SrtpSession(config);
     const srtcpSession = new SrtcpSession(config);
@@ -46,18 +45,20 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         printNaluTypes();
     }, 1000);
 
-    let audioIntervalScale = 1;
+    // opus timestamps are advanced by the actual number of audio samples emitted, computed from the
+    // HAP-requested sample rate and the repacketizer's real per-packet duration.
+    let audioSampleRateKhz = 8;
+    let audioSampleCount = 0;
     if (audioOptions) {
         switch (audioOptions.audioSampleRate) {
             case AudioStreamingSamplerate.KHZ_24:
-                audioIntervalScale = 3;
+                audioSampleRateKhz = 24;
                 break;
             case AudioStreamingSamplerate.KHZ_16:
-                audioIntervalScale = 2;
+                audioSampleRateKhz = 16;
                 break;
         }
-        audioIntervalScale = audioIntervalScale * audioOptions.audioPacketTime / 20;
-        opusPacketizer = new OpusRepacketizer(audioOptions.framesPerPacket);
+        opusPacketizer = new OpusRepacketizer(audioOptions.audioPacketTime);
     }
     else {
         if (videoOptions.maxPacketSize) {
@@ -141,7 +142,10 @@ export function createCameraStreamSender(console: Console, config: Config, sende
             // HAP requests, and the packet time is respected,
             // opus 48khz will work just fine.
             for (const rtp of packets) {
-                rtp.header.timestamp = (firstTimestamp + packetCount * 160 * audioIntervalScale) % 0xFFFFFFFF;
+                // stamp each packet by the audio it actually contains, then advance by the same amount:
+                // emittedPacketTime (ms) of audio at the HAP-requested sample rate.
+                rtp.header.timestamp = (firstTimestamp + audioSampleCount) % 0xFFFFFFFF;
+                audioSampleCount += Math.round(audioSampleRateKhz * opusPacketizer.emittedPacketTime);
                 sendPacket(rtp);
             }
             return;

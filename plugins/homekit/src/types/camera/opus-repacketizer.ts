@@ -61,14 +61,43 @@ import type { RtpPacket } from "@koush/werift-src/packages/rtp/src/rtp/rtp";
 // signaled length of the padding MUST be no larger than N, the total
 // size of the packet.
 
+// The Opus frame duration (ms) is encoded in the config (top 5 bits of the TOC byte), per RFC 6716 3.1.
+export function getOpusFrameDuration(toc: number): number {
+    const config = toc >> 3;
+    if (config < 12)
+        return [10, 20, 40, 60][config & 0b11]; // SILK
+    if (config < 16)
+        return [10, 20][config & 0b01];          // Hybrid
+    return [2.5, 5, 10, 20][config & 0b11];       // CELT
+}
+
+// Encode an opus frame length as 1 or 2 bytes, per RFC 6716 3.2.1: lengths < 252 use a single byte;
+// larger lengths use two bytes where total = b0 + b1 * 4 with 252 <= b0 <= 255.
+function encodeFrameLength(length: number): number[] {
+    if (length < 252)
+        return [length];
+    const b1 = Math.floor((length - 252) / 4);
+    const b0 = length - b1 * 4;
+    return [b0, b1];
+}
+
 export class OpusRepacketizer {
     depacketized: Buffer[] = [];
     extraPackets = 0;
 
-    // framesPerPacket argument is buggy in that it assumes that the frame durations are always 20.
-    // the frame duration can be determined from the config in the opus header above.
-    // however, frames of duration 20 seems to always be the case from the various test devices.
-    constructor(public framesPerPacket: number) {
+    // framesPerPacket and frameDuration are derived from the TOC of each incoming packet: the
+    // HAP-requested packet time divided by the actual opus frame duration. This replaces the old
+    // assumption that frames are always 20ms, which corrupted timestamps for e.g. 60ms SILK.
+    framesPerPacket: number;
+    frameDuration: number;
+
+    // packetTime is the packet duration (ms) HAP requested (e.g. 20 on LAN, 60 over LTE).
+    constructor(public packetTime: number) {
+    }
+
+    // actual duration (ms) of each emitted packet: framesPerPacket frames of frameDuration each.
+    get emittedPacketTime() {
+        return this.frameDuration * this.framesPerPacket;
     }
 
     // repacketize a packet with a single frame into a packet with multiple frames.
@@ -76,12 +105,24 @@ export class OpusRepacketizer {
         const code = packet.payload[0] & 0b00000011;
         let offset: number;
 
+        // derive frames-per-packet from the actual frame duration in the TOC. if the encoder switches
+        // config mid-stream the frame duration changes: recompute and drop any partially accumulated
+        // frames, which belong to the previous configuration.
+        const frameDuration = getOpusFrameDuration(packet.payload[0]);
+        if (frameDuration !== this.frameDuration) {
+            this.frameDuration = frameDuration;
+            // frames longer than the requested packet time can't be split without a re-encode, so they
+            // pass through one per packet (hence Math.max(1, ...)).
+            this.framesPerPacket = Math.max(1, Math.floor(this.packetTime / frameDuration));
+            this.depacketized = [];
+        }
+
         // see Frame Length Coding in RFC
         const decodeFrameLength = () => {
             let frameLength = packet.payload.readUInt8(offset++);
             if (frameLength >= 252) {
-                offset++;
-                frameLength += packet.payload.readUInt8(offset) * 4;
+                // 2-byte length: total = b0 + b1 * 4 (RFC 6716 3.2.1). read the second byte and advance.
+                frameLength += packet.payload.readUInt8(offset++) * 4;
             }
             return frameLength;
         }
@@ -183,8 +224,9 @@ export class OpusRepacketizer {
 
             const newHeader: number[] = [toc, frameCountByte];
 
-            // M-1 length bytes
-            newHeader.push(...depacketized.slice(0, -1).map(data => data.length));
+            // M-1 frame lengths, each 1 or 2 bytes (frames >= 252 bytes need the 2-byte encoding).
+            for (const data of depacketized.slice(0, -1))
+                newHeader.push(...encodeFrameLength(data.length));
 
             const headerBuffer = Buffer.from(newHeader);
             const payload = Buffer.concat([headerBuffer, ...depacketized]);

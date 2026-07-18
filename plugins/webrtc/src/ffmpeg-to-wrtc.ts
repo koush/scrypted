@@ -280,9 +280,9 @@ export async function createTrackForwarder(options: {
         alternateCodecs: ['opus', 'pcm_mulaw', 'pcm_alaw'],
         onRtp: (buffer, codec) => {
             if (false && audioTransceiver.sender.codec.mimeType?.toLowerCase() === "audio/opus") {
-                // this will use 3 20ms frames, 60ms. seems to work up to 6/120ms
+                // this will pack 60ms per packet (e.g. 3 20ms frames). seems to work up to 120ms.
                 if (!opusRepacketizer)
-                    opusRepacketizer = new OpusRepacketizer(3);
+                    opusRepacketizer = new OpusRepacketizer(60);
                 for (const rtp of opusRepacketizer.repacketize(RtpPacket.deSerialize(buffer))) {
                     audioTransceiver.sender.sendRtp(rtp);
                 }
