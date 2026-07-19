@@ -1,7 +1,7 @@
 import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, LockState, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoRecorder, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, LockState, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoRecorder, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
@@ -22,8 +22,7 @@ const rtspChannelSetting: Setting = {
     placeholder: '1',
 };
 
-class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, Lock, VideoRecorder, Reboot, ObjectDetector, VideoTextOverlays {
-    eventStream: Stream;
+class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Reboot, Camera, AudioSensor, MotionSensor, ObjectDetector, VideoTextOverlays, Lock, Intercom, VideoRecorder {
     cp: ChildProcess;
     client: AmcrestCameraClient;
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
@@ -41,10 +40,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
-
-        if (this.storage.getItem('enableDahuaLock') === 'true') {
-            this.lockState = LockState.Locked;
-        }
     }
 
     async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
@@ -210,6 +205,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     getClient() {
         if (!this.client)
             this.client = new AmcrestCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
+        
+        if (this.storage.getItem('enableDahuaLock') === 'true') {
+            this.lockState = LockState.Locked;
+        }
+
         return this.client;
     }
 
@@ -425,14 +425,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 description: 'Amcrest cameras may support both Amcrest and ONVIF two way audio protocols. ONVIF generally performs better when supported.',
                 choices,
             },
-            // sdcard write causes jitter.
-            // {
-            //     title: 'Continuous Recording',
-            //     key: 'continuousRecording',
-            //     description: 'Continuously record onto the Camera SD Card.',
-            //     type: 'boolean',
-            //     value: (this.storage.getItem('continuousRecording') === 'true').toString(),
-            // },
         );
 
         const ac = {
@@ -516,7 +508,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     updateDevice() {
         const doorbellType = this.storage.getItem('doorbellType');
         const isDoorbell = doorbellType === AMCREST_DOORBELL_TYPE || doorbellType === DAHUA_DOORBELL_TYPE;
-        // true is the legacy value before onvif was added.
         const twoWayAudio = this.storage.getItem('twoWayAudio') === 'true'
             || this.storage.getItem('twoWayAudio') === 'ONVIF'
             || this.storage.getItem('twoWayAudio') === 'Amcrest';
@@ -531,22 +522,21 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             interfaces.push(ScryptedInterface.Intercom);
         }
 
-        const enableDahuaLock = this.storage.getItem('enableDahuaLock') === 'true';
-        if (isDoorbell && doorbellType === DAHUA_DOORBELL_TYPE && enableDahuaLock) {
-            interfaces.push(ScryptedInterface.Lock);
-        }
-
         const continuousRecording = this.storage.getItem('continuousRecording') === 'true';
         if (continuousRecording)
             interfaces.push(ScryptedInterface.VideoRecorder);
 
         if (this.hasSmartDetection)
             interfaces.push(ScryptedInterface.ObjectDetector);
+            
+        if (this.storage.getItem('enableDahuaLock') === 'true') {
+            interfaces.push(ScryptedInterface.Lock);
+        }
 
         this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
-    async putSetting(key: string, value: string) {
+    async putSetting(key: string, value: string | number | boolean) {
         if (key === automaticallyConfigureSettings.key) {
             const client = this.getClient();
             autoconfigureSettings(client, parseInt(this.getRtspChannel()) || 1)
@@ -579,12 +569,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.client = undefined;
         this.videoStreamOptions = undefined;
 
-        super.putSetting(key, value);
-
-        if (key === 'enableDahuaLock' && value === 'true') {
-            this.lockState = LockState.Locked;
-        }
-
+        await super.putSetting(key, value);
         this.updateDevice();
         this.updateDeviceInfo();
     }
@@ -603,8 +588,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         const doorbellType = this.storage.getItem('doorbellType');
 
-        // not sure if this all works, since i don't actually have a doorbell.
-        // good luck!
         const channel = parseInt(this.getRtspChannel()) || 1;
 
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
@@ -635,16 +618,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 'pipe:3',
             );
             contentType = 'Audio/AAC';
-            // args.push(
-            //     "-vn",
-            //     '-acodec', 'pcm_mulaw',
-            //     '-ac', '1',
-            //     '-ar', '8000',
-            //     '-sample_fmt', 's16',
-            //     '-f', 'mulaw',
-            //     'pipe:3',
-            // );
-            // contentType = 'Audio/G.711A';
         }
 
         this.console.log('ffmpeg intercom', args);
@@ -661,8 +634,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=${channel}`;
             this.console.log('posting audio data to', url);
 
-            // seems the dahua doorbells preferred 1024 chunks. should investigate adts
-            // parsing and sending multipart chunks instead.
             const passthrough = new PassThrough();
             const abortController = new AbortController();
             this.getClient().request({
@@ -710,26 +681,31 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async lock(): Promise<void> {
+        this.console.log('[Lock]: Received Lock command on Camera!');
         const ok = await this.client.lock();
         if (!ok) {
-            this.console.error("Could not lock");
+            this.console.error("[Lock]: Could not lock");
             return;
         }
         clearTimeout(this.autoLockTimeout);
         this.lockState = LockState.Locked;
+        this.console.log('[Lock]: Lock command successful.');
     }
 
     async unlock(): Promise<void> {
+        this.console.log('[Lock]: Received Unlock command on Camera!');
         const ok = await this.client.unlock();
         if (!ok) {
-            this.console.error("Could not unlock");
+            this.console.error("[Lock]: Could not unlock");
             return;
         }
         this.lockState = LockState.Unlocked;
-        clearTimeout(this.autoLockTimeout);
         const delay = parseFloat(this.storage.getItem('dahuaAutoLockDelay')) || 5;
+        this.console.log(`[Lock]: Unlock command successful. Auto-locking in ${delay} seconds.`);
+        clearTimeout(this.autoLockTimeout);
         this.autoLockTimeout = setTimeout(() => {
             this.lockState = LockState.Locked;
+            this.console.log(`[Lock]: Auto-locked after ${delay} seconds.`);
         }, delay * 1000);
     }
 }
@@ -741,14 +717,20 @@ class AmcrestProvider extends RtspProvider {
     }
 
     getAdditionalInterfaces() {
-        return [
+        const interfaces = [
             ScryptedInterface.Reboot,
             ScryptedInterface.VideoCameraConfiguration,
             ScryptedInterface.Camera,
             ScryptedInterface.AudioSensor,
             ScryptedInterface.MotionSensor,
             ScryptedInterface.VideoTextOverlays,
+            ScryptedInterface.Intercom,
+            ScryptedInterface.VideoRecorder,
         ];
+        if (this.storage.getItem('enableDahuaLock') === 'true') {
+            interfaces.push(ScryptedInterface.Lock);
+        }
+        return interfaces;
     }
 
     getScryptedDeviceCreator(): string {
