@@ -31,6 +31,8 @@ backup_exclude:
   - '*/server/**'
   - '*/scrypted_nvr/**'
   - '*/scrypted_data/plugins/**'
+priveleged:
+  - NET_ADMIN
 map:
   - config:rw
   - media:rw
