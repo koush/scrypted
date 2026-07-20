@@ -46,6 +46,21 @@ function start(mainFilename: string) {
             console.error('peer host disconnected, exiting.');
             process.exit(1);
         });
+
+        // Backstop for orphaned workers.
+        // The 'disconnect' event above is not reliably delivered when the parent
+        // process dies abruptly (SIGKILL/crash): the worker is reparented to init
+        // (or a subreaper) and, if something keeps its event loop alive (e.g. a
+        // pending timer or socket), it lingers forever. Poll the parent pid and
+        // exit when it changes, so an orphaned worker can never leak.
+        // unref() so this timer alone never keeps an otherwise-idle worker alive.
+        const originalParentPid = process.ppid;
+        setInterval(() => {
+            if (process.ppid !== originalParentPid) {
+                console.error('parent process died (reparented), exiting.');
+                process.exit(1);
+            }
+        }, 10000).unref();
     }
 }
 
