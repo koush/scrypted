@@ -12,6 +12,7 @@ import { readLength, readLine } from './read-stream';
 import { MSection, parseSdp } from './sdp-utils';
 import { sleep } from './sleep';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
+import { RtpHeader, RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 
 const REQUIRED_WWW_AUTHENTICATE_KEYS = ['realm', 'nonce'];
 
@@ -103,16 +104,21 @@ export const H265_NAL_TYPE_FU = 49;
 export const H265_NAL_TYPE_SEI_PREFIX = 39;
 export const H265_NAL_TYPE_SEI_SUFFIX = 40;
 
+function getRtpPayload(rtp: Buffer) {
+    const parsed = RtpPacket.deSerialize(rtp);
+    return parsed.payload;
+}
+
 export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h264')
         return;
-    return findH264NaluTypeInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), naluType);
+    return findH264NaluTypeInNalu(getRtpPayload(streamChunk.chunks[streamChunk.chunks.length - 1]), naluType);
 }
 
 export function findH265NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h265')
         return;
-    return findH265NaluTypeInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), naluType);
+    return findH265NaluTypeInNalu(getRtpPayload(streamChunk.chunks[streamChunk.chunks.length - 1]), naluType);
 }
 
 export function parseH264NaluType(firstNaluByte: number) {
@@ -171,7 +177,7 @@ export function findH265NaluTypeInNalu(nalu: Buffer, naluType: number) {
 export function getStartedH264NaluTypes(streamChunk: StreamChunk) {
     if (streamChunk.type !== 'h264')
         return new Set<number>();
-    return getNaluTypesInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), true)
+    return getNaluTypesInNalu(getRtpPayload(streamChunk.chunks[streamChunk.chunks.length - 1]), true)
 }
 
 export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false, fuaRequireEnd = false) {
@@ -215,7 +221,7 @@ export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false, fuaReq
 export function getStartedH265NaluTypes(streamChunk: StreamChunk) {
     if (streamChunk.type !== 'h265')
         return new Set<number>();
-    return getNaluTypesInH265Nalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), true)
+    return getNaluTypesInH265Nalu(getRtpPayload(streamChunk.chunks[streamChunk.chunks.length - 1]), true)
 }
 
 export function getNaluTypesInH265Nalu(nalu: Buffer, fuaRequireStart = false, fuaRequireEnd = false) {
