@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scrypted-sdk"
+version = "0.1.0"
+description = "Python SDK for Scrypted: connect to a Scrypted server and use the same SDK objects plugins see"
+readme = "README.md"
+license = "ISC"
+requires-python = ">=3.10"
+authors = [
+    { name = "Koushik Dutta", email = "koushd@gmail.com" },
+]
+keywords = ["scrypted", "home-automation", "camera", "nvr"]
+classifiers = [
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Home Automation",
+]
+# keep in sync with requirements.txt
+dependencies = [
+    "aiohttp",
+    "aiodns",
+    "python-engineio[asyncio_client]",
+]
+
+[project.urls]
+Homepage = "https://github.com/koush/scrypted"
+Source = "https://github.com/koush/scrypted/tree/main/packages/python-client"
+
+[tool.hatch.build.targets.sdist]
+include = ["pyproject.toml", "hatch_build.py", "README.md"]
+
+[tool.hatch.build.targets.sdist.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
