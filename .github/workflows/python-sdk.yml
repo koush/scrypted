@@ -1,0 +1,48 @@
+name: Python SDK
+
+on:
+  push:
+    tags: ["python-sdk-v*"]
+  pull_request:
+    paths:
+      - "packages/python-client/**"
+      - "server/python/**"
+      - "sdk/types/scrypted_python/**"
+      - ".github/workflows/python-sdk.yml"
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/python-client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Build sdist and wheel
+        run: uv build
+      - name: Smoke test the wheel
+        run: |
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/*.whl
+          /tmp/smoke/bin/python -c "import scrypted_sdk; print(scrypted_sdk.connect_scrypted_client)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-sdk-dist
+          path: packages/python-client/dist/
+
+  publish:
+    name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags/python-sdk-v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # PyPI trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-sdk-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
