@@ -1,8 +1,7 @@
 name: Python SDK
 
 on:
-  push:
-    tags: ["python-sdk-v*"]
+  workflow_dispatch:
   pull_request:
     paths:
       - "packages/python-client/**"
@@ -34,7 +33,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    if: startsWith(github.ref, 'refs/tags/python-sdk-v')
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     environment: pypi
