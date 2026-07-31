@@ -147,24 +147,33 @@ async def connect_scrypted_client(
         connector=aiohttp.TCPConnector(ssl=False)
     )
     try:
-        async with session.post(
-            f"{base_url}/login",
-            json={"username": username, "password": password},
-            raise_for_status=True,
-            timeout=aiohttp.ClientTimeout(total=timeout),
-        ) as response:
-            login_response = await response.json()
-    except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-        raise ScryptedConnectionError(f"Login to {base_url} failed: {err}") from err
-    finally:
-        if owns_login_session:
-            await session.close()
+        try:
+            async with session.post(
+                f"{base_url}/login",
+                json={"username": username, "password": password},
+                raise_for_status=True,
+                timeout=aiohttp.ClientTimeout(total=timeout),
+            ) as response:
+                login_response = await response.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise ScryptedConnectionError(
+                f"Login to {base_url} failed: {err}"
+            ) from err
+        finally:
+            if owns_login_session:
+                await session.close()
 
-    if "authorization" not in login_response:
-        raise ScryptedConnectionError(
-            f"Login to {base_url} did not return an authorization header "
-            f"(response keys: {sorted(login_response)})"
-        )
+        if "authorization" not in login_response:
+            raise ScryptedConnectionError(
+                f"Login to {base_url} did not return an authorization header "
+                f"(response keys: {sorted(login_response)})"
+            )
+    except ScryptedConnectionError:
+        # A caller-provided transport already owns a session and a running
+        # send loop; failing before the engine.io phase must not leak them.
+        if transport is not None:
+            await transport.close()
+        raise
 
     if transport is None:
         transport = EioRpcTransport(loop)

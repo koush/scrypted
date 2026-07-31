@@ -55,8 +55,20 @@ from scrypted_sdk.client import (
     ScryptedConnectionError,
     connect_scrypted_client,
 )
-from scrypted_sdk.plugin_remote import DeviceManager, MediaManager, SystemManager
+from scrypted_sdk.plugin_remote import (
+    DeviceManager,
+    MediaManager,
+    PluginRemote,
+    SystemManager,
+)
 from scrypted_sdk.scrypted_python.scrypted_sdk import ScryptedStatic
+from scrypted_sdk.scrypted_python.scrypted_sdk.types import (
+    ScryptedDeviceType,
+    ScryptedInterface,
+    ScryptedInterfaceMethods,
+    ScryptedInterfaceProperty,
+    ScryptedMimeTypes,
+)
 
 __all__ = [
     "DEFAULT_CONNECT_TIMEOUT",
@@ -64,7 +76,13 @@ __all__ = [
     "DeviceManager",
     "EioRpcTransport",
     "MediaManager",
+    "PluginRemote",
     "ScryptedConnectionError",
+    "ScryptedDeviceType",
+    "ScryptedInterface",
+    "ScryptedInterfaceMethods",
+    "ScryptedInterfaceProperty",
+    "ScryptedMimeTypes",
     "ScryptedStatic",
     "SystemManager",
     "connect_scrypted_client",
