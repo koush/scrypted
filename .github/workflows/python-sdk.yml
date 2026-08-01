@@ -25,7 +25,7 @@ jobs:
         run: |
           uv venv /tmp/smoke
           uv pip install --python /tmp/smoke/bin/python dist/*.whl
-          /tmp/smoke/bin/python -c "import scrypted_sdk; print(scrypted_sdk.connect_scrypted_client)"
+          /tmp/smoke/bin/python -c "import scrypted_sdk; from scrypted_sdk.types import VideoClip, LockState; print(scrypted_sdk.connect_scrypted_client, scrypted_sdk.PluginRemote, scrypted_sdk.ScryptedInterface.MotionSensor, VideoClip, LockState)"
       - uses: actions/upload-artifact@v4
         with:
           name: python-sdk-dist
