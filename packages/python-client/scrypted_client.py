@@ -119,6 +119,38 @@ class EioRpcTransport(rpc_reader.RpcTransport):
             self._http_session = None
 
 
+async def _login(
+    base_url: str,
+    username: str,
+    password: str,
+    timeout: float,
+    login_session: aiohttp.ClientSession | None,
+) -> dict:
+    """POST /login and return the parsed response.
+
+    Uses a temporary no-verify session when none is provided (and closes it);
+    a caller-provided session is left open. Raises ScryptedConnectionError on
+    any request failure.
+    """
+    owns_session = login_session is None
+    session = login_session or aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(ssl=False)
+    )
+    try:
+        async with session.post(
+            f"{base_url}/login",
+            json={"username": username, "password": password},
+            raise_for_status=True,
+            timeout=aiohttp.ClientTimeout(total=timeout),
+        ) as response:
+            return await response.json()
+    except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        raise ScryptedConnectionError(f"Login to {base_url} failed: {err}") from err
+    finally:
+        if owns_session:
+            await session.close()
+
+
 async def connect_scrypted_client(
     loop: asyncio.AbstractEventLoop,
     base_url: str,
@@ -142,27 +174,10 @@ async def connect_scrypted_client(
     for initial system state. Raises :class:`ScryptedConnectionError` on any
     failure.
     """
-    owns_login_session = login_session is None
-    session = login_session or aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(ssl=False)
-    )
     try:
-        try:
-            async with session.post(
-                f"{base_url}/login",
-                json={"username": username, "password": password},
-                raise_for_status=True,
-                timeout=aiohttp.ClientTimeout(total=timeout),
-            ) as response:
-                login_response = await response.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            raise ScryptedConnectionError(
-                f"Login to {base_url} failed: {err}"
-            ) from err
-        finally:
-            if owns_login_session:
-                await session.close()
-
+        login_response = await _login(
+            base_url, username, password, timeout, login_session
+        )
         if "authorization" not in login_response:
             raise ScryptedConnectionError(
                 f"Login to {base_url} did not return an authorization header "
