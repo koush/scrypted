@@ -55,8 +55,20 @@ from scrypted_sdk.client import (
     ScryptedConnectionError,
     connect_scrypted_client,
 )
-from scrypted_sdk.plugin_remote import DeviceManager, MediaManager, SystemManager
+from scrypted_sdk.plugin_remote import (
+    DeviceManager,
+    MediaManager,
+    PluginRemote,
+    SystemManager,
+)
 from scrypted_sdk.scrypted_python.scrypted_sdk import ScryptedStatic
+from scrypted_sdk.scrypted_python.scrypted_sdk.types import (
+    ScryptedDeviceType,
+    ScryptedInterface,
+    ScryptedInterfaceMethods,
+    ScryptedInterfaceProperty,
+    ScryptedMimeTypes,
+)
 
 __all__ = [
     "DEFAULT_CONNECT_TIMEOUT",
@@ -64,11 +76,32 @@ __all__ = [
     "DeviceManager",
     "EioRpcTransport",
     "MediaManager",
+    "PluginRemote",
     "ScryptedConnectionError",
+    "ScryptedDeviceType",
+    "ScryptedInterface",
+    "ScryptedInterfaceMethods",
+    "ScryptedInterfaceProperty",
+    "ScryptedMimeTypes",
     "ScryptedStatic",
     "SystemManager",
     "connect_scrypted_client",
 ]
+'''
+
+TYPES_PY = '''"""Alias for the full generated type surface.
+
+The concrete type tree lives at scrypted_sdk.scrypted_python.scrypted_sdk.types
+(an artifact of build-time package generation); this module exposes all of it
+in one place::
+
+    from scrypted_sdk.types import ScryptedInterface, VideoClip, LockState
+
+The package root re-exports only the curated common names; everything else
+(interface TypedDicts, settings types, the remaining enums) is available here.
+"""
+
+from scrypted_sdk.scrypted_python.scrypted_sdk.types import *  # noqa: F401,F403
 '''
 
 _ALTERNATION = "|".join(sorted(MODULES, key=len, reverse=True))
@@ -112,6 +145,7 @@ def generate(source_dir: Path, package_dir: Path) -> None:
         shutil.rmtree(package_dir)
     package_dir.mkdir(parents=True)
     (package_dir / "__init__.py").write_text(INIT_PY)
+    (package_dir / "types.py").write_text(TYPES_PY)
 
     for flat, target in MODULES.items():
         src = source_dir / f"{flat}.py"

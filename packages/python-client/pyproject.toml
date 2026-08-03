@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "scrypted-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python SDK for Scrypted: connect to a Scrypted server and use the same SDK objects plugins see"
 readme = "README.md"
 license = "ISC"
