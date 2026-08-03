@@ -8,7 +8,7 @@
 
 # this works on wyse 5070 and core ultra 125h but requires a recent scrypted image for the compute runtime.
 # openvino==2025.4.0
-openvino==2024.5.0
+openvino==2026.2.0
 
 Pillow==10.3.0
 opencv-python-headless==4.10.0.84
