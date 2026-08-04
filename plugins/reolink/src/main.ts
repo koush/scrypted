@@ -7,7 +7,7 @@ import { OnvifCameraAPI, OnvifEvent, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
 import { DevInfo } from './probe';
-import { AIState, Enc, isDeviceHomeHub, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
+import { AIState, Enc, isDeviceHomeHub, ReolinkCameraClient } from './reolink-api';
 import { ReolinkNvrDevice } from './nvr/nvr';
 import { ReolinkNvrClient } from './nvr/api';
 
@@ -129,6 +129,19 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             title: 'Motion Timeout',
             defaultValue: 20,
             type: 'number',
+        },
+        motionTrigger: {
+            subgroup: 'Advanced',
+            title: 'Motion Trigger',
+            description: 'Which detections set the motion sensor, and therefore trigger HomeKit Secure Video. '
+                + 'Motion + AI uses both raw motion detection and AI object detection. '
+                + 'AI Only ignores raw motion, so whole-frame brightness changes such as the '
+                + 'day/night IR filter switching or a floodlight turning on no longer trigger recordings.',
+            choices: [
+                'Motion + AI',
+                'AI Only',
+            ],
+            defaultValue: 'Motion + AI',
         },
         hasObjectDetector: {
             json: true,
@@ -597,8 +610,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
 
         // reolink ai might not trigger motion if objects are detected, weird.
         const startAI = async (ret: Destroyable, triggerMotion: () => void) => {
-            let hasSucceeded = false;
             let hasSet = false;
+            let failures = 0;
             while (!killed) {
                 try {
                     const ai = this.hasPirEvents() ? await client.getEvents() : await client.getAiState();
@@ -614,16 +627,21 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                             classes.push(key);
                     }
 
-                    if (!classes.length)
-                        return;
+                    // No supported classes yet. Re-probe on a slow cadence rather than
+                    // exiting: a transient or malformed response would otherwise end
+                    // object detection for the lifetime of the device, and when the
+                    // motion sensor is driven by AI alone that leaves no trigger at all.
+                    if (!classes.length) {
+                        await sleep(10000);
+                        continue;
+                    }
 
-
+                    failures = 0;
                     if (!hasSet) {
                         hasSet = true;
                         this.storageSettings.values.hasObjectDetector = ai;
                     }
 
-                    hasSucceeded = true;
                     const od: ObjectsDetected = {
                         timestamp: Date.now(),
                         detections: [],
@@ -644,9 +662,15 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                     }
                 }
                 catch (e) {
-                    if (!hasSucceeded && !isDeviceNvr(deviceInfo))
-                        return;
                     ret.emit('error', e);
+                    // Back off instead of exiting. The previous behaviour gave up
+                    // permanently on the first failure for non-NVR devices, so a
+                    // camera that was briefly unreachable never detected objects
+                    // again. Backing off keeps a camera that genuinely has no AI
+                    // from being polled once a second forever.
+                    failures++;
+                    await sleep(Math.min(60000, 1000 * 2 ** Math.min(failures, 6)));
+                    continue;
                 }
                 await sleep(1000);
             }
@@ -717,6 +741,10 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             clearTimeout(this.motionTimeout);
             this.motionTimeout = setTimeout(() => this.motionDetected = false, this.storageSettings.values.motionTimeout * 1000);
         };
+        // AI Only suppresses the raw motion detector as a motion trigger. The PIR
+        // path is deliberately exempt: a battery camera has no AI state, so PIR is
+        // its only trigger and gating it would leave the camera with none.
+        const aiOnly = () => this.storageSettings.values.motionTrigger === 'AI Only';
         (async () => {
             while (!killed) {
                 try {
@@ -729,7 +757,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                         ret.emit('data', JSON.stringify(data));
                     } else {
                         const { value, data } = await client.getMotionState();
-                        if (value)
+                        if (value && !aiOnly())
                             triggerMotion();
                         ret.emit('data', JSON.stringify(data));
                     }
