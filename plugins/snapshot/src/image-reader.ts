@@ -1,3 +1,4 @@
+import fs from 'fs';
 import sdk, { BufferConverter, Image, ImageOptions, MediaObject, MediaObjectOptions, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import type sharp from 'sharp';
 import type { KernelEnum } from "sharp";
@@ -130,6 +131,10 @@ export class VipsImage implements Image {
 }
 
 export async function loadVipsMetadata(data: Buffer | string) {
+    if (typeof data === 'string') {
+        // if a file is deleted/truncated while being read, vips will seg fault.
+        data = await fs.promises.readFile(data);
+    }
     const image = sharpInstance(data, {
         failOn: 'none'
     });
