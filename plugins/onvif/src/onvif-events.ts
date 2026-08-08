@@ -5,6 +5,8 @@ import { Destroyable } from "../../rtsp/src/rtsp";
 export async function listenEvents(thisDevice: ScryptedDeviceBase, client: OnvifCameraAPI, motionTimeoutMs = 30000) {
     let motionTimeout: NodeJS.Timeout;
     let binaryTimeout: NodeJS.Timeout;
+    const disableMotionDebounce = thisDevice.storage.getItem('disableMotionDebounce') || false;
+    console.log(`[${thisDevice.name}] disableMotionDebounce=${disableMotionDebounce}`)
 
     const triggerMotion = () => {
         thisDevice.motionDetected = true;
@@ -39,15 +41,20 @@ export async function listenEvents(thisDevice: ScryptedDeviceBase, client: Onvif
             // events.
             // furthermore, cameras are not guaranteed to send motion stop events, which makes.
             // for the sake of providing normalized motion durations through scrypted, debounce the motion.
-            triggerMotion();
-            // thisDevice.motionDetected = true;
+            if (disableMotionDebounce) {
+                thisDevice.motionDetected = true;
+            } else {
+                triggerMotion();
+            }
         }
         else if (event === OnvifEvent.MotionStop) {
-            // reset the trigger to debounce per above.
-            if (thisDevice.motionDetected)
-                triggerMotion();
-
-            // thisDevice.motionDetected = false;
+            if (disableMotionDebounce) {
+                thisDevice.motionDetected = false;
+            } else {
+                // reset the trigger to debounce per above.
+                if (thisDevice.motionDetected)
+                    triggerMotion();
+            }
         }
         else if (event === OnvifEvent.AudioStart)
             thisDevice.audioDetected = true;
