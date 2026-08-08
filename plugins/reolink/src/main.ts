@@ -9,7 +9,7 @@ import { OnvifIntercom } from './onvif-intercom';
 import { DevInfo } from './probe';
 import { AIState, Enc, isDeviceHomeHub, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
 import { ReolinkNvrDevice } from './nvr/nvr';
-import { ReolinkNvrClient } from './nvr/api';
+import { HTTPS_API_SETTING_DESCRIPTION, ReolinkNvrClient } from './nvr/api';
 
 class ReolinkCameraSiren extends ScryptedDeviceBase implements OnOff {
     sirenTimeout: NodeJS.Timeout;
@@ -1280,6 +1280,13 @@ class ReolinkProvider extends RtspProvider {
             },
             {
                 subgroup: 'Advanced',
+                key: 'https',
+                title: 'Use HTTPS',
+                description: `Only applies when "Is NVR" is enabled. ${HTTPS_API_SETTING_DESCRIPTION}`,
+                type: 'boolean',
+            },
+            {
+                subgroup: 'Advanced',
                 key: 'skipValidate',
                 title: 'Skip Validation',
                 description: 'Add the device without verifying the credentials and network settings.',
@@ -1298,9 +1305,12 @@ class ReolinkProvider extends RtspProvider {
         const ip = settings.ip?.toString();
         const httpPort = settings.httpPort;
         const rtspPort = settings.rtspPort;
-        const httpAddress = `${ip}:${httpPort || 80}`;
+        // Creator-form boolean settings arrive as strings ('true'/'false'), so a plain
+        // truthiness check would treat 'false' as enabled. Coerce like isNvr/skipValidate.
+        const https = settings.https?.toString() === 'true';
+        const httpAddress = `${ip}:${httpPort || (https ? 443 : 80)}`;
 
-        const client = new ReolinkNvrClient(httpAddress, username, password, this.console);
+        const client = new ReolinkNvrClient(httpAddress, username, password, this.console, undefined, https);
         const { devInfo } = await client.getHubInfo();
 
         if (!devInfo) {
@@ -1329,6 +1339,7 @@ class ReolinkProvider extends RtspProvider {
         nvrDevice.storageSettings.values.password = password;
         nvrDevice.storageSettings.values.httpPort = httpPort;
         nvrDevice.storageSettings.values.rtspPort = rtspPort;
+        nvrDevice.storageSettings.values.https = https;
 
         nvrDevice.updateDeviceInfo(devInfo);
 
