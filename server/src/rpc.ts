@@ -823,6 +823,7 @@ export class RpcPeer {
                         }
                         this.localProxyMap.delete(rpcFinalize.__local_proxy_id);
                         this.localProxied.delete(local);
+                        this.yieldedAsyncIterators.delete(local);
                     }
                     break;
                 }
