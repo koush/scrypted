@@ -357,6 +357,13 @@ export class RpcPeer {
         return proxyProps?.next || 'next';
     }
 
+    static getIteratorReturn(target: any): string | undefined {
+        if (!target[Symbol.asyncIterator])
+            return undefined;
+        const proxyProps = target[this.PROPERTY_PROXY_PROPERTIES]?.[Symbol.asyncIterator.toString()];
+        return proxyProps?.return || 'return';
+    }
+
     static prepareProxyProperties(value: any) {
         let props = value?.[RpcPeer.PROPERTY_PROXY_PROPERTIES];
         if (!value[Symbol.asyncIterator])
@@ -760,7 +767,8 @@ export class RpcPeer {
                                 throw new Error(`target ${target?.constructor?.name} does not have method ${rpcApply.method}`);
 
                             const isIteratorNext = RpcPeer.getIteratorNext(target) === rpcApply.method;
-                            if (isIteratorNext)
+                            const isIteratorReturn = RpcPeer.getIteratorReturn(target) === rpcApply.method;
+                            if (isIteratorNext || isIteratorReturn)
                                 this.yieldedAsyncIterators.delete(target);
                             value = await target[rpcApply.method](...args);
 
