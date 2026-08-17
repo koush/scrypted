@@ -39,7 +39,9 @@
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "onvif": "file:../onvif/onvif"
+      "@types/xml2js": "^0.4.14",
+      "onvif": "file:../onvif/onvif",
+      "xml2js": "^0.6.2"
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk",
