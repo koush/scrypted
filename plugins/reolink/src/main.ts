@@ -6,6 +6,7 @@ import { createRtspMediaStreamOptions, Destroyable, RtspProvider, RtspSmartCamer
 import { OnvifCameraAPI, OnvifEvent, connectCameraAPI } from './onvif-api';
 import { listenEvents } from './onvif-events';
 import { OnvifIntercom } from './onvif-intercom';
+import { BaichuanIntercom } from './baichuan-intercom';
 import { DevInfo } from './probe';
 import { AIState, Enc, isDeviceHomeHub, isDeviceNvr, ReolinkCameraClient } from './reolink-api';
 import { ReolinkNvrDevice } from './nvr/nvr';
@@ -105,6 +106,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     clientWithToken: ReolinkCameraClient;
     onvifClient: OnvifCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
+    baichuanIntercom = new BaichuanIntercom(this);
     motionTimeout: NodeJS.Timeout;
     siren: ReolinkCameraSiren;
     floodlight: ReolinkCameraFloodlight;
@@ -122,6 +124,12 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             subgroup: 'Advanced',
             title: 'RTMP Port Override',
             placeholder: '1935',
+            type: 'number',
+        },
+        baichuanPort: {
+            subgroup: 'Advanced',
+            title: 'Baichuan Port Override',
+            placeholder: '9000',
             type: 'number',
         },
         motionTimeout: {
@@ -198,6 +206,15 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
         useOnvifTwoWayAudio: {
             subgroup: 'Advanced',
             title: 'Use ONVIF for Two-Way Audio',
+            type: 'boolean',
+        },
+        useBaichuanTwoWayAudio: {
+            subgroup: 'Advanced',
+            title: 'Use Baichuan for Two-Way Audio',
+            description: 'Uses Reolink\'s native Baichuan protocol for two-way audio instead of ONVIF. '
+                + 'Sends audio directly with no RTP/jitter buffering, which measured significantly '
+                + 'lower latency than the ONVIF backchannel on a real device over LAN. Does not '
+                + 'affect ONVIF-based object detection, which is unrelated and unaffected by this setting.',
             type: 'boolean',
         },
     });
@@ -416,6 +433,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
+        if (this.storageSettings.values.useBaichuanTwoWayAudio)
+            return this.baichuanIntercom.startIntercom(media);
+
         if (!this.onvifIntercom.url) {
             const client = await this.getOnvifClient();
             const streamUrl = await client.getStreamUrl();
@@ -425,6 +445,8 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
     }
 
     stopIntercom(): Promise<void> {
+        if (this.storageSettings.values.useBaichuanTwoWayAudio)
+            return this.baichuanIntercom.stopIntercom();
         return this.onvifIntercom.stopIntercom();
     }
 
@@ -498,7 +520,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
             type = ScryptedDeviceType.Doorbell;
             name = 'Reolink Doorbell';
         }
-        if (this.storageSettings.values.doorbell || this.storageSettings.values.useOnvifTwoWayAudio) {
+        if (this.storageSettings.values.doorbell || this.storageSettings.values.useOnvifTwoWayAudio || this.storageSettings.values.useBaichuanTwoWayAudio) {
             interfaces.push(
                 ScryptedInterface.Intercom
             );
