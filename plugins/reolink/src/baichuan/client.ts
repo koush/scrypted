@@ -1,4 +1,5 @@
 import { readLength } from '@scrypted/common/src/read-stream';
+import { sleep } from '@scrypted/common/src/sleep';
 import net from 'net';
 import {
     EncryptionMode,
@@ -85,6 +86,27 @@ export class BaichuanClient {
 
     async connect(): Promise<void> {
         this.socket = new net.Socket();
+
+        // A persistent 'error' listener for the socket's whole lifetime,
+        // not just during connect: Node treats an 'error' event with no
+        // listener as an uncaught exception and crashes the *entire*
+        // process, not just this session - which would take down the rest
+        // of Scrypted, not just this one intercom call. Any error past the
+        // connect phase (including the timeout destroy() just below)
+        // surfaces to callers naturally anyway, since it causes the
+        // socket's pending readLength()/write() calls to fail via
+        // 'close'/'end', so this handler only needs to stop the crash and
+        // log, not resolve/reject anything itself.
+        this.socket.on('error', err => this.console?.error?.('baichuan: socket error', err));
+
+        // socket.setTimeout() alone only emits a 'timeout' event on
+        // inactivity - it does not tear down the connection by itself.
+        // Without also destroying it here, a connection that stalls after
+        // connecting (no error, no data, ever) would leave any pending
+        // readLength() call awaiting data forever.
+        this.socket.on('timeout', () => this.socket.destroy(new Error('baichuan: socket inactivity timeout')));
+        this.socket.setTimeout(this.timeout);
+
         await new Promise<void>((resolve, reject) => {
             const onError = (err: Error) => {
                 this.socket.removeListener('connect', onConnect);
@@ -96,7 +118,6 @@ export class BaichuanClient {
             };
             this.socket.once('error', onError);
             this.socket.once('connect', onConnect);
-            this.socket.setTimeout(this.timeout);
             this.socket.connect(this.options.port, this.options.host);
         });
     }
@@ -188,17 +209,39 @@ export class BaichuanClient {
      * with replies - e.g. we observed VideoInput/Serial/AbilityInfo pushes
      * arrive right after login, unprompted - which must be skipped rather
      * than mistaken for the reply we're waiting for.
+     *
+     * Bounded by wall-clock time, not a message count: a real Talk session
+     * can run for minutes and generate hundreds of per-block acks (see
+     * writeAdpcmBlock) that pile up unread on the socket between calls to
+     * this function, since we don't wait on those individually. A fixed
+     * skip-count limit was tried first and failed in exactly this way -
+     * stopTalk()'s TalkReset timed out after a longer real conversation
+     * because there were more queued acks to drain than the limit allowed,
+     * even though every one of them was legitimately ours to skip.
      */
-    private async waitForReply(msgNum: number, maxSkip = 20): Promise<{ header: BcHeader; xml: string }> {
-        for (let i = 0; i < maxSkip; i++) {
-            const { header, body } = await this.readRawMessage();
-            if (header.msgNum !== msgNum) {
-                this.console?.debug?.(`baichuan: skipping unsolicited message msgId=${header.msgId} msgNum=${header.msgNum}`);
-                continue;
+    private async waitForReply(msgNum: number, timeoutMs = 8000): Promise<{ header: BcHeader; xml: string }> {
+        const findReply = (async () => {
+            while (true) {
+                const { header, body } = await this.readRawMessage();
+                if (header.msgNum !== msgNum) {
+                    this.console?.debug?.(`baichuan: skipping unsolicited message msgId=${header.msgId} msgNum=${header.msgNum}`);
+                    continue;
+                }
+                return { header, xml: this.decodeXml(header, body) };
             }
-            return { header, xml: this.decodeXml(header, body) };
+        })();
+
+        let timer: NodeJS.Timeout;
+        const timeout = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`baichuan: no reply for msgNum=${msgNum} within ${timeoutMs}ms`)), timeoutMs);
+        });
+
+        try {
+            return await Promise.race([findReply, timeout]);
         }
-        throw new Error(`baichuan: no reply for msgNum=${msgNum} after ${maxSkip} messages`);
+        finally {
+            clearTimeout(timer!);
+        }
     }
 
     /**
@@ -343,6 +386,7 @@ export class BaichuanClient {
 export class TalkSession {
     private readonly encoder = new AdpcmEncoder();
     private seq = 0;
+    private nextSendAt: number | undefined;
     closed = false;
 
     constructor(private readonly client: BaichuanClient, public readonly audioConfig: TalkAudioConfig) {
@@ -361,11 +405,36 @@ export class TalkSession {
         return this.samplesPerBlock * 2; // 16-bit samples
     }
 
+    /**
+     * Encodes and sends one block, paced to real time. The device's own
+     * playback buffer expects roughly one block every `samplesPerBlock /
+     * sampleRate` seconds (64ms for this doorbell's 1024-sample/16kHz
+     * profile); a caller that feeds blocks faster than that - e.g. audio
+     * generated up front and written back-to-back, as opposed to a live
+     * microphone feed that is naturally paced by ffmpeg producing one
+     * chunk at a time - was observed live to eventually make TalkReset
+     * fail (response code 400) after the burst, presumably because the
+     * device's small internal buffer got overrun. A caller that is already
+     * at or behind real time (the normal case: ffmpeg only has the next
+     * chunk ready every ~64ms) is unaffected - this only ever adds delay
+     * when the caller is running ahead of the audio's own real-time clock.
+     */
     async writeSamples(pcm: Int16Array): Promise<void> {
         if (this.closed)
             throw new Error('baichuan: talk session is closed');
         if (pcm.length !== this.samplesPerBlock)
             throw new Error(`baichuan: expected ${this.samplesPerBlock} samples, got ${pcm.length}`);
+
+        const blockDurationMs = (this.samplesPerBlock / this.sampleRate) * 1000;
+        const now = Date.now();
+        if (this.nextSendAt !== undefined && now < this.nextSendAt)
+            await sleep(this.nextSendAt - now);
+
+        const sendTime = Date.now();
+        this.nextSendAt = this.nextSendAt !== undefined && sendTime <= this.nextSendAt
+            ? this.nextSendAt + blockDurationMs
+            : sendTime + blockDurationMs;
+
         const block = this.encoder.encodeBlock(pcm);
         this.seq++;
         await this.client.writeAdpcmBlock(block, this.seq);
