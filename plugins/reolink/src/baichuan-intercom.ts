@@ -22,9 +22,11 @@ const DEFAULT_BAICHUAN_PORT = 9000;
  * comment for why sessions are not reused.
  */
 export class BaichuanIntercom implements Intercom {
-    private process: ChildProcess;
-    private client: BaichuanClient;
-    private session: TalkSession;
+    // All three are assigned together in startIntercom() and cleared
+    // together in stopIntercom(); undefined whenever no session is active.
+    private process: ChildProcess | undefined;
+    private client: BaichuanClient | undefined;
+    private session: TalkSession | undefined;
 
     constructor(public camera: RtspSmartCamera) {
     }
@@ -84,7 +86,7 @@ export class BaichuanIntercom implements Intercom {
             try {
                 while (true) {
                     const data = await readLength(socket, pcmBytesPerBlock);
-                    if (!data.length)
+                    if (!data.length || session.closed)
                         break;
                     // Read as int16 samples rather than viewing the Buffer's
                     // underlying ArrayBuffer directly: Node may hand back a
@@ -97,7 +99,15 @@ export class BaichuanIntercom implements Intercom {
                 }
             }
             catch (e) {
-                if (!(e instanceof StreamEndError))
+                // A caller hanging up races naturally against the last
+                // already-in-flight chunk from ffmpeg: stopIntercom() (from
+                // the hangup) can close the session between this loop's
+                // readLength() returning and its writeSamples() call. That
+                // is a normal end of call, not a real error - the explicit
+                // session.closed check above avoids it in the common case,
+                // this only catches the rare case where the close happens
+                // mid-iteration.
+                if (!(e instanceof StreamEndError) && !(e instanceof Error && session.closed))
                     this.camera.console.error('baichuan intercom: audio pipeline error', e);
             }
             finally {
