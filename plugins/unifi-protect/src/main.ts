@@ -5,7 +5,7 @@ import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import axios, { ResponseType } from "axios";
 import https from 'https';
 import { UnifiCamera } from "./camera";
-import { debounceFingerprintDetected, debounceMotionDetected } from "./camera-sensors";
+import { debounceFingerprintDetected, handleMotionEvent, isSmartDetectionEvent } from "./camera-sensors";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
 import { UnifiSensor } from "./sensor";
@@ -230,7 +230,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 //     modelKey: 'event'
                 // }
 
-                if (payload.type === 'smartDetectZone' || payload.type === 'smartDetectLine') {
+                if (isSmartDetectionEvent(payload.type)) {
                     unifiCamera.resetDetectionTimeout();
 
                     detections = payload.smartDetectTypes.map(type => ({
@@ -250,9 +250,6 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         unifiCamera.lastRing = payload.start;
                         unifiCamera.resetRingTimeout();
                     }
-                    else if (payload.type === 'motion') {
-                        debounceMotionDetected(unifiCamera);
-                    }
                     else if (payload.type === 'fingerprintIdentified') {
                         const anypay = payload as any;
                         const userId: string = anypay.metadata?.fingerprint?.userId || anypay.metadata?.fingerprint?.ulpId;
@@ -263,6 +260,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         }
                     }
                 }
+
+                handleMotionEvent(unifiCamera, payload.type, unifiCamera.smartDetectionAsMotion);
 
                 const detection: ObjectsDetected = {
                     detectionId,

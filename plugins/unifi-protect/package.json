@@ -15,7 +15,8 @@
       "scrypted-debug": "scrypted-debug",
       "scrypted-deploy": "scrypted-deploy",
       "scrypted-readme": "scrypted-readme",
-      "scrypted-package-json": "scrypted-package-json"
+      "scrypted-package-json": "scrypted-package-json",
+      "test": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' node --require ts-node/register --test test/*.test.ts"
    },
    "keywords": [
       "scrypted",
@@ -36,7 +37,9 @@
    },
    "devDependencies": {
       "@types/node": "^22.15.29",
-      "@types/ws": "^8.18.1"
+      "@types/ws": "^8.18.1",
+      "ts-node": "^10.9.2",
+      "typescript": "^5.9.3"
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",

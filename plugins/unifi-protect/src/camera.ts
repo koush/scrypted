@@ -307,6 +307,14 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     async getSettings(): Promise<Setting[]> {
         // const vsos = await this.getVideoStreamOptions();
         return [
+            {
+                key: 'smartDetectionAsMotion',
+                title: 'Smart Detections Trigger Motion',
+                description: 'Use Protect smart detection events to report motion. Enable this for cameras that report smart detections but do not report regular motion events.',
+                type: 'boolean',
+                value: this.smartDetectionAsMotion,
+                group: 'Advanced',
+            },
             // {
             //     title: 'Sensor Timeout',
             //     key: 'sensorTimeout',
@@ -314,6 +322,10 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             //     description: 'Time to wait in seconds before clearing the motion, doorbell button, or object detection state.',
             // }
         ];
+    }
+
+    get smartDetectionAsMotion() {
+        return this.storage.getItem('smartDetectionAsMotion') === 'true';
     }
 
     async putSetting(key: string, value: string | number | boolean) {

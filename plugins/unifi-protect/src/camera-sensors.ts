@@ -11,6 +11,22 @@ export interface UnifiFingerprintDevice {
     setFingerprintDetected(fingerprintDetected: boolean): void;
 }
 
+export function isSmartDetectionEvent(eventType: string) {
+    return eventType === 'smartDetectZone' || eventType === 'smartDetectLine';
+}
+
+export function shouldTriggerMotionFromEvent(eventType: string, smartDetectionAsMotion: boolean) {
+    return eventType === 'motion' || (smartDetectionAsMotion && isSmartDetectionEvent(eventType));
+}
+
+export function handleMotionEvent(device: UnifiMotionDevice, eventType: string, smartDetectionAsMotion: boolean) {
+    if (!shouldTriggerMotionFromEvent(eventType, smartDetectionAsMotion))
+        return false;
+
+    debounceMotionDetected(device);
+    return true;
+}
+
 export function debounceMotionDetected(device: UnifiMotionDevice) {
     device.setMotionDetected(true);
     clearTimeout(device.motionTimeout);
