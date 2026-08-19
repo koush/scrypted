@@ -204,13 +204,11 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                     if (this.storageSettings.values.debugEvents) {
                         logger.debug(`Events call result: ${JSON.stringify(eventsRes)}`);
                     }
-                    this.cameraNativeMap.forEach((camera) => {
-                        if (camera) {
-                            const channel = camera.storageSettings.values.rtspChannel;
-                            const cameraEventsData = eventsRes?.parsed[channel];
-                            if (cameraEventsData) {
-                                camera.processEvents(cameraEventsData);
-                            }
+                    await this.forEachCamera('processEvents', async (camera) => {
+                        const channel = camera.storageSettings.values.rtspChannel;
+                        const cameraEventsData = eventsRes?.parsed[channel];
+                        if (cameraEventsData) {
+                            await camera.processEvents(cameraEventsData);
                         }
                     });
                 }
@@ -222,13 +220,11 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                         logger.debug(`Battery info call result: ${JSON.stringify({ batteryInfoData, response })}`);
                     }
 
-                    this.cameraNativeMap.forEach((camera) => {
-                        if (camera) {
-                            const channel = camera.storageSettings.values.rtspChannel;
-                            const cameraBatteryData = batteryInfoData[channel];
-                            if (cameraBatteryData) {
-                                camera.processBatteryData(cameraBatteryData);
-                            }
+                    await this.forEachCamera('processBatteryData', async (camera) => {
+                        const channel = camera.storageSettings.values.rtspChannel;
+                        const cameraBatteryData = batteryInfoData[channel];
+                        if (cameraBatteryData) {
+                            await camera.processBatteryData(cameraBatteryData);
                         }
                     });
                 }
@@ -242,13 +238,11 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                             logger.info(`Status info raw result: ${JSON.stringify({ deviceStatusData, response })}`);
                         }
 
-                        this.cameraNativeMap.forEach((camera) => {
-                            if (camera) {
-                                const channel = camera.storageSettings.values.rtspChannel;
-                                const cameraDeviceStatusData = deviceStatusData[channel];
-                                if (cameraDeviceStatusData) {
-                                    camera.processDeviceStatusData(cameraDeviceStatusData);
-                                }
+                        await this.forEachCamera('processDeviceStatusData', async (camera) => {
+                            const channel = camera.storageSettings.values.rtspChannel;
+                            const cameraDeviceStatusData = deviceStatusData[channel];
+                            if (cameraDeviceStatusData) {
+                                await camera.processDeviceStatusData(cameraDeviceStatusData);
                             }
                         });
                     }
@@ -259,6 +253,28 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                 this.processing = false;
             }
         }, 1000);
+    }
+
+    /**
+     * Runs `fn` for every live camera and waits for all of them.
+     *
+     * processEvents / processBatteryData / processDeviceStatusData are all `async`.
+     * Calling them from `Map.forEach` is fire-and-forget: the returned promise is
+     * dropped, so a rejection escapes the enclosing try/catch of the events-flow
+     * timer and surfaces as a process-level unhandledRejection attributed to the
+     * timer frame -- observed in the wild as a repeating
+     * "TypeError: Cannot read properties of undefined (reading 'id')" at this file.
+     *
+     * allSettled (not all) so one bad channel cannot prevent its siblings being
+     * processed, and every rejection is logged rather than silently swallowed.
+     */
+    private async forEachCamera(label: string, fn: (camera: ReolinkNvrCamera) => Promise<void>) {
+        const cameras = [...this.cameraNativeMap.values()].filter(camera => !!camera);
+        const results = await Promise.allSettled(cameras.map(camera => fn(camera)));
+        for (const result of results) {
+            if (result.status === 'rejected')
+                this.console.error(`Error in ${label}`, result.reason);
+        }
     }
 
     getClient() {
