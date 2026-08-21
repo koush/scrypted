@@ -55,7 +55,11 @@ async function getAuth(options: AuthFetchOptions, url: string | URL, method: str
             ...digest.data,
         });
 
-        return header;
+        // RFC 7616 requires algorithm, qop, and nc to be unquoted tokens.
+        return header
+            .replace(`algorithm="${digest.data.algorithm}"`, `algorithm=${digest.data.algorithm}`)
+            .replace(`qop="${digest.data.qop}"`, `qop=${digest.data.qop}`)
+            .replace(`nc="${nc}"`, `nc=${nc}`);
     }
     else if (basic) {
         const { BASIC, buildAuthorizationHeader } = await import('http-auth-utils');
