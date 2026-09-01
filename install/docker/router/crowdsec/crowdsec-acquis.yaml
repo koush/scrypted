@@ -1,0 +1,6 @@
+---
+source: journalctl
+journalctl_filter:
+  - "system"
+labels:
+  type: caddy

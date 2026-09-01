@@ -26,6 +26,7 @@ Created issues that do not meet these requirements or are improperly filled out 
 
 1. Delete this section and everything above it.
 2. Fill out the sections below.
+3. Failure to fill out the issue template properly may result in the issue being closed and multiple failed submissions may result in a Github ban.
 
 ** Before You Submit**
 
@@ -33,7 +34,7 @@ Created issues that do not meet these requirements or are improperly filled out 
 - [ ] I checked the relevant camera/device and/or plugin `Log` in the `Management Console` for errors or warnings that may help identify and resolve the issue myself.
 
 **Describe the bug**
-A clear and concise description of what the bug is. The issue tracker is only for reporting bugs in Scrypted, for general support check Discord. Hardrware support requests or assistance requests will be immediately closed.
+A clear and concise description of what the bug is. The issue tracker is only for reporting bugs in Scrypted, for general support check Discord. Hardware support requests or assistance requests will be immediately closed.
 
 **To Reproduce**
 Steps to reproduce the behavior:

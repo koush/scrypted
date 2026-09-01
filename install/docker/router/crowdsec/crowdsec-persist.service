@@ -1,0 +1,11 @@
+[Unit]
+Description=CrowdSec Persistent Storage Migration
+Before=crowdsec.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/crowdsec-persist.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
