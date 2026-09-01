@@ -1,0 +1,129 @@
+name: Upstream sync
+
+# Watches the upstream project this fork is based on and opens a PR with any
+# new commits, so they can be reviewed (and validated by CI) before merging.
+#
+# Notes:
+#   * Scheduled workflows are disabled by default in forks - enable Actions on
+#     the "Actions" tab once, otherwise the cron never fires.
+#   * With the default GITHUB_TOKEN, pushes made here do NOT trigger other
+#     workflows, so `test.yml` will not run on the sync PR. To get CI on it,
+#     create a PAT with `repo` scope, store it as the `SYNC_TOKEN` secret, and
+#     this workflow will use it automatically.
+#   * Submodules are deliberately not checked out: the merge only touches the
+#     superproject, and cloning them would make every run much slower.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  UPSTREAM_REPO: https://github.com/koush/scrypted.git
+  UPSTREAM_BRANCH: main
+  SYNC_BRANCH: sync/upstream
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout the repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+          token: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: ⚙️ Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: 🔗 Fetch upstream
+        run: |
+          git remote add upstream "$UPSTREAM_REPO" 2>/dev/null || git remote set-url upstream "$UPSTREAM_REPO"
+          git fetch --filter=blob:none upstream "$UPSTREAM_BRANCH"
+
+      - name: 🔍 Look for new upstream commits
+        id: check
+        run: |
+          count=$(git rev-list --count "HEAD..upstream/$UPSTREAM_BRANCH")
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -eq 0 ]; then
+            echo "Already up to date with upstream." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "Upstream \`$UPSTREAM_BRANCH\` has **$count** new commit(s):"
+            echo
+            git log --no-merges --pretty='- %h %s (%an)' "HEAD..upstream/$UPSTREAM_BRANCH"
+          } > /tmp/upstream-changes.md
+          cat /tmp/upstream-changes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 🔀 Merge upstream into the sync branch
+        id: merge
+        if: steps.check.outputs.count != '0'
+        run: |
+          before=$(git rev-parse --verify --quiet "origin/$SYNC_BRANCH" || echo none)
+          git checkout -B "$SYNC_BRANCH"
+          if ! git merge --no-edit "upstream/$UPSTREAM_BRANCH"; then
+            git merge --abort || true
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "conflict=false" >> "$GITHUB_OUTPUT"
+          after=$(git rev-parse HEAD)
+          if [ "$before" = "$after" ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+          else
+            git push --force-with-lease origin "$SYNC_BRANCH"
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 🔁 Open or refresh the pull request
+        if: steps.merge.outputs.conflict == 'false' && steps.merge.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          pr=$(gh pr list --head "$SYNC_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            gh pr comment "$pr" --body-file /tmp/upstream-changes.md
+          else
+            gh pr create --base "$BASE" --head "$SYNC_BRANCH" \
+              --title "Sync with upstream ($UPSTREAM_BRANCH)" \
+              --body-file /tmp/upstream-changes.md
+          fi
+
+      - name: 🚨 Report a conflicting merge
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create upstream-sync --color BFD4F2 --description "Upstream sync automation" --force
+          issue=$(gh issue list --state open --label upstream-sync --json number --jq '.[0].number // empty')
+          {
+            echo "Merging upstream \`$UPSTREAM_BRANCH\` into this fork hit conflicts, so no PR was opened."
+            echo
+            cat /tmp/upstream-changes.md
+            echo
+            echo "Resolve locally:"
+            echo '```'
+            echo "git fetch upstream $UPSTREAM_BRANCH"
+            echo "git switch -c $SYNC_BRANCH"
+            echo "git merge upstream/$UPSTREAM_BRANCH"
+            echo '```'
+          } > /tmp/conflict.md
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body-file /tmp/conflict.md
+          else
+            gh issue create --label upstream-sync \
+              --title "Upstream sync needs a manual merge" \
+              --body-file /tmp/conflict.md
+          fi
