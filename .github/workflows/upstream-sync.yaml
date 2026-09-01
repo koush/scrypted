@@ -6,12 +6,18 @@ name: Upstream sync
 # Notes:
 #   * Scheduled workflows are disabled by default in forks - enable Actions on
 #     the "Actions" tab once, otherwise the cron never fires.
-#   * With the default GITHUB_TOKEN, pushes made here do NOT trigger other
-#     workflows, so `test.yml` will not run on the sync PR. To get CI on it,
-#     create a PAT with `repo` scope, store it as the `SYNC_TOKEN` secret, and
-#     this workflow will use it automatically.
+#   * A `SYNC_TOKEN` secret is effectively required. The default GITHUB_TOKEN
+#     may never push a commit that touches `.github/workflows/**` (no
+#     `permissions:` key can grant this), and upstream regularly changes its
+#     own workflows, so those syncs are rejected outright. It also cannot
+#     trigger other workflows, so `test.yml` would not run on the sync PR.
+#     Create a PAT - classic with `repo` + `workflow` scopes, or fine-grained
+#     with Contents and Workflows read/write - and store it as `SYNC_TOKEN`.
 #   * Submodules are deliberately not checked out: the merge only touches the
 #     superproject, and cloning them would make every run much slower.
+#   * Do not add a partial-clone filter here. Pushing a merge commit from a
+#     blobless clone needs upstream blobs the fork does not have, and the push
+#     fails; the full history is only ~40 MiB anyway.
 
 on:
   schedule:
@@ -24,6 +30,7 @@ permissions:
   issues: write
 
 env:
+  HAS_SYNC_TOKEN: ${{ secrets.SYNC_TOKEN != '' }}
   UPSTREAM_REPO: https://github.com/koush/scrypted.git
   UPSTREAM_BRANCH: main
   SYNC_BRANCH: sync/upstream
@@ -36,7 +43,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          filter: blob:none
           submodules: false
           token: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
 
@@ -48,7 +54,7 @@ jobs:
       - name: 🔗 Fetch upstream
         run: |
           git remote add upstream "$UPSTREAM_REPO" 2>/dev/null || git remote set-url upstream "$UPSTREAM_REPO"
-          git fetch --filter=blob:none upstream "$UPSTREAM_BRANCH"
+          git fetch upstream "$UPSTREAM_BRANCH"
 
       - name: 🔍 Look for new upstream commits
         id: check
@@ -59,12 +65,34 @@ jobs:
             echo "Already up to date with upstream." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          if git diff --quiet "HEAD...upstream/$UPSTREAM_BRANCH" -- .github/workflows; then
+            echo "workflows=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "workflows=true" >> "$GITHUB_OUTPUT"
+          fi
           {
             echo "Upstream \`$UPSTREAM_BRANCH\` has **$count** new commit(s):"
             echo
             git log --no-merges --pretty='- %h %s (%an)' "HEAD..upstream/$UPSTREAM_BRANCH"
           } > /tmp/upstream-changes.md
           cat /tmp/upstream-changes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 🔑 Check the token may push workflow changes
+        if: steps.check.outputs.count != '0' && steps.check.outputs.workflows == 'true' && env.HAS_SYNC_TOKEN != 'true'
+        run: |
+          {
+            echo "### A \`SYNC_TOKEN\` secret is required"
+            echo
+            echo "These upstream commits change files under \`.github/workflows/\`, and"
+            echo "the default GITHUB_TOKEN is never allowed to push those - GitHub"
+            echo "rejects the push: refusing to allow a GitHub App to create or"
+            echo "update workflow ... without workflows permission."
+            echo
+            echo "Create a PAT (classic: \`repo\` + \`workflow\` scopes; fine-grained:"
+            echo "Contents and Workflows read/write) and store it as the \`SYNC_TOKEN\`"
+            echo "repository secret."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: 🔀 Merge upstream into the sync branch
         id: merge
@@ -81,10 +109,20 @@ jobs:
           after=$(git rev-parse HEAD)
           if [ "$before" = "$after" ]; then
             echo "updated=false" >> "$GITHUB_OUTPUT"
-          else
-            git push --force-with-lease origin "$SYNC_BRANCH"
-            echo "updated=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          if ! git push --force-with-lease origin "$SYNC_BRANCH"; then
+            {
+              echo "### Push to \`$SYNC_BRANCH\` failed"
+              echo
+              echo "The merge itself was clean. Check that Actions may write to this"
+              echo "repository (Settings > Actions > General > Workflow permissions:"
+              echo "\"Read and write permissions\"), and that \`SYNC_TOKEN\` is a PAT with"
+              echo "workflow scope if the sync touches \`.github/workflows/\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "updated=true" >> "$GITHUB_OUTPUT"
 
       - name: 🔁 Open or refresh the pull request
         if: steps.merge.outputs.conflict == 'false' && steps.merge.outputs.updated == 'true'
