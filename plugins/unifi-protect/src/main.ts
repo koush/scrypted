@@ -122,6 +122,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 return;
             }
             if (!await this.api.getBootstrap()) {
+                this.log.a('Connected with API key, but failed to load Protect devices. Retrying.');
                 this.reconnect('refresh failed')();
                 return;
             }
@@ -749,13 +750,18 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         try {
             const loginResult = await this.relogin();
             if (!loginResult) {
-                this.log.a(publicOnly ? 'Login failed. Check API key.' : 'Login failed. Check credentials.');
+                // relogin() already raised alerts / scheduled reconnect when appropriate.
                 return;
             }
 
-            if (!await this.api.getBootstrap()) {
-                this.reconnect('refresh failed')();
-                return;
+            // relogin() already refreshes bootstrap. Avoid a second bootstrap pass —
+            // the public Integration API is rate-limited to ~10 req/s, and a duplicate
+            // fetch reliably 429s then tears down still-connecting websockets.
+            if (!this.api.bootstrap) {
+                if (!await this.api.getBootstrap()) {
+                    this.reconnect('refresh failed')();
+                    return;
+                }
             }
 
             const resetWsTimeout = () => {
@@ -763,6 +769,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             };
             resetWsTimeout();
 
+            this.api.removeAllListeners('message');
             this.api.on('message', message => {
                 resetWsTimeout();
                 this.listener(message);

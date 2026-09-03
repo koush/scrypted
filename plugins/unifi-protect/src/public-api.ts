@@ -12,6 +12,14 @@ export const CONNECTION_MODE_API_KEY_ONLY = 'API Key Only';
 
 const INTEGRATION_PREFIX = '/proxy/protect/integration/v1';
 const QUALITY_ORDER = ['high', 'medium', 'low', 'package'];
+// UniFi Protect public Integration API rate limit: 10 requests / 1000ms.
+const PUBLIC_API_RATE_LIMIT = 10;
+const PUBLIC_API_RATE_WINDOW_MS = 1000;
+const PUBLIC_API_MAX_RETRIES = 4;
+
+function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export interface PublicCameraFeatureFlags {
     supportFullHdSnapshot?: boolean;
@@ -226,6 +234,8 @@ export class ProtectPublicApi extends EventEmitter {
     private devicesWs?: WS;
     private closed = false;
     private connectionHost?: string;
+    private requestTimestamps: number[] = [];
+    private requestChain: Promise<void> = Promise.resolve();
 
     constructor(private log: { debug?: (...args: any[]) => void, error?: (...args: any[]) => void, info?: (...args: any[]) => void, warn?: (...args: any[]) => void } = {}) {
         super();
@@ -239,14 +249,41 @@ export class ProtectPublicApi extends EventEmitter {
         return `https://${this.host}${INTEGRATION_PREFIX}${path}`;
     }
 
+    private async acquireRateLimitSlot() {
+        // Serialize callers so concurrent bootstrap/stream work cannot burst past the limit.
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        const previous = this.requestChain;
+        this.requestChain = previous.then(() => gate, () => gate);
+        await previous.catch(() => { });
+
+        try {
+            const now = Date.now();
+            this.requestTimestamps = this.requestTimestamps.filter(t => now - t < PUBLIC_API_RATE_WINDOW_MS);
+            if (this.requestTimestamps.length >= PUBLIC_API_RATE_LIMIT - 1) {
+                const waitMs = PUBLIC_API_RATE_WINDOW_MS - (now - this.requestTimestamps[0]) + 25;
+                if (waitMs > 0)
+                    await sleep(waitMs);
+                const refreshed = Date.now();
+                this.requestTimestamps = this.requestTimestamps.filter(t => refreshed - t < PUBLIC_API_RATE_WINDOW_MS);
+            }
+            this.requestTimestamps.push(Date.now());
+        }
+        finally {
+            release();
+        }
+    }
+
     private async request<T = any>(method: Method, path: string, options: {
         data?: any,
         responseType?: ResponseType,
         params?: Record<string, any>,
         signal?: AbortSignal,
-    } = {}): Promise<T> {
+    } = {}, attempt = 0): Promise<T> {
         if (!this.host || !this.apiKey)
             throw new Error('Public API client is not logged in.');
+
+        await this.acquireRateLimitSlot();
 
         const headers: Record<string, string> = {
             'X-API-KEY': this.apiKey,
@@ -270,6 +307,20 @@ export class ProtectPublicApi extends EventEmitter {
         const response = await axios(config);
         if (response.status === 401 || response.status === 403)
             throw new Error(`Protect API key was rejected (${response.status}).`);
+        if (response.status === 429) {
+            if (attempt >= PUBLIC_API_MAX_RETRIES)
+                throw new Error(`Protect public API ${method} ${path} failed (429): too many retries`);
+            const body = response.data || {};
+            const windowMs = typeof body.windowMs === 'number' ? body.windowMs : PUBLIC_API_RATE_WINDOW_MS;
+            const retryAfterHeader = response.headers?.['retry-after'];
+            const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : NaN;
+            const waitMs = Number.isFinite(retryAfterMs) && retryAfterMs > 0
+                ? retryAfterMs
+                : windowMs + 50 * (attempt + 1);
+            this.log.warn?.(`Protect public API rate limited on ${method} ${path}; retrying in ${waitMs}ms`);
+            await sleep(waitMs);
+            return this.request(method, path, options, attempt + 1);
+        }
         if (response.status < 200 || response.status >= 300) {
             const detail = typeof response.data === 'string'
                 ? response.data
@@ -306,15 +357,21 @@ export class ProtectPublicApi extends EventEmitter {
 
     async getBootstrap(): Promise<boolean> {
         try {
-            const [cameras, lights] = await Promise.all([
-                this.request<PublicCamera[]>('GET', '/cameras'),
-                this.request<PublicLight[]>('GET', '/lights').catch(() => [] as PublicLight[]),
-            ]);
+            // Fetch sequentially to stay under the public API rate limit.
+            const cameras = await this.request<PublicCamera[]>('GET', '/cameras');
+            let lights: PublicLight[] = [];
+            try {
+                lights = await this.request<PublicLight[]>('GET', '/lights');
+            }
+            catch (e) {
+                this.log.warn?.('Unable to list lights from public API', e);
+            }
 
             const adaptedCameras = [];
             for (const camera of cameras || []) {
                 try {
-                    camera.rtspsStreams = await this.getCameraRtspsStreams(camera.id);
+                    // Prefer GET-only priming during bootstrap; create streams lazily on demand.
+                    camera.rtspsStreams = await this.getCameraRtspsStreams(camera.id, false);
                 }
                 catch (e) {
                     this.log.warn?.(`Unable to prime RTSPS streams for camera ${camera.name || camera.id}`, e);
@@ -341,15 +398,17 @@ export class ProtectPublicApi extends EventEmitter {
         }
     }
 
-    async getCameraRtspsStreams(cameraId: string): Promise<Record<string, string | null | undefined>> {
+    async getCameraRtspsStreams(cameraId: string, createIfMissing = true): Promise<Record<string, string | null | undefined>> {
         try {
             const existing = await this.request<Record<string, string | null | undefined>>('GET', `/cameras/${cameraId}/rtsps-stream`);
             const active = Object.entries(existing || {}).filter(([, url]) => typeof url === 'string' && !!url);
-            if (active.length)
+            if (active.length || !createIfMissing)
                 return existing || {};
         }
         catch (e) {
             this.log.debug?.('GET rtsps-stream failed, will try create', e);
+            if (!createIfMissing)
+                return {};
         }
 
         // Create common qualities when none are active yet.
@@ -526,17 +585,27 @@ export class ProtectPublicApi extends EventEmitter {
         };
     }
 
+    private safeCloseSocket(ws?: WS) {
+        if (!ws)
+            return;
+        // Closing a CONNECTING socket emits an 'error' event. With no listener,
+        // Node treats that as an uncaughtException and crashes the plugin.
+        ws.removeAllListeners();
+        ws.on('error', () => { });
+        try {
+            if (ws.readyState === WS.CONNECTING || ws.readyState === WS.CLOSING)
+                ws.terminate();
+            else if (ws.readyState === WS.OPEN)
+                ws.close();
+            else
+                ws.terminate();
+        }
+        catch { }
+    }
+
     private resetSockets() {
-        try {
-            this.eventsWs?.removeAllListeners();
-            this.eventsWs?.close();
-        }
-        catch { }
-        try {
-            this.devicesWs?.removeAllListeners();
-            this.devicesWs?.close();
-        }
-        catch { }
+        this.safeCloseSocket(this.eventsWs);
+        this.safeCloseSocket(this.devicesWs);
         this.eventsWs = undefined;
         this.devicesWs = undefined;
     }
@@ -546,6 +615,7 @@ export class ProtectPublicApi extends EventEmitter {
         this.resetSockets();
         this.bootstrap = null;
         this.headers = new Map();
+        this.requestTimestamps = [];
     }
 
     logout() {

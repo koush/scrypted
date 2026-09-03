@@ -9,6 +9,7 @@ import WS from 'ws';
 import { UnifiProtect } from "./main";
 import { MOTION_SENSOR_TIMEOUT, UnifiFingerprintDevice, UnifiMotionDevice, debounceMotionDetected } from './camera-sensors';
 import { FeatureFlagsShim, PrivacyZone } from "./shim";
+import { adaptPublicCamera } from "./public-api";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 
 const { deviceManager, mediaManager } = sdk;
@@ -408,11 +409,25 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return this.protect.api.bootstrap.cameras.find(camera => camera.id === id);
     }
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
-        const camera = this.findCamera();
-        const vsos = await this.getVideoStreamOptions();
+        let camera = this.findCamera();
+        let vsos = await this.getVideoStreamOptions();
+        if ((!vsos.length || !camera.channels?.length) && this.protect.isPublicOnly) {
+            // Streams may be inactive until first requested; create them on demand.
+            const publicApi = this.protect.api as any;
+            const streams = await publicApi.getCameraRtspsStreams(camera.id, true);
+            const idx = this.protect.api.bootstrap.cameras.findIndex(c => c.id === camera.id);
+            const adapted = adaptPublicCamera({
+                ...camera,
+                rtspsStreams: streams,
+            }, this.protect.getSetting('ip'));
+            if (idx >= 0)
+                this.protect.api.bootstrap.cameras[idx] = adapted;
+            camera = this.findCamera();
+            vsos = await this.getVideoStreamOptions();
+        }
         const vso = vsos.find(check => check.id === options?.id) || vsos[0];
 
-        const rtspChannel = camera.channels.find(check => check.id.toString() === vso.id);
+        const rtspChannel = camera.channels.find(check => check.id.toString() === vso?.id);
         if (!rtspChannel)
             throw new Error('No RTSP channel is available for this camera.');
 
