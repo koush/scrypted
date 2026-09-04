@@ -110,7 +110,11 @@ export async function readLength(readable: Readable, length: number): Promise<Bu
 
 const CHARCODE_NEWLINE = '\n'.charCodeAt(0);
 
-export async function readUntil(readable: Readable, charCode: number) {
+/**
+ * Read up to (not including) the next occurrence of charCode, returning the raw bytes.
+ * The delimiter itself is consumed and discarded.
+ */
+export async function readUntilBuffer(readable: Readable, charCode: number): Promise<Buffer> {
   const queued: Buffer[] = [];
   while (true) {
     const available: Buffer = readable.read();
@@ -129,12 +133,55 @@ export async function readUntil(readable: Readable, charCode: number) {
 
     const after = available.subarray(index + 1);
     readable.unshift(after);
-    return Buffer.concat(queued).toString();
+    return Buffer.concat(queued);
   }
+}
+
+export async function readUntil(readable: Readable, charCode: number) {
+  return (await readUntilBuffer(readable, charCode)).toString();
+}
+
+/**
+ * Read one line as raw bytes. The terminating LF is consumed and not returned;
+ * a preceding CR, if any, is returned.
+ */
+export async function readLineBuffer(readable: Readable) {
+  return readUntilBuffer(readable, CHARCODE_NEWLINE);
 }
 
 export async function readLine(readable: Readable) {
   return readUntil(readable, CHARCODE_NEWLINE);
+}
+
+/**
+ * Format bytes for diagnostics. Printable ASCII is kept, CR, LF and TAB are shown as
+ * escapes so line structure is unambiguous, everything else is shown as \xNN.
+ * A hex dump follows. Intended for error messages and opt-in debug logging.
+ */
+export function formatRawBytes(buffer: Buffer, maxLength = 512): string {
+  const shown = buffer.subarray(0, maxLength);
+  let escaped = '';
+  for (const c of shown) {
+    if (c === 13)
+      escaped += '\\r';
+    else if (c === 10)
+      escaped += '\\n\n';
+    else if (c === 9)
+      escaped += '\\t';
+    else if (c >= 32 && c < 127)
+      escaped += String.fromCharCode(c);
+    else
+      escaped += '\\x' + c.toString(16).padStart(2, '0');
+  }
+  const hexLines: string[] = [];
+  for (let i = 0; i < shown.length; i += 16) {
+    const chunk = shown.subarray(i, i + 16);
+    const hex = [...chunk].map(c => c.toString(16).padStart(2, '0')).join(' ');
+    const ascii = [...chunk].map(c => c >= 32 && c < 127 ? String.fromCharCode(c) : '.').join('');
+    hexLines.push(`${i.toString(16).padStart(8, '0')}  ${hex.padEnd(47)}  |${ascii}|`);
+  }
+  const truncated = buffer.length > shown.length ? `\n... ${buffer.length - shown.length} more bytes not shown` : '';
+  return `${escaped}\n${hexLines.join('\n')}${truncated}`;
 }
 
 export async function readString(readable: Readable | Promise<Readable>) {

@@ -8,7 +8,7 @@ import { URL } from 'url';
 import { Deferred } from './deferred';
 import { closeQuiet, createBindZero, createSquentialBindZero, listenZeroSingleClient } from './listen-cluster';
 import { timeoutPromise } from './promise-utils';
-import { readLength, readLine } from './read-stream';
+import { formatRawBytes, readLength, readLine, readLineBuffer } from './read-stream';
 import { MSection, parseSdp } from './sdp-utils';
 import { sleep } from './sleep';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
@@ -36,14 +36,46 @@ export interface RtspStreamParser extends StreamParser {
     sdp: Promise<string>;
 }
 
-export async function readMessage(client: Readable): Promise<string[]> {
-    let currentHeaders: string[] = [];
+/**
+ * Read an RTSP message header block (status or request line followed by headers),
+ * returning one string per header. The block ends at an empty line.
+ *
+ * RTSP header syntax is inherited from HTTP/1.1 (RFC 2326 section 4.2 refers to
+ * RFC 2068 section 4.2): "Header fields can be extended over multiple lines by
+ * preceding each extra line with at least one SP or HT." Such continuation lines
+ * are folded into the preceding header here.
+ *
+ * The end-of-headers test is made before trimming. A line containing only
+ * whitespace is a (content-free) continuation line, not the end of the message.
+ * Luma x20 cameras ("Customer RTSP Server/1.0.0") send exactly that, a lone
+ * SP CRLF, between the Session and RTP-Info headers of the PLAY response.
+ * Trimming first turned that into an early end of message and left RTP-Info in
+ * the socket buffer, where the interleaved frame reader rejected it as bad magic.
+ *
+ * @param console optional. When provided, every line is logged as read, raw and
+ * trimmed, with its bytes, so whitespace and line endings are visible.
+ */
+export async function readMessage(client: Readable, console?: Console): Promise<string[]> {
+    const currentHeaders: string[] = [];
     while (true) {
-        let line = await readLine(client);
-        line = line.trim();
-        if (!line)
+        const raw = await readLineBuffer(client);
+        const line = raw.toString();
+        // readLine consumes the LF. Drop the CR (or any stray CR/LF) that precedes it.
+        const content = line.replace(/[\r\n]+$/, '');
+        const trimmed = content.trim();
+        console?.log(`rtsp raw line ${JSON.stringify(line)} -> ${JSON.stringify(trimmed)} [${raw.toString('hex')}]`);
+
+        if (!content)
             return currentHeaders;
-        currentHeaders.push(line);
+
+        if ((content[0] === ' ' || content[0] === '\t') && currentHeaders.length) {
+            // continuation (folded) line: append to the previous header.
+            if (trimmed)
+                currentHeaders[currentHeaders.length - 1] += ' ' + trimmed;
+            continue;
+        }
+
+        currentHeaders.push(trimmed);
     }
 }
 
@@ -395,6 +427,13 @@ export class RtspStatusError extends Error {
 export class RtspBase {
     client: net.Socket;
     console?: Console;
+    /**
+     * Opt-in raw logging of the control channel: every line read by readMessage is
+     * logged with its bytes. Only emitted when a console is attached, so it costs
+     * nothing otherwise. Enable with the SCRYPTED_RTSP_NOISY environment variable
+     * or by setting it on an instance.
+     */
+    noisy = !!process.env.SCRYPTED_RTSP_NOISY;
 
     constructor() {
     }
@@ -404,7 +443,7 @@ export class RtspBase {
     }
 
     async readMessage(): Promise<string[]> {
-        const message = await readMessage(this.client);
+        const message = await readMessage(this.client, this.noisy ? this.console : undefined);
         this.console?.log('rtsp incoming message\n', message.join('\n'));
         this.console?.log();
         return message;
@@ -520,7 +559,7 @@ export class RtspClient extends RtspBase {
     async handleDataPayload(header: Buffer) {
         // todo: fix this, because calling teardown outside of the read loop causes this.
         if (header[0] !== RTSP_FRAME_MAGIC)
-            throw new Error('RTSP Client received invalid frame magic. This may be a bug in your camera firmware. If this error persists, switch your RTSP Parser to FFmpeg or Scrypted (UDP): ' + header.toString());
+            throw this.createBadHeader(header);
 
         const channel = header.readUInt8(1);
         const length = header.readUInt16BE(2);
@@ -536,7 +575,19 @@ export class RtspClient extends RtspBase {
     }
 
     createBadHeader(header: Buffer) {
-        return new Error('RTSP Client received invalid frame magic. This may be a bug in your camera firmware. If this error persists, switch your RTSP Parser to FFmpeg or Scrypted (UDP): ' + header.toString());
+        // Include whatever else is already buffered so the error shows the bytes in
+        // context rather than only the 4 that failed validation. The socket is about
+        // to be destroyed by every caller, so consuming the buffer here is harmless.
+        let buffered: Buffer;
+        try {
+            buffered = this.client.read() || Buffer.alloc(0);
+        }
+        catch (e) {
+            buffered = Buffer.alloc(0);
+        }
+        const context = Buffer.concat([header, buffered]);
+        return new Error('RTSP Client received invalid frame magic. This may be a bug in your camera firmware. If this error persists, switch your RTSP Parser to FFmpeg or Scrypted (UDP): ' + header.toString()
+            + `\nRaw bytes at the failure (${header.length} header + ${buffered.length} buffered):\n${formatRawBytes(context)}`);
     }
 
     async readLoopLegacy() {
