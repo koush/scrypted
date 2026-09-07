@@ -231,6 +231,14 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
             ...await super.getOtherSettings(),
             {
                 subgroup: 'Advanced',
+                key: 'disableMotionDebounce',
+                title: 'Disable Motion Debounce',
+                type: 'boolean',
+                value: this.storage.getItem('disableMotionDebounce'),
+                description: 'Optional: Disable motion detection debounce for well behaved ONVIF cameras',
+            },
+            {
+                subgroup: 'Advanced',
                 title: 'Onvif Doorbell',
                 type: 'boolean',
                 description: 'Enable if this device is a doorbell',
