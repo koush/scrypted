@@ -33,8 +33,9 @@ export async function createRTCPeerConnectionSource(options: {
     mediaStreamOptions: ResponseMediaStreamOptions,
     startRTCSignalingSession: (session: RTCSignalingSession) => Promise<RTCSessionControl | undefined>,
     maximumCompatibilityMode: boolean,
+    preferPcmu?: boolean,
 }): Promise<RTCPeerConnectionPipe> {
-    const { mediaStreamOptions, startRTCSignalingSession, mixinId, nativeId, maximumCompatibilityMode } = options;
+    const { mediaStreamOptions, startRTCSignalingSession, mixinId, nativeId, maximumCompatibilityMode, preferPcmu } = options;
     const console = mixinId ? sdk.deviceManager.getMixinConsole(mixinId, nativeId) : sdk.deviceManager.getDeviceConsole(nativeId);
 
     const { clientPromise, port } = await listenZeroSingleClient('127.0.0.1');
@@ -64,11 +65,16 @@ export async function createRTCPeerConnectionSource(options: {
         const ensurePeerConnection = (setup: RTCAVSignalingSetup) => {
             if (peerConnection.finished)
                 return;
+            const audioCodecs = preferPcmu
+                ? requiredAudioCodecs.filter(codec => codec.name === 'PCMU' || codec.name === 'PCMA')
+                : requiredAudioCodecs;
+            if (preferPcmu)
+                console.log('Ring doorbell audio compatibility: requiring PCMU/PCMA source audio');
             const ret = new RTCPeerConnection({
                 bundlePolicy: setup.configuration?.bundlePolicy as BundlePolicy,
                 codecs: {
                     audio: [
-                        ...requiredAudioCodecs,
+                        ...audioCodecs,
                     ],
                     video: [
                         requiredVideoCodec,
