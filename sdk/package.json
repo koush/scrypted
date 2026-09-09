@@ -37,7 +37,7 @@
     "@rollup/plugin-typescript": "^12.3.0",
     "@rollup/plugin-virtual": "^3.0.2",
     "@scrypted/auth-fetch": "^1.0.5",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "0.6.0",
     "babel-loader": "^10.0.0",
     "babel-plugin-const-enum": "^1.2.0",
     "ncp": "^2.0.0",
@@ -53,7 +53,6 @@
     "webpack-bundle-analyzer": "^4.10.2"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.8",
     "@types/ncp": "^2.0.8",
     "@types/node": "^24.9.2",
     "@types/tmp": "^0.2.6",

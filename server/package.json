@@ -6,7 +6,7 @@
     "@scrypted/ffmpeg-static": "^6.1.0-build3",
     "@scrypted/node-pty": "^1.0.25",
     "@scrypted/types": "^0.5.55",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "0.6.0",
     "body-parser": "^2.2.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.5.0",
@@ -31,7 +31,6 @@
     "ws": "^8.18.2"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.7",
     "@types/cookie-parser": "^1.4.9",
     "@types/express": "^5.0.3",
     "@types/follow-redirects": "^1.14.4",
