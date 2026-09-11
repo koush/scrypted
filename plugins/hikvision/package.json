@@ -24,6 +24,7 @@
       "camera"
    ],
    "scrypted": {
+      "rollup": true,
       "name": "Hikvision Plugin",
       "type": "DeviceProvider",
       "interfaces": [

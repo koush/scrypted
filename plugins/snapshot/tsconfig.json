@@ -1,14 +1,27 @@
 {
     "compilerOptions": {
-        "module": "NodeNext",
-        "target": "ESNext",
+        "module": "es2022",
+        "target": "ES2021",
         "resolveJsonModule": true,
-        "moduleResolution": "NodeNext",
+        "moduleResolution": "bundler",
         "esModuleInterop": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "lib": [
+            "ES2022",
+            "DOM",
+            "DOM.Iterable"
+        ]
     },
     "include": [
         "src/**/*",
-        "test/**/*",
+        "../../common/src/**/*",
+        "../../packages/auth-fetch/src/**/*",
+        "../../server/src/fetch/**/*",
+        "../../plugins/objectdetector/src/polygon.ts",
+        "../../server/src/deferred.ts",
+        "../../server/src/promise-utils.ts",
+        "../../server/src/sleep.ts",
+        "../../server/src/listen-zero.ts",
+        "../../server/src/media-helpers.ts"
     ]
 }

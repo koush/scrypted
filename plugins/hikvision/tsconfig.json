@@ -1,13 +1,34 @@
 {
     "compilerOptions": {
-        "module": "Node16",
+        "module": "es2022",
         "target": "ES2021",
         "resolveJsonModule": true,
-        "moduleResolution": "Node16",
+        "moduleResolution": "bundler",
         "esModuleInterop": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "lib": [
+            "ES2022",
+            "DOM",
+            "DOM.Iterable"
+        ],
+        "strict": false
     },
     "include": [
-        "src/**/*"
+        "src/**/*",
+        "../../common/src/**/*",
+        "../../packages/auth-fetch/src/**/*",
+        "../../external/werift/packages/common/src/**/*",
+        "../../external/werift/packages/rtp/src/rtp/**/*",
+        "../../server/src/fetch/**/*",
+        "../../plugins/ffmpeg-camera/src/common.ts",
+        "../../plugins/homekit/src/types/camera/jitter-buffer.ts",
+        "../../plugins/onvif/src/onvif-intercom.ts",
+        "../../plugins/rtsp/src/rtsp.ts",
+        "../../plugins/webrtc/src/rtp-forwarders.ts",
+        "../../server/src/deferred.ts",
+        "../../server/src/promise-utils.ts",
+        "../../server/src/sleep.ts",
+        "../../server/src/listen-zero.ts",
+        "../../server/src/media-helpers.ts"
     ]
 }

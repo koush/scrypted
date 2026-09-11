@@ -16,7 +16,7 @@
   "dependencies": {
     "@koush/werift-src": "file:../external/werift",
     "@scrypted/sdk": "file:../sdk",
-    "http-auth-utils": "^5.0.1",
+    "http-auth-utils": "^7.1.0",
     "typescript": "^5.5.3"
   },
   "devDependencies": {

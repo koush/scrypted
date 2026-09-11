@@ -24,6 +24,7 @@
       "camera"
    ],
    "scrypted": {
+      "rollup": true,
       "name": "Reolink Camera Plugin",
       "type": "DeviceProvider",
       "interfaces": [
@@ -39,7 +40,7 @@
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "onvif": "file:../onvif/onvif"
+      "onvif": "^0.7.4"
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk",

@@ -22,6 +22,7 @@
       "camera"
    ],
    "scrypted": {
+      "rollup": true,
       "realfs": true,
       "name": "Snapshot Plugin",
       "type": "API",

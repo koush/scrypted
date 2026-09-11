@@ -3,7 +3,7 @@ import { VideoStreamConfiguration } from '@scrypted/sdk';
 import { EventEmitter } from 'events';
 import { Readable } from 'stream';
 
-const onvif = require('onvif');
+import onvif from 'onvif';
 const { Cam } = onvif;
 
 export enum OnvifEvent {
