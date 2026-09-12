@@ -322,6 +322,14 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
     async handlePublicFinal(request: HttpRequest, response: HttpResponse) {
         // need to strip off the query.
         const incomingPathname = request.url.split('?')[0];
+
+        if (incomingPathname.includes('..')) {
+            response.send('Forbidden', {
+                code: 403,
+            });
+            return;
+        }
+
         if (request.url !== '/index.html') {
             response.sendFile("dist" + incomingPathname);
             return;
