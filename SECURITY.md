@@ -5,7 +5,7 @@
 | Version | Supported          |
 | ------- | ------------------ |
 | 0.145.0 (latest) | :white_check_mark: |
-| 5 < latest   | :x:                |
+| < latest   | :x:                |
 
 ## Reporting a Vulnerability
 
