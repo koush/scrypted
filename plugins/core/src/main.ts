@@ -16,6 +16,7 @@ import { checkLegacyLxc, checkLxc, checkLxcVersionUpdateNeeded } from './platfor
 import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId, newTerminalService } from './terminal-service';
+import { OIDCCore, OIDCNativeId } from './oidc';
 import { UsersCore, UsersNativeId } from './user';
 
 const { deviceManager, endpointManager } = sdk;
@@ -33,6 +34,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
     aggregateCore: AggregateCore;
     automationCore: AutomationCore;
     users: UsersCore;
+    oidcCore: OIDCCore;
     consoleService: PluginSocketService;
     replService: PluginSocketService;
     terminalService: TerminalService;
@@ -215,6 +217,17 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
             );
         })();
 
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'OIDC Settings',
+                    nativeId: OIDCNativeId,
+                    interfaces: [ScryptedInterface.ScryptedSystemDevice, ScryptedInterface.Settings, ScryptedInterface.ScryptedSettings, ScryptedInterface.Readme],
+                    type: ScryptedDeviceType.Internal,
+                },
+            );
+        })();
+
         // check on workers immediately and once an hour.
         this.updateWorkers();
         setInterval(() => this.updateWorkers(), 60 * 1000 * 60);
@@ -308,6 +321,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
             return this.aggregateCore ||= new AggregateCore();
         if (nativeId === UsersNativeId)
             return this.users ||= new UsersCore();
+        if (nativeId === OIDCNativeId)
+            return this.oidcCore ||= new OIDCCore();
         if (nativeId === TerminalServiceNativeId)
             return this.terminalService ||= new TerminalService(TerminalServiceNativeId, false);
         if (nativeId === ReplServiceNativeId)

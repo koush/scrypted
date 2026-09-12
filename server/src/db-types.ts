@@ -21,6 +21,7 @@ export class ScryptedUser extends ScryptedDocument {
     token!: string;
     salt!: string;
     aclId?: string;
+    oidcSubject?: string;
 }
 
 export class ScryptedAlert extends ScryptedDocument {
