@@ -1,5 +1,5 @@
-import { Device, EngineIOHandler, ScryptedInterface } from '@scrypted/types';
-import crypto, { scrypt } from 'crypto';
+import { Device, EngineIOHandler, HttpRequest, ScryptedInterface } from '@scrypted/types';
+import crypto from 'crypto';
 import * as io from 'engine.io';
 import fs from 'fs';
 import os from 'os';
@@ -7,12 +7,13 @@ import { PassThrough } from 'stream';
 import WebSocket from 'ws';
 import { utilizesClusterForkWorker } from '../cluster/cluster-labels';
 import { setupCluster } from '../cluster/cluster-setup';
-import { Plugin } from '../db-types';
+import { Plugin, PluginDevice } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
 import type { LogEntry, Logger } from '../logger';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { createRpcSerializer } from '../rpc-serializer';
 import { ScryptedRuntime } from '../runtime';
+import { ClusterForkOptions } from '../scrypted-cluster-main';
 import { serverVersion } from '../services/info';
 import { sleep } from '../sleep';
 import { AccessControls } from './acl';
@@ -28,7 +29,13 @@ import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { createClusterForkWorker } from './runtime/cluster-fork-worker';
 import { prepareZipSync } from './runtime/node-worker-common';
 import type { RuntimeWorker, RuntimeWorkerOptions } from './runtime/runtime-worker';
-import { ClusterForkOptions } from '../scrypted-cluster-main';
+
+export interface ScryptedEndpointRequest {
+    endpointRequest: HttpRequest,
+    pluginDevice: PluginDevice,
+    accessControls: AccessControls,
+};
+
 export class UnsupportedRuntimeError extends Error {
     constructor(runtime: string) {
         super(`Unsupported runtime: ${runtime}`);
@@ -155,16 +162,16 @@ export class PluginHost {
                     accessControls,
                     endpointRequest,
                     pluginDevice,
-                } = (socket.request as any).scrypted;
+                } = (socket.request as any).scrypted as ScryptedEndpointRequest;
 
                 try {
                     if (socket.request.url!.indexOf('/engine.io/api') !== -1) {
-                        if (socket.request.url!.indexOf('/public') !== -1) {
-                            socket.close();
+                        if (endpointRequest.isPublicEndpoint === false) {
+                            await this.createRpcIoPeer(socket, accessControls);
                             return;
                         }
 
-                        await this.createRpcIoPeer(socket, accessControls);
+                        socket.close();
                         return;
                     }
                 }

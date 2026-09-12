@@ -28,7 +28,7 @@ import { getMixins, hasMixinCycle } from './mixin/mixin-cycle';
 import { AccessControls } from './plugin/acl';
 import { PluginDebug } from './plugin/plugin-debug';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
-import { PluginHost, UnsupportedRuntimeError } from './plugin/plugin-host';
+import { PluginHost, ScryptedEndpointRequest, UnsupportedRuntimeError } from './plugin/plugin-host';
 import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
@@ -432,7 +432,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             endpointRequest,
             pluginDevice,
             accessControls,
-        };
+        } as ScryptedEndpointRequest;
 
         if ((req as any).upgradeHead)
             pluginHost.io.handleUpgrade(reqany, res.socket!, reqany.upgradeHead)
