@@ -2,8 +2,13 @@ import { AuthFetchCredentialState, authHttpFetch, HttpFetchOptions } from '@scry
 import { PassThrough, Readable } from 'stream';
 import { sleep } from "@scrypted/common/src/sleep";
 import { PanTiltZoomCommand, VideoClipOptions } from "@scrypted/sdk";
-import { DevInfo, getLoginParameters } from '../probe';
+import { DevInfo, getLoginParameters, ReolinkProtocol } from '../probe';
 import { ReolinkNvrDevice } from './nvr';
+
+// Single source for the "Use HTTPS" setting copy so the creator-form (main.ts) and the
+// device-settings (nvr.ts) descriptions can't drift. The creator form prepends an
+// "Is NVR"-only caveat since that form is shared with the standalone camera flow.
+export const HTTPS_API_SETTING_DESCRIPTION = 'Use HTTPS for the api.cgi control connection. Required for the Reolink Home Hub / Home Hub Pro, which only serve the API over HTTPS (typically port 443).';
 
 type StoredLoginSession = {
     host: string;
@@ -119,23 +124,29 @@ export class ReolinkNvrClient {
     connectionTime = Date.now();
     console: Console;
     host: string;
+    protocol: ReolinkProtocol;
 
     maxSessionsCount = 0;
     loginFirstCount = 0;
 
     constructor(
-        httpAddress: string,
+        address: string,
         username: string,
         password: string,
         console: Console,
-        public nvrDevice?: ReolinkNvrDevice
+        public nvrDevice?: ReolinkNvrDevice,
+        https = false,
     ) {
         this.credential = {
             username,
             password,
         };
-        this.host = httpAddress;
+        this.host = address;
         this.console = console;
+        // Reolink Home Hub / Home Hub Pro serve the api.cgi endpoint over HTTPS only.
+        // Standalone cameras and most NVRs use plain HTTP. Default to HTTP for backwards
+        // compatibility; opt into HTTPS via the device's "Use HTTPS" setting.
+        this.protocol = https ? 'https' : 'http';
     }
 
     private async request(options: HttpFetchOptions<Readable>, body?: Readable) {
@@ -177,7 +188,7 @@ export class ReolinkNvrClient {
     }
 
     private async validateExistingSession(parameters: Record<string, string>) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'GetDevInfo');
         for (const [k, v] of Object.entries(parameters)) {
@@ -258,7 +269,8 @@ export class ReolinkNvrClient {
                 this.host,
                 this.credential.username,
                 this.credential.password,
-                true
+                true,
+                this.protocol,
             );
 
             this.parameters = parameters;
@@ -328,7 +340,7 @@ export class ReolinkNvrClient {
     }
 
     async reboot() {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'Reboot');
         this.rebooting = true;
@@ -351,7 +363,7 @@ export class ReolinkNvrClient {
     }
 
     async logout() {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const body = [
             {
@@ -376,7 +388,7 @@ export class ReolinkNvrClient {
     }
 
     async getOsd(channel: number): Promise<Osd> {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const body = [
             {
@@ -401,7 +413,7 @@ export class ReolinkNvrClient {
     }
 
     async setOsd(channel: number, osd: Osd) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const body = [
             {
@@ -436,7 +448,7 @@ export class ReolinkNvrClient {
     }
 
     async getHubInfo() {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
         const body = [
             {
                 cmd: "GetAbility",
@@ -471,7 +483,7 @@ export class ReolinkNvrClient {
     }
 
     async jpegSnapshot(channel: number, timeout = 10000) {
-        const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/cgi-bin/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'Snap');
         params.set('channel', String(channel));
@@ -486,7 +498,7 @@ export class ReolinkNvrClient {
     }
 
     async getEncoderConfiguration(channel: number): Promise<Enc> {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'GetEnc');
         params.set('channel', String(channel));
@@ -499,7 +511,7 @@ export class ReolinkNvrClient {
     }
 
     private async ptzOp(channel: number, op: string, speed: number, id?: number) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'PtzCtrl');
 
@@ -540,7 +552,7 @@ export class ReolinkNvrClient {
     }
 
     private async presetOp(channel: number, speed: number, id: number) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'PtzCtrl');
 
@@ -596,7 +608,7 @@ export class ReolinkNvrClient {
     }
 
     async getSiren(channel: number) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const body = [{
             cmd: 'GetAudioAlarmV20',
@@ -621,7 +633,7 @@ export class ReolinkNvrClient {
     }
 
     async setSiren(channel: number, on: boolean, duration?: number) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'AudioAlarmPlay');
 
@@ -660,7 +672,7 @@ export class ReolinkNvrClient {
     }
 
     async setWhiteLedState(channel: number, on?: boolean, brightness?: number) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const settings: any = { channel };
 
@@ -690,7 +702,7 @@ export class ReolinkNvrClient {
     }
 
     async getStatusInfo(channelsMap: Map<number, DeviceInputData>) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
         const chanelIndex: Record<number, { osd?: number, floodlight?: number, pir?: number, presets?: number }> = {};
 
         const body: any[] = [];
@@ -793,7 +805,7 @@ export class ReolinkNvrClient {
     }
 
     async getBatteryInfo(channelsMap: Map<number, DeviceInputData>) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
         const chanelIndex: Record<number, number> = {};
 
         const body: any[] = [
@@ -848,7 +860,7 @@ export class ReolinkNvrClient {
     }
 
     async getChannels() {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const channelsBody = [{ cmd: 'GetChannelstatus' }];
 
@@ -869,7 +881,7 @@ export class ReolinkNvrClient {
     }
 
     async getEvents(channelsMap: Map<number, DeviceInputData>) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const body = [];
         const chanelIndex: Record<number, { events?: number, motion?: number, }> = {};
@@ -954,7 +966,7 @@ export class ReolinkNvrClient {
     }
 
     async getDevicesInfo() {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const { channels, channelsResponse } = await this.getChannels();
 
@@ -1017,7 +1029,7 @@ export class ReolinkNvrClient {
     }
 
     async getPirState(channel: number) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const body = [{
             cmd: 'GetPirInfo',
@@ -1043,7 +1055,7 @@ export class ReolinkNvrClient {
     }
 
     async setPirState(channel: number, on: boolean) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const currentPir = await this.getPirState(channel);
         const newState = on ? 1 : 0;
@@ -1077,7 +1089,7 @@ export class ReolinkNvrClient {
     }
 
     async getLocalLink(channel: number) {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
         const body = [
             {

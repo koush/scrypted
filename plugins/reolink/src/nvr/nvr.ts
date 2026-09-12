@@ -3,7 +3,7 @@ import ReolinkProvider from "../main";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { DevInfo } from "../probe";
 import { ReolinkNvrCamera } from "./camera";
-import { DeviceInputData, ReolinkNvrClient } from "./api";
+import { DeviceInputData, HTTPS_API_SETTING_DESCRIPTION, ReolinkNvrClient } from "./api";
 
 export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, DeviceDiscovery, DeviceProvider, Reboot {
     storageSettings = new StorageSettings(this, {
@@ -29,11 +29,30 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             type: 'password',
             onPut: async () => await this.reinit()
         },
-        httpPort: {
-            title: 'HTTP Port',
+        https: {
+            title: 'Use HTTPS',
             subgroup: 'Advanced',
-            defaultValue: 80,
-            placeholder: '80',
+            description: HTTPS_API_SETTING_DESCRIPTION,
+            type: 'boolean',
+            defaultValue: false,
+            onPut: async (ov, nv) => {
+                // A device created before the scheme-aware port default may have the old
+                // HTTP default (80) persisted; an explicit 443 likewise lingers when HTTPS
+                // is turned off. Clear a stored value that only matches the other scheme's
+                // default so the scheme-aware fallback in getClient() applies, keeping
+                // behavior consistent with the "Defaults to 80/443" copy. A genuinely
+                // custom port is preserved.
+                const port = this.storageSettings.values.httpPort;
+                if ((nv && port === 80) || (!nv && port === 443))
+                    this.storageSettings.values.httpPort = undefined;
+                await this.reinit();
+            }
+        },
+        httpPort: {
+            title: 'API Port',
+            subgroup: 'Advanced',
+            description: 'Optional override for the api.cgi port. Defaults to 80 for HTTP and 443 for HTTPS.',
+            placeholder: '80 / 443',
             type: 'number',
             onPut: async () => await this.reinit()
         },
@@ -244,14 +263,18 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
 
     getClient() {
         if (!this.client) {
-            const { ipAddress, httpPort, password, username } = this.storageSettings.values;
-            const address = `${ipAddress}:${httpPort}`;
+            const { ipAddress, httpPort, password, username, https } = this.storageSettings.values;
+            // Default the port to match the scheme when unset: 443 for HTTPS
+            // (Home Hub), 80 for HTTP. An explicit port override always wins.
+            const port = httpPort || (https ? 443 : 80);
+            const address = `${ipAddress}:${port}`;
             this.client = new ReolinkNvrClient(
-                address, 
-                username, 
-                password, 
+                address,
+                username,
+                password,
                 this.console,
                 this,
+                https,
             );
         }
         return this.client;
