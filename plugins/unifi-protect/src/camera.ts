@@ -9,6 +9,7 @@ import WS from 'ws';
 import { UnifiProtect } from "./main";
 import { MOTION_SENSOR_TIMEOUT, UnifiFingerprintDevice, UnifiMotionDevice, debounceMotionDetected } from './camera-sensors';
 import { FeatureFlagsShim, PrivacyZone } from "./shim";
+import { adaptPublicCamera } from "./public-api";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 
 const { deviceManager, mediaManager } = sdk;
@@ -87,6 +88,9 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async setPrivacyMasks(masks: PrivacyMasks): Promise<void> {
+        if (this.protect.isPublicOnly)
+            throw new Error('Privacy masks are not available in API Key Only mode.');
+
         const privacyZones: PrivacyZone[] = masks.masks.map((mask, index) => {
             return {
                 id: index,
@@ -104,6 +108,9 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async ptzCommand(command: PanTiltZoomCommand): Promise<void> {
+        if (this.protect.isPublicOnly)
+            throw new Error('Optical zoom is not available in API Key Only mode.');
+
         const camera = this.findCamera();
         await this.protect.api.updateDevice(camera, {
             ispSettings: {
@@ -164,6 +171,9 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async startIntercom(media: MediaObject) {
+        if (this.protect.isPublicOnly)
+            throw new Error('Two-way audio is not available in API Key Only mode.');
+
         this.stopIntercom();
 
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
@@ -284,6 +294,9 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async getDetectionInput(detectionId: any): Promise<MediaObject> {
+        if (this.protect.isPublicOnly)
+            throw new Error('Event thumbnails are not available in API Key Only mode.');
+
         const input = this.protect.runningEvents.get(detectionId);
         if (input) {
             this.console.log('fetching event snapshot', detectionId);
@@ -340,11 +353,28 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async getSnapshot(options?: PictureOptions, suffix?: string): Promise<Buffer> {
+        const camera = this.findCamera();
+        if (this.protect.isPublicOnly) {
+            if (suffix && suffix.includes('package')) {
+                // Public Integration API does not expose package-camera snapshots yet.
+                throw new Error('Package camera snapshots are not available in API Key Only mode.');
+            }
+            const abort = new AbortController();
+            const timeout = setTimeout(() => abort.abort('Unifi Protect Snapshot timed out after 10 seconds. Aborted.'), 10000);
+            try {
+                const publicApi = this.protect.api as any;
+                const highQuality = !!camera?.featureFlags?.supportFullHdSnapshot;
+                return await publicApi.getSnapshot(camera.id, highQuality, abort.signal);
+            }
+            finally {
+                clearTimeout(timeout);
+            }
+        }
+
         suffix = suffix || 'snapshot';
         let size = '';
         try {
             if (options?.picture?.width && options?.picture?.height) {
-                const camera = this.findCamera();
                 const mainChannel = camera.channels[0];
                 const w = options.picture.width;
                 const h = fitHeightToWidth(mainChannel.width, mainChannel.height, w);
@@ -355,7 +385,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         catch (e) {
 
         }
-        const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.findCamera().id}/${suffix}?ts=${Date.now()}${size}`
+        const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${camera.id}/${suffix}?ts=${Date.now()}${size}`
 
         const abort = new AbortController();
         const timeout = setTimeout(() => abort.abort('Unifi Protect Snapshot timed out after 10 seconds. Aborted.'), 10000);
@@ -379,15 +409,43 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return this.protect.api.bootstrap.cameras.find(camera => camera.id === id);
     }
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
-        const camera = this.findCamera();
-        const vsos = await this.getVideoStreamOptions();
+        let camera = this.findCamera();
+        let vsos = await this.getVideoStreamOptions();
+        if ((!vsos.length || !camera.channels?.length) && this.protect.isPublicOnly) {
+            // Streams may be inactive until first requested; create them on demand.
+            const publicApi = this.protect.api as any;
+            const streams = await publicApi.getCameraRtspsStreams(camera.id, true);
+            const idx = this.protect.api.bootstrap.cameras.findIndex(c => c.id === camera.id);
+            const adapted = adaptPublicCamera({
+                ...camera,
+                rtspsStreams: streams,
+            }, this.protect.getSetting('ip'));
+            if (idx >= 0)
+                this.protect.api.bootstrap.cameras[idx] = adapted;
+            camera = this.findCamera();
+            vsos = await this.getVideoStreamOptions();
+        }
         const vso = vsos.find(check => check.id === options?.id) || vsos[0];
 
-        const rtspChannel = camera.channels.find(check => check.id.toString() === vso.id);
+        const rtspChannel = camera.channels.find(check => check.id.toString() === vso?.id);
+        if (!rtspChannel)
+            throw new Error('No RTSP channel is available for this camera.');
 
-        const { rtspAlias } = rtspChannel;
-        const ip = (this.protect.getSetting('useConnectionHost') !== 'false' && camera.connectionHost) || this.protect.getSetting('ip');
-        const u = `rtsps://${ip}:7441/${rtspAlias}`
+        // Public API returns complete RTSPS URLs; private API uses alias + host.
+        let u: string = (rtspChannel as any).rtspsUrl;
+        if (!u) {
+            const { rtspAlias } = rtspChannel;
+            const ip = (this.protect.getSetting('useConnectionHost') !== 'false' && camera.connectionHost) || this.protect.getSetting('ip');
+            u = `rtsps://${ip}:7441/${rtspAlias}`;
+        }
+        else if (this.protect.getSetting('useConnectionHost') === 'false') {
+            try {
+                const parsed = new URL(u);
+                parsed.hostname = this.protect.getSetting('ip');
+                u = parsed.toString();
+            }
+            catch { }
+        }
 
         const data = Buffer.from(JSON.stringify({
             url: u,
@@ -398,18 +456,20 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     createMediaStreamOptions(channel: ProtectCameraChannelConfig, cameraVideoCodec: string) {
+        const fps = channel.fps || 0;
+        const idrInterval = channel.idrInterval || 0;
         const ret: ResponseMediaStreamOptions = {
             id: channel.id.toString(),
             name: channel.name,
             video: {
                 codec: cameraVideoCodec || 'h264',
-                width: channel.width,
-                height: channel.height,
-                bitrate: channel.maxBitrate,
-                minBitrate: channel.minBitrate,
-                maxBitrate: channel.maxBitrate,
-                fps: channel.fps,
-                keyframeInterval: channel.idrInterval * channel.fps,
+                width: channel.width || undefined,
+                height: channel.height || undefined,
+                bitrate: channel.maxBitrate || undefined,
+                minBitrate: channel.minBitrate || undefined,
+                maxBitrate: channel.maxBitrate || undefined,
+                fps: fps || undefined,
+                keyframeInterval: fps && idrInterval ? idrInterval * fps : undefined,
             },
             audio: {
                 codec: 'aac',
@@ -432,6 +492,9 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async setVideoStreamOptions(options: MediaStreamOptions): Promise<MediaStreamConfiguration> {
+        if (this.protect.isPublicOnly)
+            throw new Error('Dynamic bitrate is not available in API Key Only mode.');
+
         const bitrate = options?.video?.bitrate;
         if (!bitrate)
             return;
@@ -483,6 +546,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             text: title.substring(0, 30),
             type: 'CUSTOM_MESSAGE',
         };
+        // LCD messages are supported by the public camera PATCH as well.
         this.protect.api.updateDevice(this.findCamera(), {
             lcdMessage: payload,
         })
@@ -503,13 +567,13 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         if (!camera)
             return;
         this.on = !!camera.ledSettings?.isEnabled;
-        const online = !!camera.isConnected;
+        const online = !!(camera as any).isConnected || (camera as any).state === 'CONNECTED';
         if (online !== this.online)
             this.online = online;
         if (!!camera.isMotionDetected)
             debounceMotionDetected(this);
 
-        if (!!camera.featureFlags.canOpticalZoom) {
+        if (!this.protect.isPublicOnly && !!camera.featureFlags?.canOpticalZoom) {
             this.ptzCapabilities = { pan: false, tilt: false, zoom: true };
         }
     }

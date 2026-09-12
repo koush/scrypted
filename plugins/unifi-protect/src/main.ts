@@ -9,6 +9,7 @@ import { debounceFingerprintDetected, debounceMotionDetected } from "./camera-se
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
 import { UnifiSensor } from "./sensor";
+import { CONNECTION_MODE_API_KEY_ONLY, CONNECTION_MODE_LOCAL_USER, ProtectPublicApi } from "./public-api";
 import { ProtectApi, ProtectCameraConfigInterface, ProtectEventAddInterface, ProtectEventPacket } from "./unifi-protect";
 
 const httpsAgent = new https.Agent({
@@ -16,6 +17,8 @@ const httpsAgent = new https.Agent({
 });
 
 const { deviceManager } = sdk;
+
+type ProtectClient = ProtectApi | ProtectPublicApi;
 
 const filter = [
     'channels',
@@ -38,7 +41,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     unifiSensors = new Map<string, UnifiSensor>();
     lights = new Map<string, UnifiLight>();
     locks = new Map<string, UnifiLock>();
-    api: ProtectApi;
+    api: ProtectClient;
     startup: Promise<void>;
     runningEvents = new Map<string, { promise: Promise<unknown>, resolve: (value: unknown) => void }>();
     reconnecting = false;
@@ -56,6 +59,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }, 1 * 60 * 1000);
 
         this.updateManagementUrl();
+    }
+
+    get isPublicOnly() {
+        return this.storageSettings.values.connectionMode === CONNECTION_MODE_API_KEY_ONLY
+            || this.getSetting('connectionMode') === CONNECTION_MODE_API_KEY_ONLY;
     }
 
     handleUpdatePacket(packet: ProtectEventPacket) {
@@ -77,6 +85,17 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
         Object.assign(device, packet.payload);
 
+        // Public Integration API reports connectivity via `state`.
+        if ((packet.payload as any)?.state != null) {
+            (device as any).isConnected = (packet.payload as any).state === 'CONNECTED';
+        }
+        if ((packet.payload as any)?.isLightForceEnabled != null) {
+            (device as any).lightOnSettings = {
+                ...((device as any).lightOnSettings || {}),
+                isLedForceOn: !!(packet.payload as any).isLightForceEnabled,
+            };
+        }
+
         const nativeId = this.getNativeId(device, false);
 
         const ret = this.unifiSensors.get(nativeId) ||
@@ -95,9 +114,24 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
     async relogin() {
         const ip = this.getSetting('ip');
+        if (this.isPublicOnly) {
+            const apiKey = this.getSetting('apiKey');
+            const loginResult = await (this.api as ProtectPublicApi).login(ip, apiKey);
+            if (!loginResult) {
+                this.log.a('Login failed. Check API key.');
+                return;
+            }
+            if (!await this.api.getBootstrap()) {
+                this.log.a('Connected with API key, but failed to load Protect devices. Retrying.');
+                this.reconnect('refresh failed')();
+                return;
+            }
+            return loginResult;
+        }
+
         const username = this.getSetting('username');
         const password = this.getSetting('password');
-        const loginResult = await this.api.login(ip, username, password);
+        const loginResult = await (this.api as ProtectApi).login(ip, username, password);
         if (!loginResult) {
             this.log.a('Login failed. Check credentials.');
             return;
@@ -114,9 +148,16 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         try {
             const api = this.api as any;
             const headers: Record<string, string> = {};
-            for (const [header, value] of api.headers) {
-                headers[header] = value;
+            if (api.headers instanceof Map) {
+                for (const [header, value] of api.headers) {
+                    headers[header] = value;
+                }
             }
+            else if (api.headers) {
+                Object.assign(headers, api.headers);
+            }
+            if (this.isPublicOnly && this.getSetting('apiKey'))
+                headers['X-API-KEY'] = this.getSetting('apiKey');
 
             return await axios(url, {
                 responseType: options?.responseType,
@@ -188,12 +229,22 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     return;
                 }
 
-                if (!payload.camera)
+                if (!payload.camera && !(payload as any).device)
                     return;
-                const nativeId = this.getNativeId({ id: payload.camera }, false);
+                const cameraId = payload.camera || (payload as any).device;
+                const nativeId = this.getNativeId({ id: cameraId }, false);
                 const unifiCamera = this.cameras.get(nativeId);
 
                 if (!unifiCamera) {
+                    // Public API also emits lightMotion events against light devices.
+                    if (payload.type === 'lightMotion' || payload.type === 'motionLight') {
+                        const lightNativeId = this.getNativeId({ id: cameraId }, false);
+                        const unifiLight = this.lights.get(lightNativeId);
+                        if (unifiLight) {
+                            debounceMotionDetected(unifiLight);
+                            return;
+                        }
+                    }
                     this.console.log('unknown device event, sync needed?', payload, nativeId);
                     return;
                 }
@@ -368,21 +419,26 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     ScryptedInterface.Settings,
                     ScryptedInterface.Camera,
                     ScryptedInterface.VideoCamera,
-                    ScryptedInterface.VideoCameraMask,
-                    ScryptedInterface.VideoCameraConfiguration,
                     ScryptedInterface.MotionSensor,
                 ],
                 type: isDoorbell
                     ? ScryptedDeviceType.Doorbell
                     : ScryptedDeviceType.Camera,
             };
+            // Private-API-only camera features are omitted in API-key-only mode.
+            if (!this.isPublicOnly) {
+                d.interfaces.push(
+                    ScryptedInterface.VideoCameraMask,
+                    ScryptedInterface.VideoCameraConfiguration,
+                );
+            }
             if (isDoorbell) {
                 d.interfaces.push(ScryptedInterface.BinarySensor);
             }
-            if (camera.featureFlags.hasSpeaker) {
+            if (!this.isPublicOnly && camera.featureFlags.hasSpeaker) {
                 d.interfaces.push(ScryptedInterface.Intercom);
             }
-            if (camera.featureFlags.hasLcdScreen) {
+            if (!this.isPublicOnly && camera.featureFlags.hasLcdScreen) {
                 d.interfaces.push(ScryptedInterface.Notifier);
             }
             if (camera.featureFlags.hasPackageCamera) {
@@ -391,7 +447,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             if (camera.featureFlags.hasLedStatus) {
                 d.interfaces.push(ScryptedInterface.OnOff);
             }
-            if (camera.featureFlags.canOpticalZoom) {
+            if (!this.isPublicOnly && camera.featureFlags.canOpticalZoom) {
                 d.interfaces.push(ScryptedInterface.PanTiltZoom);
             }
             d.interfaces.push(ScryptedInterface.ObjectDetector);
@@ -400,6 +456,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
 
         for (const sensor of this.api.bootstrap.sensors || []) {
+            if (this.isPublicOnly)
+                continue;
             if (!sensor.isAdopted || sensor.isAdoptedByOther) {
                 continue;
             }
@@ -470,6 +528,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
 
         for (const lock of (this.api.bootstrap.doorlocks as any) || []) {
+            if (this.isPublicOnly)
+                continue;
             if (!lock.isAdopted || lock.isAdoptedByOther) {
                 continue;
             }
@@ -541,25 +601,27 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         let camera = this.api.bootstrap.cameras.find(c => c.id === d.nativeId);
         if (camera) {
             let needUpdate = false;
-            for (const channel of camera.channels) {
-                if (channel.idrInterval !== 4 || !channel.isRtspEnabled) {
-                    if (channel.idrInterval !== 4)
-                        this.console.log('attempting to change invalid idr interval. if this message shows up again on plugin reload, it failed. idr:', channel.idrInterval);
-                    channel.idrInterval = 4;
-                    channel.isRtspEnabled = true;
-                    needUpdate = true;
+            if (!this.isPublicOnly) {
+                for (const channel of camera.channels) {
+                    if (channel.idrInterval !== 4 || !channel.isRtspEnabled) {
+                        if (channel.idrInterval !== 4)
+                            this.console.log('attempting to change invalid idr interval. if this message shows up again on plugin reload, it failed. idr:', channel.idrInterval);
+                        channel.idrInterval = 4;
+                        channel.isRtspEnabled = true;
+                        needUpdate = true;
+                    }
                 }
-            }
 
-            if (needUpdate) {
-                const updated = await this.api.updateDevice(camera, {
-                    channels: camera.channels,
-                });
-                if (!camera) {
-                    this.log.a('Unable to enable RTSP and IDR interval on camera. Is this an admin account?');
-                }
-                else {
-                    camera = updated;
+                if (needUpdate) {
+                    const updated = await this.api.updateDevice(camera, {
+                        channels: camera.channels,
+                    });
+                    if (!camera) {
+                        this.log.a('Unable to enable RTSP and IDR interval on camera. Is this an admin account?');
+                    }
+                    else {
+                        camera = updated;
+                    }
                 }
             }
 
@@ -590,7 +652,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 devices.push(d);
             }
 
-            if (camera.featureFlags.hasFingerprintSensor) {
+            if (!this.isPublicOnly && camera.featureFlags.hasFingerprintSensor) {
                 const nativeId = providerNativeId + '-fingerprintSensor';
                 const d: Device = {
                     providerNativeId,
@@ -627,8 +689,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         this.reconnecting = false;
 
         const ip = this.getSetting('ip');
+        const connectionMode = this.getSetting('connectionMode') || CONNECTION_MODE_LOCAL_USER;
+        const apiKey = this.getSetting('apiKey');
         const username = this.getSetting('username');
         const password = this.getSetting('password');
+        const publicOnly = connectionMode === CONNECTION_MODE_API_KEY_ONLY;
 
         this.log.clearAlerts();
 
@@ -638,39 +703,65 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             return;
         }
 
-        if (!username) {
-            if (!silent)
-                this.log.a('Must provide username.');
-            return;
+        if (publicOnly) {
+            if (!apiKey) {
+                if (!silent)
+                    this.log.a('Must provide API key. Create one in UniFi OS: Settings → Control Plane → Integrations.');
+                return;
+            }
+        }
+        else {
+            if (!username) {
+                if (!silent)
+                    this.log.a('Must provide username.');
+                return;
+            }
+
+            if (!password) {
+                if (!silent)
+                    this.log.a('Must provide password.');
+                return;
+            }
         }
 
-        if (!password) {
-            if (!silent)
-                this.log.a('Must provide password.');
-            return;
-        }
-
-        if (!this.api) {
-            this.api = new ProtectApi({
-                debug() { },
-                error: (...args) => {
-                    this.console.error(...args);
-                },
-                info() { },
-                warn() { },
-            });
+        if (!this.api || (this.api instanceof ProtectPublicApi) !== publicOnly) {
+            if (publicOnly) {
+                this.api = new ProtectPublicApi({
+                    debug: (...args) => this.debugLog(...args),
+                    error: (...args) => {
+                        this.console.error(...args);
+                    },
+                    info: (...args) => this.console.log(...args),
+                    warn: (...args) => this.console.warn(...args),
+                });
+            }
+            else {
+                this.api = new ProtectApi({
+                    debug() { },
+                    error: (...args) => {
+                        this.console.error(...args);
+                    },
+                    info() { },
+                    warn() { },
+                });
+            }
         }
 
         try {
             const loginResult = await this.relogin();
             if (!loginResult) {
-                this.log.a('Login failed. Check credentials.');
+                // relogin() already raised alerts / scheduled reconnect when appropriate.
                 return;
             }
 
-            if (!await this.api.getBootstrap()) {
-                this.reconnect('refresh failed')();
-                return;
+            // relogin() already refreshes bootstrap. Avoid a second bootstrap pass —
+            // the public Integration API is rate-limited to ~10 req/s, and a duplicate
+            // fetch reliably 429s then tears down still-connecting websockets.
+            if (!this.api.bootstrap) {
+                if (!await this.api.getBootstrap()) {
+                    this.reconnect('refresh failed')();
+                    return;
+                }
             }
 
             const resetWsTimeout = () => {
@@ -678,6 +769,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             };
             resetWsTimeout();
 
+            this.api.removeAllListeners('message');
             this.api.on('message', message => {
                 resetWsTimeout();
                 this.listener(message);
@@ -688,9 +780,9 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             // refresh all adopted devices and update state.
             const adoptedDevices = [
                 ...this.api.bootstrap.cameras || [],
-                ...this.api.bootstrap.sensors || [],
+                ...(publicOnly ? [] : this.api.bootstrap.sensors || []),
                 ...this.api.bootstrap.lights || [],
-                ...(this.api.bootstrap.doorlocks as any) || [],
+                ...(publicOnly ? [] : (this.api.bootstrap.doorlocks as any) || []),
             ]
                 .filter(device => device.isAdopted && !device.isAdoptedByOther);
 
@@ -790,14 +882,41 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     }
 
     storageSettings = new StorageSettings(this, {
+        connectionMode: {
+            title: 'Connection Mode',
+            description: 'Local User uses a Protect local account (full feature set). API Key Only uses the UniFi OS Integration API key with no local user — currently cameras (streams/snapshots) and lights.',
+            choices: [
+                CONNECTION_MODE_LOCAL_USER,
+                CONNECTION_MODE_API_KEY_ONLY,
+            ],
+            defaultValue: CONNECTION_MODE_LOCAL_USER,
+            onPut: () => this.forceReconnect(),
+        },
         username: {
             title: 'Username',
+            description: 'Local Protect user. Not used in API Key Only mode.',
             onPut: () => this.forceReconnect(),
+            onGet: async () => ({
+                hide: this.isPublicOnly,
+            }),
         },
         password: {
             title: 'Password',
             type: 'password',
+            description: 'Local Protect user password. Not used in API Key Only mode.',
             onPut: () => this.forceReconnect(),
+            onGet: async () => ({
+                hide: this.isPublicOnly,
+            }),
+        },
+        apiKey: {
+            title: 'API Key',
+            type: 'password',
+            description: 'Create in UniFi OS: Settings → Control Plane → Integrations. Required for API Key Only mode.',
+            onPut: () => this.forceReconnect(),
+            onGet: async () => ({
+                hide: !this.isPublicOnly,
+            }),
         },
         ip: {
             title: 'Unifi Protect IP',
