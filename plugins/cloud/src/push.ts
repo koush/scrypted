@@ -10,7 +10,7 @@ export declare interface PushManager {
 
 export class PushManager extends EventEmitter {
     registrationId: Promise<string>;
-    currentRegistrationId: string;
+    currentRegistrationId?: string;
 
     constructor(public senderId: string) {
         super();
