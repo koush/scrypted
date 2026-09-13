@@ -10,7 +10,7 @@
     "body-parser": "^2.2.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.5.0",
-    "engine.io": "^6.6.4",
+    "engine.io": "^6.6.9",
     "express": "^5.1.0",
     "follow-redirects": "^1.15.9",
     "http-auth": "^4.2.1",
