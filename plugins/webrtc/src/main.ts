@@ -165,6 +165,9 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
 
         const fork = await result.result;
         try {
+            const sourceDevice = systemManager.getDeviceById(this.id);
+            const preferPcmu = sourceDevice.pluginId === '@scrypted/ring'
+                && sourceDevice.type === ScryptedDeviceType.Doorbell;
             const { getIntercom, mediaObject, pcClose } = await fork.createRTCPeerConnectionSource({
                 __json_copy_serialize_children: true,
                 nativeId: this.nativeId,
@@ -172,6 +175,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingClient & VideoCame
                 mediaStreamOptions: this.createVideoStreamOptions(),
                 startRTCSignalingSession: (session) => this.mixinDevice.startRTCSignalingSession(session),
                 maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
+                preferPcmu,
             });
 
             this.webrtcIntercom = getIntercom();
@@ -723,6 +727,7 @@ export async function fork() {
             mediaStreamOptions: ResponseMediaStreamOptions,
             startRTCSignalingSession: (session: RTCSignalingSession) => Promise<RTCSessionControl | undefined>,
             maximumCompatibilityMode: boolean,
+            preferPcmu?: boolean,
         }): Promise<RTCPeerConnectionPipe> {
             try {
                 const ret = await createRTCPeerConnectionSource({
@@ -731,6 +736,7 @@ export async function fork() {
                     mediaStreamOptions: options.mediaStreamOptions,
                     startRTCSignalingSession: (session) => options.startRTCSignalingSession(session),
                     maximumCompatibilityMode: options.maximumCompatibilityMode,
+                    preferPcmu: options.preferPcmu,
                 });
                 ret.pcClose().finally(() => delayProcessExit());
                 return ret;
