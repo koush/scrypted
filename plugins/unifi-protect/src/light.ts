@@ -14,12 +14,18 @@ export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness,
         this.console.log(protectLight);
     }
     async turnOff(): Promise<void> {
-        const result = await this.protect.api.updateDevice(this.findLight(), { lightOnSettings: { isLedForceOn: false } });
+        const result = await this.protect.api.updateDevice(this.findLight(), {
+            lightOnSettings: { isLedForceOn: false },
+            isLightForceEnabled: false,
+        } as any);
         if (!result)
             this.console.error('turnOff failed.');
     }
     async turnOn(): Promise<void> {
-        const result = await this.protect.api.updateDevice(this.findLight(), { lightOnSettings: { isLedForceOn: true } });
+        const result = await this.protect.api.updateDevice(this.findLight(), {
+            lightOnSettings: { isLedForceOn: true },
+            isLightForceEnabled: true,
+        } as any);
         if (!result)
             this.console.error('turnOn failed.');
     }
@@ -37,9 +43,10 @@ export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness,
         light = light || this.findLight();
         if (!light)
             return;
-        this.on = !!light.isLightOn;
+        this.on = !!(light as any).isLightOn || !!(light as any).isLightForceEnabled || !!(light as any).lightOnSettings?.isLedForceOn;
         // The Protect ledLevel settings goes from 1 - 6. HomeKit expects percentages, so we convert it like so.
-        this.brightness = (light.lightDeviceSettings.ledLevel - 1) * 20;
+        const ledLevel = light.lightDeviceSettings?.ledLevel ?? 1;
+        this.brightness = (ledLevel - 1) * 20;
         if (!!light.isPirMotionDetected)
             debounceMotionDetected(this);
     }
