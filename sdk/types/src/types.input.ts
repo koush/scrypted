@@ -2542,6 +2542,7 @@ export interface RTCSignalingOptions {
     width: number;
     height: number;
   };
+  videoSendEncodings?: RTCRtpEncodingParameters[];
 }
 
 /**
@@ -2550,6 +2551,13 @@ export interface RTCSignalingOptions {
  */
 export interface RTCSignalingClient {
   createRTCSignalingSession(): Promise<RTCSignalingSession>;
+}
+/**
+ * @category WebRTC Reference
+ */
+export interface RTCSFrameKey {
+    kid: string; // Decimal uint64; avoids JS number precision loss.
+    key: string; // Base64 key material.
 }
 
 /**
@@ -2562,6 +2570,10 @@ export interface RTCSessionControl {
   setPlayback(options: {
     audio: boolean,
     video: boolean,
+  }): Promise<void>;
+  updateSFrameReceiveKeys?(update: {
+    add: RTCSFrameKey[];
+      remove: string[];
   }): Promise<void>;
 }
 /**
