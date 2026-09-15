@@ -21,7 +21,10 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         audioPacketTime: number,
         audioSampleRate: AudioStreamingSamplerate,
         framesPerPacket: number,
-    }) {
+        // Modern HomeKit Opus uses the standard 48 kHz RTP clock, independently
+        // of the advertised encoder sample rate.
+        rtpClockRate?: number,
+    }, rewriteSequenceNumbers = false) {
     const srtpSession = new SrtpSession(config);
     const srtcpSession = new SrtcpSession(config);
 
@@ -57,10 +60,12 @@ export function createCameraStreamSender(console: Console, config: Config, sende
                 break;
         }
         audioIntervalScale = audioIntervalScale * audioOptions.audioPacketTime / 20;
+        if (audioOptions.rtpClockRate)
+            audioIntervalScale = audioOptions.rtpClockRate * audioOptions.audioPacketTime / 1000 / 160;
         opusPacketizer = new OpusRepacketizer(audioOptions.framesPerPacket);
     }
     else {
-        if (videoOptions.maxPacketSize) {
+        if (videoOptions?.maxPacketSize) {
             // adjust packet size for the rtp packet header (12).
             const adjustedMtu = videoOptions.maxPacketSize - 12;
             h264Packetizer = new H264Repacketizer(console, adjustedMtu, videoOptions);
@@ -105,6 +110,8 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         rtp.header.padding = false;
         rtp.header.ssrc = ssrc;
         rtp.header.payloadType = payloadType;
+        if (rewriteSequenceNumbers)
+            rtp.header.sequenceNumber = (firstSequenceNumber + packetCount - 1) & 0xffff;
 
 
         const srtp = srtpSession.encrypt(rtp.payload, rtp.header);
@@ -141,7 +148,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
             // HAP requests, and the packet time is respected,
             // opus 48khz will work just fine.
             for (const rtp of packets) {
-                rtp.header.timestamp = (firstTimestamp + packetCount * 160 * audioIntervalScale) % 0xFFFFFFFF;
+                rtp.header.timestamp = (firstTimestamp + packetCount * 160 * audioIntervalScale) % (audioOptions.rtpClockRate ? 0x100000000 : 0xFFFFFFFF);
                 sendPacket(rtp);
             }
             return;

@@ -24,16 +24,21 @@ export const optionalVideoCodec = new RTCRtpCodecParameters({
         { type: "nack", parameter: "pli" },
         { type: "goog-remb" },
     ],
-    parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f'
 });
 
+const opusCodec = new RTCRtpCodecParameters({
+    mimeType: "audio/opus",
+    clockRate: 48000,
+    channels: 2,
+    payloadType: 111,
+    parameters: 'minptime=20;useinbandfec=1;stereo=0;sprop-stereo=0',
+});
+
+export const opusAudioCodecOnly = [
+    opusCodec,
+];
 export const requiredAudioCodecs = [
-    new RTCRtpCodecParameters({
-        mimeType: "audio/opus",
-        clockRate: 48000,
-        channels: 2,
-        payloadType: 111,
-    }),
+    opusCodec,
     // new RTCRtpCodecParameters({
     //     mimeType: "audio/G722",
     //     clockRate: 8000,
@@ -54,14 +59,6 @@ export const requiredAudioCodecs = [
     }),
 ];
 
-export const opusAudioCodecOnly = [
-    new RTCRtpCodecParameters({
-        mimeType: "audio/opus",
-        clockRate: 48000,
-        channels: 2,
-        payloadType: 111,
-    }),
-];
 
 export function getAudioCodec(outputCodecParameters: RTCRtpCodecParameters) {
     if (outputCodecParameters.name === 'PCMA') {

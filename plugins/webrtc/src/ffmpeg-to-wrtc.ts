@@ -10,9 +10,33 @@ import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from 
 import { RtpCodecCopy, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments, optionalVideoCodec, opusAudioCodecOnly, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RTCRtpTransceiver, RtpPacket } from "./werift";
+import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket, defaultPeerConfig, useSdesRTPStreamId } from "./werift";
 import { WeriftSignalingSession } from "./werift-signaling-session";
 import { logIsLocalIceTransport } from "./werift-util";
+import { SFrameStreamCryptor, SFrameSuite } from "./sframe";
+import { SFrameRepacketizer, SFrameRtpPacketizer } from "./sframe-repacketizer";
+
+// A forwarder can be recreated while its peer connection and RTP sender remain alive.
+// Retain counters/sequences for that sender, without extending its lifetime.
+const sframeSenders = new WeakMap<RTCRtpTransceiver['sender'], {
+    key: string, kid: string, ssrc: number, suite: SFrameSuite, packetizer: SFrameRtpPacketizer,
+}>();
+
+function getSFramePacketizer(sender: RTCRtpTransceiver['sender'], sframe: RTCSignalingOptions['sframe'], suite: SFrameSuite) {
+    if (!sframe?.sendKey)
+        return;
+    const { key, kid } = sframe.sendKey;
+    let state = sframeSenders.get(sender);
+    if (state && (state.key !== key || state.kid !== kid || state.ssrc !== sender.ssrc || state.suite !== suite))
+        throw new Error('SFrame sender configuration changed on an existing RTP sender');
+    if (!state) {
+        // Use a 1200-byte RTP payload budget; RTP and SRTP overhead is additional.
+        const packetizer = new SFrameRtpPacketizer(new SFrameStreamCryptor(sframe.sendKey, sender.ssrc, suite), 1200);
+        state = { key, kid, ssrc: sender.ssrc, suite, packetizer };
+        sframeSenders.set(sender, state);
+    }
+    return state.packetizer;
+}
 
 function getDebugModeH264EncoderArgs() {
     return [
@@ -42,6 +66,7 @@ export async function createTrackForwarder(options: {
     requestMediaStream: RequestMediaStream,
     videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver,
     maximumCompatibilityMode: boolean, clientOptions: RTCSignalingOptions,
+    sframe?: RTCSignalingOptions['sframe'],
 }) {
     const {
         timeStart,
@@ -50,6 +75,7 @@ export async function createTrackForwarder(options: {
         videoTransceiver, audioTransceiver,
         maximumCompatibilityMode,
         clientOptions,
+        sframe,
     } = options;
 
     const { sessionSupportsH264High, transcodeWidth, isMediumResolution, width, height } = parseOptions(clientOptions);
@@ -136,6 +162,7 @@ export async function createTrackForwarder(options: {
         sessionSupportsH264High,
         maximumCompatibilityMode,
         ...clientOptions,
+        sframe: sframe ? { profile: sframe.profile, hasSendKey: !!sframe.sendKey } : undefined,
     });
 
     const findAndSetCodec = (transceiver: RTCRtpTransceiver, mimeType: string) => {
@@ -258,6 +285,7 @@ export async function createTrackForwarder(options: {
         needPacketization = false;
 
     let opusRepacketizer: OpusRepacketizer;
+    const audioSFrame = audioTransceiver && getSFramePacketizer(audioTransceiver.sender, sframe, 8);
     let lastPacketTs: number = 0;
     const audioRtpTrack: RtpTrack = {
         negotiate: async msection => {
@@ -296,7 +324,13 @@ export async function createTrackForwarder(options: {
                 rtp.header.payloadType = audioTransceiver.sender.codec.payloadType;
                 // pcm audio can be concatenated.
                 // hikvision seems to send 40ms duration packets, so 25 packets per second.
-                audioTransceiver.sender.sendRtp(rtp.serialize());
+                if (audioSFrame) {
+                    for (const packet of audioSFrame.packetize(rtp, rtp.payload))
+                        audioTransceiver.sender.sendRtp(packet);
+                }
+                else {
+                    audioTransceiver.sender.sendRtp(rtp.serialize());
+                }
                 lastPacketTs = now;
             }
         },
@@ -338,7 +372,7 @@ export async function createTrackForwarder(options: {
     // So using Chrome's 1200 seems best, though crappy.
     // https://iotdevices.att.com/att-iot/FirstNetMTU.aspx
     const videoPacketSize = 1200;
-    let repacketizer: H264Repacketizer | H265Repacketizer;
+    let repacketizer: H264Repacketizer | H265Repacketizer | SFrameRepacketizer;
     let videoSection: MSection;
 
     const videoRtpTrack: RtpTrack = {
@@ -347,23 +381,31 @@ export async function createTrackForwarder(options: {
         packetSize: videoPacketSize,
         onMSection: (v) => videoSection = v,
         onRtp: (buffer, codec) => {
+            const senderParameters = videoTransceiver.sender.getParameters();
             let onRtp: typeof videoRtpTrack.onRtp;
 
-            if (needPacketization && !repacketizer) {
-                if (videoSection.codec === 'h264') {
-                    const spsPps = getSpsPps(videoSection);
+            const videoSFrame = getSFramePacketizer(videoTransceiver.sender, sframe, 6);
+            if ((needPacketization || videoSFrame) && !repacketizer) {
+                const maxPayload = videoSFrame ? Infinity : videoPacketSize - 12;
+                let depacketizer: H264Repacketizer | H265Repacketizer;
+                if (codec === 'h264') {
+                    const spsPps = videoSection && getSpsPps(videoSection);
                     // adjust packet size for the rtp packet header (12).
-                    repacketizer = new H264Repacketizer(console, videoPacketSize - 12, {
+                    depacketizer = new H264Repacketizer(console, maxPayload, {
                         ...spsPps,
                     });
                 }
-                else if (videoSection.codec === 'h265') {
-                    const spsPpsVps = getSpsPpsVps(videoSection);
+                else if (codec === 'h265') {
+                    const spsPpsVps = videoSection && getSpsPpsVps(videoSection);
                     // adjust packet size for the rtp packet header (12).
-                    repacketizer = new H265Repacketizer(console, videoPacketSize - 12, {
+                    depacketizer = new H265Repacketizer(console, maxPayload, {
                         ...spsPpsVps,
                     });
                 }
+
+                if (!depacketizer)
+                    throw new Error(`Unsupported video repacketizer codec: ${codec}`);
+                repacketizer = videoSFrame ? new SFrameRepacketizer(depacketizer, videoSFrame) : depacketizer;
 
                 onRtp = (buffer, codec) => {
                     if (codecMap[videoTransceiver.sender.codec.mimeType] !== codec)
@@ -537,6 +579,7 @@ class WebRTCTrack implements RTCOutputMediaObjectTrack, RTCInputMediaObjectTrack
 }
 
 export class WebRTCConnectionManagement implements RTCConnectionManagement {
+    readonly sframe: RTCSignalingOptions['sframe'];
     pc: RTCPeerConnection;
     private negotiationDeferred = new Deferred<void>();
     weriftSignalingSession: WeriftSignalingSession;
@@ -552,6 +595,12 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             weriftConfiguration: Partial<PeerConfig>,
         }) {
 
+        this.sframe = clientOptions?.sframe ? {
+            profile: clientOptions.sframe.profile,
+            sendKey: clientOptions.sframe.sendKey ? { ...clientOptions.sframe.sendKey } : undefined,
+        } : undefined;
+        const weriftConfiguration = { ...options.weriftConfiguration };
+
         this.pc = new RTCPeerConnection({
             // werift supports ice servers, but it seems to fail for some reason.
             // it does not matter, as we can send the ice servers to the browser instead.
@@ -565,7 +614,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                     optionalVideoCodec,
                 ],
             },
-            ...options.weriftConfiguration,
+            ...weriftConfiguration,
         });
         logConnectionState(console, this.pc);
         waitConnected(this.pc)
@@ -623,6 +672,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                     audioTransceiver,
                     maximumCompatibilityMode: this.maximumCompatibilityMode,
                     clientOptions: this.clientOptions,
+                    sframe: this.sframe,
                 });
                 return ret;
             },

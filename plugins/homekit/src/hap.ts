@@ -7,6 +7,7 @@ export * from '@homebridge/hap-nodejs/dist/lib/camera/RecordingManagement';
 export * from '@homebridge/hap-nodejs/dist/lib/model/ControllerStorage';
 export * from '@homebridge/hap-nodejs/dist/lib/util/eventedhttp';
 export * from '@homebridge/hap-nodejs/dist/lib/controller/CameraController';
+export * from '@homebridge/hap-nodejs/dist/lib/controller/SecureVideoController';
 export * from '@homebridge/hap-nodejs/dist/lib/datastream/DataStreamServer';
 export * from '@homebridge/hap-nodejs/dist/lib/Service';
 export * from '@homebridge/hap-nodejs/dist/types';

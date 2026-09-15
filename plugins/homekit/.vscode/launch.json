@@ -17,7 +17,11 @@
             "sourceMaps": true,
             "localRoot": "${workspaceFolder}/out",
             "remoteRoot": "/plugin/",
-            "type": "node"
+            "type": "node",
+"sourceMapPathOverrides": {
+    "../../../src/*": "/Volumes/Dev/scrypted/homekit-scratchpad/HAP-NodeJS/src/*",
+    "/Volumes/Dev/src/*": "/Volumes/Dev/scrypted/homekit-scratchpad/HAP-NodeJS/src/*"
+}
         }
     ]
 }

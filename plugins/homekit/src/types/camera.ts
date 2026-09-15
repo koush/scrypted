@@ -1,11 +1,15 @@
-import { Deferred } from '@scrypted/common/src/deferred';
+import type { RTCSignalingChannel } from '@scrypted/sdk';
 import sdk, { AudioSensor, Camera, DeviceProvider, Intercom, MotionSensor, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import { createCameraStorageSettings } from '../camera-mixin';
 import { DummyDevice, addSupportedType, bindCharacteristic } from '../common';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, H264Level, H264Profile, MediaContainerType, RecordingPacket, SRTPCryptoSuites, Service, VideoCodecType, WithUUID } from '../hap';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, H264Level, H264Profile, MediaContainerType, RecordingPacket, SRTPCryptoSuites, SecureVideoController, Service, VideoCodecType, WithUUID } from '../hap';
 import type { HomeKitPlugin } from '../main';
+import { createMultiTierRtpDelegate } from './camera/camera-multitier-rtp';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
+import { createSecureVideoController, secureVideoCmafEnabled } from './camera/camera-secure-video';
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
 import { FORCE_OPUS } from './camera/camera-utils';
+import { createHomeKitWebRTCDelegate } from './camera/camera-webrtc';
 import { makeAccessory, mergeOnOffDevicesByType } from './common';
 
 const { deviceManager, systemManager } = sdk;
@@ -20,6 +24,8 @@ addSupportedType({
     async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom & OnOff, homekitPlugin: HomeKitPlugin) {
         const console = deviceManager.getMixinConsole(device.id, undefined);
         const storage = deviceManager.getMixinStorage(device.id, undefined);
+        const cameraStorage = createCameraStorageSettings({ storage, onDeviceEvent: undefined });
+        const secureVideo3 = cameraStorage.values.secureVideo3;
         const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
 
         const forceOpus = FORCE_OPUS;
@@ -107,14 +113,14 @@ addSupportedType({
 
         let configuration: CameraRecordingConfiguration;
         const openRecordingStreams = new Map<number, AsyncGenerator<RecordingPacket>>();
-        if (isRecordingEnabled) {
+        if (isRecordingEnabled || secureVideo3) {
             recordingDelegate = {
                 updateRecordingConfiguration(newConfiguration: CameraRecordingConfiguration) {
                     configuration = newConfiguration;
                 },
                 handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
                     const ret = handleFragmentsRequests(streamId, device, configuration, console, homekitPlugin, 
-                        () => openRecordingStreams.has(streamId));
+                        () => openRecordingStreams.has(streamId), secureVideo3);
                     openRecordingStreams.set(streamId, ret);
                     return ret;
                 },
@@ -191,22 +197,33 @@ addSupportedType({
 
         const delegate = createCameraStreamingDelegate(device, console, storage, homekitPlugin);
 
-        const controller = new CameraController({
-            cameraStreamCount: 8,
-            delegate,
-            streamingOptions,
-            recording: !isRecordingEnabled ? undefined : {
-                options: recordingOptions,
-                delegate: recordingDelegate,
-            },
-            sensors: {
-                motion: isRecordingEnabled,
-            },
-        });
+        const controller = secureVideo3
+            ? createSecureVideoController(accessory, delegate.handleSnapshotRequest, console, recordingDelegate,
+                tiers => createMultiTierRtpDelegate(device, tiers, console),
+                tiers => createHomeKitWebRTCDelegate(systemManager.getDeviceById<RTCSignalingChannel>(device.id), console, tiers[0]))
+            : new CameraController({
+                cameraStreamCount: 8,
+                delegate,
+                streamingOptions,
+                recording: !isRecordingEnabled ? undefined : {
+                    options: recordingOptions,
+                    delegate: recordingDelegate,
+                },
+                sensors: {
+                    motion: isRecordingEnabled,
+                },
+            });
 
         accessory.configureController(controller);
 
-        if (controller.motionService) {
+        if (controller instanceof SecureVideoController) {
+            console.log('HomeKit Secure Video 3 multi-tier RTP, SFrame WebRTC, and HDS recording enabled.');
+            if (secureVideoCmafEnabled)
+                console.log('HSV3 CMAF services enabled for diagnostics; clip production is not implemented.');
+            // logSecureVideoRequests(accessory, controller, console);
+        }
+
+        if (controller.motionService && isRecordingEnabled) {
             const motionDevice = device;
             if (!motionDevice) {
                 return;

@@ -15,6 +15,13 @@ export function canCameraMixin(type: ScryptedDeviceType | string, interfaces: st
 
 export function createCameraStorageSettings(device: StorageSettingsDevice) {
     return new StorageSettings(device, {
+        secureVideo3: {
+            title: 'HomeKit Secure Video 3',
+            subgroup: 'Pairing',
+            description: 'Enable the new HomeKit camera services and H.265 multi-tier RTP streaming (experimental). WebRTC and recording are not implemented yet. Changing this setting reloads the HomeKit plugin.',
+            type: 'boolean',
+            defaultValue: false,
+        },
         hasWarnedBridgedCamera: {
             description: 'Setting to warn user that bridged cameras are bad.',
             type: 'boolean',
@@ -37,6 +44,10 @@ export class CameraMixin extends HomekitMixin<Readme & VideoCamera> implements R
 
         this.storageSettings.settings.standalone.persistedDefaultValue = true;
         this.cameraStorageSettings.settings.doorbellAutomationButton.hide = this.type !== ScryptedDeviceType.Doorbell;
+        this.cameraStorageSettings.settings.secureVideo3.onPut = (oldValue, newValue) => {
+            if (oldValue !== newValue)
+                this.alertReload();
+        };
 
         if (!this.cameraStorageSettings.values.hasWarnedBridgedCamera && !this.storageSettings.values.standalone) {
             this.cameraStorageSettings.values.hasWarnedBridgedCamera = true;
@@ -138,6 +149,9 @@ ${this.storageSettings.values.qrCode}
     async putMixinSetting(key: string, value: SettingValue) {
         if (this.storageSettings.settings[key]) {
             return super.putMixinSetting(key, value);
+        }
+        if (this.cameraStorageSettings.settings[key]) {
+            return this.cameraStorageSettings.putSetting(key, value);
         }
 
         if (key === 'debugMode') {

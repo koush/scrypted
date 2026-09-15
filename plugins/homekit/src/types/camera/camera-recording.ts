@@ -116,7 +116,8 @@ async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
 }
 
 export async function* handleFragmentsRequests(streamId: number, device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
-    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin, isOpen: () => boolean): AsyncGenerator<RecordingPacket> {
+    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin, isOpen: () => boolean,
+    secureVideo3 = false): AsyncGenerator<RecordingPacket> {
 
     // homekitPlugin.storageSettings.values.lastKnownHomeHub = connection.remoteAddress;
 
@@ -132,7 +133,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
     const media = await device.getVideoStream({
         destination: 'remote-recorder',
         video: {
-            codec: 'h264',
+            codec: secureVideo3 ? 'h265' : 'h264',
         },
         audio: {
             codec: 'aac',
@@ -233,11 +234,19 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
             );
         }
         else {
-            checkCompatibleCodec(console, device, videoCodec)
+            const isHevc = videoCodec?.toLowerCase() === 'h265' || videoCodec?.toLowerCase() === 'hevc';
+            if (!secureVideo3 || !isHevc)
+                checkCompatibleCodec(console, device, videoCodec);
             videoArgs.push(
                 '-vcodec', 'copy',
             );
+            if (secureVideo3 && isHevc)
+                videoArgs.push('-tag:v', 'hvc1');
         }
+
+        // The HSV3 HDS receiver expects producer reference time on media fragments.
+        if (secureVideo3)
+            videoArgs.push('-write_prft', 'wallclock');
 
         console.log(`motion recording starting`);
         session = await startFFMPegFragmentedMP4Session(inputArguments, audioArgs, videoArgs, console);
@@ -334,6 +343,11 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
                     moov = undefined;
                 }
             }
+
+            // tvOS 27 requires zero prft flags for HSV3 recording; FFmpeg's 0x18 flags
+            // cause fragment date extraction to fail and can crash homed.
+            if (secureVideo3 && type === 'prft' && data.length >= 4)
+                data.writeUIntBE(0, 1, 3);
 
             // every moov/moof frame designates an iframe?
             pending.push(header, data);

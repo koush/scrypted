@@ -2542,7 +2542,10 @@ export interface RTCSignalingOptions {
     width: number;
     height: number;
   };
-  videoSendEncodings?: RTCRtpEncodingParameters[];
+  sframe?: {
+    profile: 'homekit';
+    sendKey?: RTCSFrameKey;
+  };
 }
 
 /**
