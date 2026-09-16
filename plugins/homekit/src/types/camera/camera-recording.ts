@@ -116,8 +116,7 @@ async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
 }
 
 export async function* handleFragmentsRequests(streamId: number, device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
-    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin, isOpen: () => boolean,
-    secureVideo3 = false): AsyncGenerator<RecordingPacket> {
+    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin, isOpen: () => boolean): AsyncGenerator<RecordingPacket> {
 
     // homekitPlugin.storageSettings.values.lastKnownHomeHub = connection.remoteAddress;
 
@@ -132,9 +131,6 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
 
     const media = await device.getVideoStream({
         destination: 'remote-recorder',
-        video: {
-            codec: secureVideo3 ? 'h265' : 'h264',
-        },
         audio: {
             codec: 'aac',
         },
@@ -145,6 +141,9 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
     const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
     const audioCodec = ffmpegInput.mediaStreamOptions?.audio?.codec;
     const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
+
+    const isHevc = videoCodec?.toLowerCase() === 'h265' || videoCodec?.toLowerCase() === 'hevc';
+
     const isDefinitelyNotAAC = !audioCodec || audioCodec.toLowerCase().indexOf('aac') === -1;
     const needsFFmpeg = debugMode.video || debugMode.video
         || !ffmpegInput.url.startsWith('tcp://')
@@ -234,18 +233,17 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
             );
         }
         else {
-            const isHevc = videoCodec?.toLowerCase() === 'h265' || videoCodec?.toLowerCase() === 'hevc';
-            if (!secureVideo3 || !isHevc)
+            if (!isHevc)
                 checkCompatibleCodec(console, device, videoCodec);
             videoArgs.push(
                 '-vcodec', 'copy',
             );
-            if (secureVideo3 && isHevc)
+            if (isHevc)
                 videoArgs.push('-tag:v', 'hvc1');
         }
 
         // The HSV3 HDS receiver expects producer reference time on media fragments.
-        if (secureVideo3)
+        if (isHevc)
             videoArgs.push('-write_prft', 'wallclock');
 
         console.log(`motion recording starting`);
@@ -346,7 +344,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
 
             // tvOS 27 requires zero prft flags for HSV3 recording; FFmpeg's 0x18 flags
             // cause fragment date extraction to fail and can crash homed.
-            if (secureVideo3 && type === 'prft' && data.length >= 4)
+            if (isHevc && type === 'prft' && data.length >= 4)
                 data.writeUIntBE(0, 1, 3);
 
             // every moov/moof frame designates an iframe?

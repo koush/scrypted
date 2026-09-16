@@ -120,7 +120,7 @@ addSupportedType({
                 },
                 handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
                     const ret = handleFragmentsRequests(streamId, device, configuration, console, homekitPlugin, 
-                        () => openRecordingStreams.has(streamId), secureVideo3);
+                        () => openRecordingStreams.has(streamId));
                     openRecordingStreams.set(streamId, ret);
                     return ret;
                 },
