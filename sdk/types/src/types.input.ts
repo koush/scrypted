@@ -2559,8 +2559,8 @@ export interface RTCSignalingClient {
  * @category WebRTC Reference
  */
 export interface RTCSFrameKey {
-    kid: string; // Decimal uint64; avoids JS number precision loss.
-    key: string; // Base64 key material.
+  kid: string; // Decimal uint64; avoids JS number precision loss.
+  key: string; // Base64 key material.
 }
 
 /**
@@ -2571,13 +2571,15 @@ export interface RTCSessionControl {
   extendSession(): Promise<void>;
   endSession(): Promise<void>;
   setPlayback(options: {
-    audio: boolean,
+    audio: boolean | 'on-demand',
     video: boolean,
   }): Promise<void>;
   updateSFrameReceiveKeys?(update: {
     add: RTCSFrameKey[];
-      remove: string[];
+    remove: string[];
   }): Promise<void>;
+  createLocalDescription?(type: 'offer' | 'answer'): Promise<RTCSessionDescriptionInit>;
+  setRemoteDescription?(description: RTCSessionDescriptionInit): Promise<void>;
 }
 /**
  * @category WebRTC Reference

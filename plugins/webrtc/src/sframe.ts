@@ -1,4 +1,4 @@
-import { createCipheriv, createHmac, hkdfSync } from 'crypto';
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, timingSafeEqual } from 'crypto';
 import type { RTCSFrameKey } from '@scrypted/sdk';
 
 // HomeKit's AES-256-CTR/HMAC-SHA512 suites: video uses an 80-bit tag,
@@ -44,6 +44,117 @@ export function deriveSFrameKeys(baseKey: Buffer, kid: bigint, suite: SFrameSuit
     };
 }
 
+export function decodeSFrameHeader(frame: Buffer) {
+    if (!frame.length)
+        throw new Error('Missing SFrame header');
+    let offset = 1;
+    const read = (field: number) => {
+        if (!(field & 8))
+            return BigInt(field);
+        const length = (field & 7) + 1;
+        if (offset + length > frame.length)
+            throw new Error('Truncated SFrame header');
+        let value = 0n;
+        for (let i = 0; i < length; i++)
+            value = (value << 8n) | BigInt(frame[offset++]);
+        return value;
+    };
+    const kid = read(frame[0] >> 4);
+    const counter = read(frame[0] & 15);
+    return { kid, counter, length: offset };
+}
+
+function deriveSFrameStreamKeys(encodedKey: string, kid: bigint, ssrc: number, suite: SFrameSuite) {
+    const key = Buffer.from(encodedKey, 'base64');
+    if (key.length !== 32)
+        throw new Error('HomeKit SFrame key must be 32 bytes');
+    const salt = Buffer.alloc(4);
+    salt.writeUInt32BE(ssrc);
+    const baseKey = Buffer.from(hkdfSync('sha512', key, salt, Buffer.from('SFrame 1.0 RTP Stream'), 64));
+    return deriveSFrameKeys(baseKey, kid, suite);
+}
+
+export function unprotectSFrame(keys: ReturnType<typeof deriveSFrameKeys>, suite: SFrameSuite,
+    frame: Buffer, metadata = Buffer.alloc(0)): Buffer {
+    const header = decodeSFrameHeader(frame);
+    const tagLength = suite === 6 ? 10 : 4;
+    if (frame.length < header.length + tagLength)
+        throw new Error('Truncated SFrame authentication tag');
+    const aad = Buffer.concat([frame.subarray(0, header.length), metadata]);
+    const ciphertext = frame.subarray(header.length, frame.length - tagLength);
+    const nonce = Buffer.from(keys.salt);
+    const counterBytes = uint64(header.counter);
+    for (let i = 0; i < counterBytes.length; i++)
+        nonce[nonce.length - counterBytes.length + i] ^= counterBytes[i];
+    const lengths = Buffer.alloc(24);
+    lengths.writeBigUInt64BE(BigInt(aad.length), 0);
+    lengths.writeBigUInt64BE(BigInt(ciphertext.length), 8);
+    lengths.writeBigUInt64BE(BigInt(tagLength), 16);
+    const tag = createHmac('sha512', keys.key.subarray(32))
+        .update(lengths).update(nonce).update(aad).update(ciphertext)
+        .digest().subarray(0, tagLength);
+    if (!timingSafeEqual(tag, frame.subarray(frame.length - tagLength)))
+        throw new Error('SFrame authentication failed');
+    const decipher = createDecipheriv('aes-256-ctr', keys.key.subarray(0, 32), Buffer.concat([nonce, Buffer.alloc(4)]));
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+}
+
+// Receive state belongs to the connection, so replay tracking survives talkback toggles.
+export class SFrameAudioReceiver {
+    private streams = new Map<string, {
+        key: string;
+        keys: ReturnType<typeof deriveSFrameKeys>;
+        highest: bigint;
+        received: bigint;
+    }>();
+
+    constructor(private readonly receiveKeys: ReadonlyMap<string, string>) {
+    }
+
+    clear() {
+        this.streams.clear();
+    }
+
+    removeKey(kid: string) {
+        for (const id of this.streams.keys()) {
+            if (id.startsWith(`${kid}:`))
+                this.streams.delete(id);
+        }
+    }
+
+    receive(payload: Buffer, ssrc: number): Buffer {
+        if (!this.receiveKeys.size)
+            return payload;
+        // Audio carries one complete protected Opus packet. Do not pass partial frames to the decoder.
+        if (!payload.length || payload[0] !== 0xc0)
+            throw new Error('Expected a complete SFrame audio RTP payload');
+        const frame = payload.subarray(1);
+        const { kid, counter } = decodeSFrameHeader(frame);
+        const key = this.receiveKeys.get(kid.toString());
+        if (!key)
+            throw new Error('Unknown SFrame receive KID');
+        const id = `${kid}:${ssrc}`;
+        let stream = this.streams.get(id);
+        if (!stream || stream.key !== key) {
+            stream = { key, keys: deriveSFrameStreamKeys(key, kid, ssrc, 8), highest: -1n, received: 0n };
+        }
+        const age = stream.highest - counter;
+        if (age >= 64n || (age >= 0n && (stream.received & (1n << age))))
+            throw new Error('Replayed SFrame audio packet');
+        const plaintext = unprotectSFrame(stream.keys, 8, frame);
+        if (counter > stream.highest) {
+            const shift = counter - stream.highest;
+            stream.received = shift >= 64n ? 1n : ((stream.received << shift) | 1n) & maxUint64;
+            stream.highest = counter;
+        }
+        else {
+            stream.received |= 1n << age;
+        }
+        this.streams.set(id, stream);
+        return plaintext;
+    }
+}
+
 // RFC 9605 CTR/HMAC AEAD. Metadata is authenticated but not carried in the frame.
 export function protectSFrame(keys: ReturnType<typeof deriveSFrameKeys>, suite: SFrameSuite,
     kid: bigint, counter: bigint, plaintext: Buffer, metadata = Buffer.alloc(0)): Buffer {
@@ -73,13 +184,7 @@ export class SFrameStreamCryptor {
 
     constructor(sendKey: RTCSFrameKey, ssrc: number, private readonly suite: SFrameSuite) {
         this.kid = BigInt(sendKey.kid);
-        const key = Buffer.from(sendKey.key, 'base64');
-        if (key.length !== 32)
-            throw new Error('HomeKit SFrame sender key must be 32 bytes');
-        const salt = Buffer.alloc(4);
-        salt.writeUInt32BE(ssrc);
-        const baseKey = Buffer.from(hkdfSync('sha512', key, salt, Buffer.from('SFrame 1.0 RTP Stream'), 64));
-        this.keys = deriveSFrameKeys(baseKey, this.kid, suite);
+        this.keys = deriveSFrameStreamKeys(sendKey.key, this.kid, ssrc, suite);
     }
 
     protectFrame(plaintext: Buffer): Buffer {

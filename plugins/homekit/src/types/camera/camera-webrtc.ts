@@ -1,4 +1,5 @@
 import { Deferred } from '@scrypted/common/src/deferred';
+import { createAsyncQueue } from '@scrypted/common/src/async-queue';
 import { randomBytes } from 'crypto';
 import { parseSdp } from '@scrypted/common/src/sdp-utils';
 import type { RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSession } from '@scrypted/sdk';
@@ -128,10 +129,11 @@ class HomeKitSignalingSession implements RTCSignalingSession {
 
 export function createHomeKitWebRTCDelegate(camera: RTCSignalingChannel, console: Console,
     tier: Parameters<typeof addHomeKitVideoMetadata>[1]) {
+    type ReceiveKeyUpdate = Parameters<NonNullable<RTCSessionControl['updateSFrameReceiveKeys']>>[0];
     const sessions = new Map<string, {
         signaling: HomeKitSignalingSession;
         control?: RTCSessionControl;
-        receiveKeys: Map<bigint, Buffer>;
+        receiveKeys: ReturnType<typeof createAsyncQueue<ReceiveKeyUpdate>>;
         timer: ReturnType<typeof setTimeout>;
     }>();
 
@@ -142,6 +144,7 @@ export function createHomeKitWebRTCDelegate(camera: RTCSignalingChannel, console
         sessions.delete(id);
         clearTimeout(session.timer);
         session.receiveKeys.clear();
+        session.receiveKeys.end();
         const error = new Error('HomeKit WebRTC session ended');
         session.signaling.offer.reject(error);
         session.signaling.answer.reject(error);
@@ -166,7 +169,7 @@ export function createHomeKitWebRTCDelegate(camera: RTCSignalingChannel, console
             const session = {
                 signaling,
                 control: undefined as RTCSessionControl | undefined,
-                receiveKeys: new Map<bigint, Buffer>(),
+                receiveKeys: createAsyncQueue<ReceiveKeyUpdate>(),
                 timer: setTimeout(() => {
                     console.log('HSV3 WebRTC negotiation timed out');
                     end(id).catch(() => console.log('HSV3 WebRTC cleanup failed'));
@@ -181,10 +184,20 @@ export function createHomeKitWebRTCDelegate(camera: RTCSignalingChannel, console
             (async () => {
                 try {
                     const control = await camera.startRTCSignalingSession(signaling);
-                    if (sessions.get(id) !== session)
+                    await control.setPlayback({
+                        audio: 'on-demand',
+                        video: false,
+                    });
+                    if (sessions.get(id) !== session) {
                         await control?.endSession();
-                    else
-                        session.control = control;
+                        return;
+                    }
+                    session.control = control;
+                    for await (const update of session.receiveKeys.queue) {
+                        if (sessions.get(id) !== session)
+                            break;
+                        await control?.updateSFrameReceiveKeys?.(update);
+                    }
                 }
                 catch {
                     console.log('HSV3 WebRTC signaling failed');
@@ -222,27 +235,42 @@ export function createHomeKitWebRTCDelegate(camera: RTCSignalingChannel, console
             if (!request.sdpAnswer)
                 throw new Error('Missing HomeKit WebRTC answer');
             const sdp = mergeHomeKitIceCandidates(request.sdpAnswer, request.candidates || []);
-            console.log('[HSV3 SDP]', JSON.stringify({ type: 'answer', sessionIdentifier: request.sessionIdentifier,
-                sdp: request.sdpAnswer, candidates: request.candidates || [] }));
+            console.log('[HSV3 SDP]', JSON.stringify({
+                type: 'answer', sessionIdentifier: request.sessionIdentifier,
+                sdp: request.sdpAnswer, candidates: request.candidates || []
+            }));
             session.signaling.answer.resolve({ type: 'answer', sdp });
             clearTimeout(session.timer);
             console.log('HSV3 WebRTC answer forwarded');
         },
-        async handleReoffer() {
-            throw new Error('HomeKit WebRTC reoffer is not implemented');
+        async handleReoffer(request) {
+            console.warn(request);
+            const session = sessions.get(request.sessionIdentifier);
+            await session.control!.setRemoteDescription({
+                type: 'offer',
+                sdp: request.sdpOffer,
+            }, );
+            const response = await session.control.createLocalDescription('answer');
+            session.control.setPlayback({
+                audio: 'on-demand',
+                video: false,
+            });
+            return {
+                sdpAnswer: response.sdp,
+            }
         },
         async handleUpdateSession(update) {
             const session = sessions.get(update.sessionIdentifier);
             if (!session)
                 throw new Error('Unknown HomeKit WebRTC session');
-            // Retain receive keys for future WebRTC SFrame integration. Accept
-            // these updates before the SDP answer as well as after negotiation.
-            for (const kid of update.receiveKIDsToRemove)
-                session.receiveKeys.delete(kid);
-            for (const { kid, key } of update.receiveKeysToAdd)
-                session.receiveKeys.set(kid, Buffer.from(key));
-            console.log('HSV3 WebRTC receive keys saved; added:', update.receiveKeysToAdd.length,
-                'removed:', update.receiveKIDsToRemove.length, 'retained:', session.receiveKeys.size);
+            session.receiveKeys.submit({
+                add: update.receiveKeysToAdd.map(({ kid, key }) => ({
+                    kid: kid.toString(), key: Buffer.from(key).toString('base64'),
+                })),
+                remove: update.receiveKIDsToRemove.map(kid => kid.toString()),
+            });
+            console.log('HSV3 WebRTC receive keys queued; added:', update.receiveKeysToAdd.length,
+                'removed:', update.receiveKIDsToRemove.length);
         },
         async handleEndSession(sessionIdentifier) {
             await end(sessionIdentifier);

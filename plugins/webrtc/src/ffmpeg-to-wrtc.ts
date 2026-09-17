@@ -13,7 +13,7 @@ import { getAudioCodec, getFFmpegRtpAudioOutputArguments, optionalVideoCodec, op
 import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket, defaultPeerConfig, useSdesRTPStreamId } from "./werift";
 import { WeriftSignalingSession } from "./werift-signaling-session";
 import { logIsLocalIceTransport } from "./werift-util";
-import { SFrameStreamCryptor, SFrameSuite } from "./sframe";
+import { SFrameAudioReceiver, SFrameStreamCryptor, SFrameSuite } from "./sframe";
 import { SFrameRepacketizer, SFrameRtpPacketizer } from "./sframe-repacketizer";
 
 // A forwarder can be recreated while its peer connection and RTP sender remain alive.
@@ -525,7 +525,8 @@ class WebRTCTrack implements RTCOutputMediaObjectTrack, RTCInputMediaObjectTrack
     removed = new Deferred<void>();
 
     constructor(public connectionManagement: WebRTCConnectionManagement, public video: RTCRtpTransceiver, public audio: RTCRtpTransceiver, intercom: Intercom) {
-        this.control = new ScryptedSessionControl(intercom, audio);
+        this.control = new ScryptedSessionControl(this.connectionManagement, intercom,
+            update => this.connectionManagement.updateSFrameReceiveKeys(update), connectionManagement.sframeAudioReceiver);
         this.connectionManagement.activeTracks.add(this);
     }
 
@@ -544,7 +545,8 @@ class WebRTCTrack implements RTCOutputMediaObjectTrack, RTCInputMediaObjectTrack
         this.cleanup(true);
 
         this.removed = new Deferred();
-        this.control = new ScryptedSessionControl(intercom, this.audio);
+        this.control = new ScryptedSessionControl(this.connectionManagement, intercom,
+            update => this.connectionManagement.updateSFrameReceiveKeys(update), this.connectionManagement.sframeAudioReceiver);
 
         const f = await createTrackForwarder(this.video, this.audio);
         this.attachForwarder(f);
@@ -580,6 +582,8 @@ class WebRTCTrack implements RTCOutputMediaObjectTrack, RTCInputMediaObjectTrack
 
 export class WebRTCConnectionManagement implements RTCConnectionManagement {
     readonly sframe: RTCSignalingOptions['sframe'];
+    readonly sframeReceiveKeys = new Map<string, string>();
+    readonly sframeAudioReceiver = new SFrameAudioReceiver(this.sframeReceiveKeys);
     pc: RTCPeerConnection;
     private negotiationDeferred = new Deferred<void>();
     weriftSignalingSession: WeriftSignalingSession;
@@ -617,6 +621,11 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             ...weriftConfiguration,
         });
         logConnectionState(console, this.pc);
+        waitClosed(this.pc).catch(error => this.console.error('WebRTC close failed', error)).then(() => {
+            this.closed = true;
+            this.sframeReceiveKeys.clear();
+            this.sframeAudioReceiver.clear();
+        });
         waitConnected(this.pc)
             .then(() => logIsLocalIceTransport(this.console, this.pc)).catch(() => { });
 
@@ -624,6 +633,17 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     }
 
     async probe() {
+    }
+
+    async updateSFrameReceiveKeys(update: Parameters<NonNullable<ScryptedSessionControl['updateSFrameReceiveKeys']>>[0]) {
+        if (this.closed)
+            return;
+        for (const kid of update.remove) {
+            this.sframeReceiveKeys.delete(kid);
+            this.sframeAudioReceiver.removeKey(kid);
+        }
+        for (const { kid, key } of update.add)
+            this.sframeReceiveKeys.set(kid, key);
     }
 
     async createTracks(mediaObject: MediaObject) {
@@ -771,6 +791,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     }
 
     async close(): Promise<void> {
+        this.closed = true;
+        this.sframeReceiveKeys.clear();
+        this.sframeAudioReceiver.clear();
         for (const track of this.activeTracks) {
             track.cleanup(false);
         }
