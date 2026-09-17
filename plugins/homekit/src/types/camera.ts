@@ -1,4 +1,4 @@
-import type { RTCSignalingChannel } from '@scrypted/sdk';
+import type { Resolution, RTCSignalingChannel } from '@scrypted/sdk';
 import sdk, { AudioSensor, Camera, DeviceProvider, Intercom, MotionSensor, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { createCameraStorageSettings } from '../camera-mixin';
 import { DummyDevice, addSupportedType, bindCharacteristic } from '../common';
@@ -21,7 +21,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
-    async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom & OnOff, homekitPlugin: HomeKitPlugin) {
+    async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom & OnOff & Resolution, homekitPlugin: HomeKitPlugin) {
         const console = deviceManager.getMixinConsole(device.id, undefined);
         const storage = deviceManager.getMixinStorage(device.id, undefined);
         const cameraStorage = createCameraStorageSettings({ storage, onDeviceEvent: undefined });
@@ -200,7 +200,8 @@ addSupportedType({
         const controller = secureVideo3
             ? createSecureVideoController(accessory, delegate.handleSnapshotRequest, console, recordingDelegate,
                 tiers => createMultiTierRtpDelegate(device, tiers, console),
-                tiers => createHomeKitWebRTCDelegate(systemManager.getDeviceById<RTCSignalingChannel>(device.id), console, tiers[0]))
+                tiers => createHomeKitWebRTCDelegate(systemManager.getDeviceById<RTCSignalingChannel>(device.id), console, tiers[0]),
+                device.resolution)
             : new CameraController({
                 cameraStreamCount: 8,
                 delegate,
