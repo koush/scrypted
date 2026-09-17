@@ -741,28 +741,39 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 return this.locks.get(nativeId);
 
             const id = this.findId(nativeId);
+
+            const patchupIdToNativeId = () => {
+                const idToNativeId = this.storageSettings.values.idToNativeId || {};
+                idToNativeId[id] = nativeId;
+                this.storageSettings.values.idToNativeId = idToNativeId;
+            };
+
             const camera = this.api.bootstrap.cameras.find(camera => camera.id === id);
             if (camera) {
                 const ret = new UnifiCamera(this, nativeId, camera);
                 this.cameras.set(nativeId, ret);
+                patchupIdToNativeId();
                 return ret;
             }
             const sensor = this.api.bootstrap.sensors.find(sensor => sensor.id === id);
             if (sensor) {
                 const ret = new UnifiSensor(this, nativeId, sensor);
                 this.unifiSensors.set(nativeId, ret);
+                patchupIdToNativeId();
                 return ret;
             }
             const light = this.api.bootstrap.lights.find(light => light.id === id);
             if (light) {
                 const ret = new UnifiLight(this, nativeId, light);
                 this.lights.set(nativeId, ret);
+                patchupIdToNativeId();
                 return ret;
             }
             const lock = (this.api.bootstrap.doorlocks as any)?.find(lock => lock.id === id);
             if (lock) {
                 const ret = new UnifiLock(this, nativeId, lock);
                 this.locks.set(nativeId, ret);
+                patchupIdToNativeId();
                 return ret;
             }
         }
