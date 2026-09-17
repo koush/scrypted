@@ -131,6 +131,10 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
 
     const media = await device.getVideoStream({
         destination: 'remote-recorder',
+        video :{
+            codec: 'h264',
+            alternateCodecs: ['h264', 'h265'],
+        },
         audio: {
             codec: 'aac',
         },
