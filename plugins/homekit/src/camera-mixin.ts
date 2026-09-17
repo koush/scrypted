@@ -1,5 +1,5 @@
 import { SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { ObjectDetector, Readme, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { Readme, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { StorageSettings, StorageSettingsDevice } from "@scrypted/sdk/storage-settings";
 import { HomekitMixin } from "./homekit-mixin";
 import { getDebugMode } from "./types/camera/camera-debug-mode-storage";
@@ -15,10 +15,16 @@ export function canCameraMixin(type: ScryptedDeviceType | string, interfaces: st
 
 export function createCameraStorageSettings(device: StorageSettingsDevice) {
     return new StorageSettings(device, {
+        secureVideo3Html: {
+            title: 'HomeKit Secure Video 3',
+            subgroup: 'Pairing',
+            type: 'html',
+            defaultValue: `<div style="color: red; padding-bottom: 16px;">HomeKit Secure Video 3 is experimental and is not recommended for most cameras. Refer to the <a target="_blank" href="https://docs.scrypted.app/homekit.html#homekit-secure-video-v3">documentation.</a></div>`,
+        },
         secureVideo3: {
             title: 'HomeKit Secure Video 3',
             subgroup: 'Pairing',
-            description: 'Enable the new HomeKit camera services and H.265 multi-tier RTP streaming (experimental). WebRTC and recording are not implemented yet. Changing this setting reloads the HomeKit plugin.',
+            description: 'Toggle HomeKit Secure Video 3. Changing this setting will reset the accessory pairing and reload the HomeKit plugin. The device must be re-paired.',
             type: 'boolean',
             defaultValue: false,
         },
@@ -52,6 +58,10 @@ export class CameraMixin extends HomekitMixin<Readme & VideoCamera> implements R
         if (!this.cameraStorageSettings.values.hasWarnedBridgedCamera && !this.storageSettings.values.standalone) {
             this.cameraStorageSettings.values.hasWarnedBridgedCamera = true;
             log.a(`${this.name} is paired in Bridge Mode. Using Accessory Mode is recommended for cameras for optimal performance.`)
+        }
+
+        this.cameraStorageSettings.settings.secureVideo3.onPut = (oldValue, newValue) => {
+            this.storageSettings.values.resetAccessory = 'RESET';
         }
     }
 
