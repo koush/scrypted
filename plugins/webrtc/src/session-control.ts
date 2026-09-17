@@ -78,7 +78,7 @@ export class ScryptedSessionControl implements RTCSessionControl {
                 // HACK, this may not be opus
                 "m=audio 0 RTP/AVP 110",
                 "a=rtpmap:110 opus/48000/2",
-                "a=fmtp:101 minptime=10;useinbandfec=1",
+                "a=fmtp:110 minptime=10;useinbandfec=1",
 
                 // "m=audio 0 RTP/AVP 0",
                 // "a=rtpmap:0 PCMU/8000",
