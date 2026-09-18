@@ -10,7 +10,6 @@ import { addTrackControls, getSpsPpsVps, parseSdp } from '@scrypted/common/src/s
 import sdk, { FFmpegInput, Intercom, MediaStreamFeedback, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import dgram from 'dgram';
 import { Socket } from 'net';
-import { H265Repacketizer } from '../../../../webrtc/src/h265-packetizer';
 import { RtpForwarderProcess, RtpTracks, startRtpForwarderProcess } from '../../../../webrtc/src/rtp-forwarders';
 import { AudioStreamingSamplerate, CameraController, MultiTierPrepareStreamRequest, MultiTierRTPStreamingDelegate, RTPSRTPParameters, SecureVideoVideoTier } from '../../hap';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
@@ -47,6 +46,7 @@ interface Session {
     timeout?: NodeJS.Timeout;
     forwarder?: RtpForwarderProcess;
     feedback?: MediaStreamFeedback;
+    videoClock?: { start: number; base: number; sourceTimestamp: number; ticks: number };
     videoSenders: Map<number, ReturnType<typeof createCameraStreamSender>>;
     audioSenders: Map<number, ReturnType<typeof createCameraStreamSender>>;
     stopTalkback?: () => void;
@@ -54,7 +54,7 @@ interface Session {
     talkback?: { server: RtspServer, track: string };
 }
 
-export function createMultiTierRtpDelegate(device: ScryptedDevice & VideoCamera & Intercom, tiers: SecureVideoVideoTier[], console: Console) {
+export function createMultiTierRtpDelegate(device: ScryptedDevice & VideoCamera & Intercom, tiers: SecureVideoVideoTier[], console: Console, storage?: Storage) {
     const sessions = new Map<string, Session>();
     let intercomOwner: Session;
 
@@ -278,6 +278,17 @@ export function createMultiTierRtpDelegate(device: ScryptedDevice & VideoCamera 
             const tier = tiers.find(t => t.identifier === request.videoTier);
             if (!tier || (request.audioTier !== undefined && request.audioTier !== 1))
                 throw new Error('Unknown multi-tier stream tier');
+            if (session.forwarder) {
+                refreshTimeout(session);
+                await session.feedback?.reconfigureStream({
+                    video: {
+                        bitrate: tier.targetAverageBitrate * 1000,
+                        width: tier.width,
+                        height: tier.height,
+                    },
+                });
+                return;
+            }
             const generation = ++session.generation;
             const active = () => !session.ended.finished && session.generation === generation;
             session.forwarder?.kill();
@@ -308,14 +319,17 @@ export function createMultiTierRtpDelegate(device: ScryptedDevice & VideoCamera 
                 // prepared SSRCs for outgoing RTP/RTCP.
                 const videoSSRC = session.videoSSRC;
                 const audioSSRC = session.audioSSRC;
+                const ffmpegSender = storage?.getItem('rtpSender') === 'FFmpeg';
+                const useSystemClock = storage?.getItem('secureVideo3UseSystemClock') !== 'false';
+                const videoOptions = { codec: 'h265' as const, maxPacketSize: rtpPacketSize,
+                    vps: undefined as Buffer, sps: undefined as Buffer, pps: undefined as Buffer };
                 // Retain encryption/sequence state across tier changes that reuse an SSRC.
                 let videoSender = session.videoSenders.get(videoSSRC);
-                if (!videoSender) {
+                if (!ffmpegSender && !videoSender) {
                     videoSender = createCameraStreamSender(console, session.videoConfig, session.video, videoSSRC, videoPayloadType,
-                        session.request.controllerVideoPort, session.request.targetAddress, 0.5, undefined, undefined, true);
+                        session.request.controllerVideoPort, session.request.targetAddress, 0.5, videoOptions, undefined, true);
                     session.videoSenders.set(videoSSRC, videoSender);
                 }
-                const packetizer = new H265Repacketizer(console, rtpPacketSize - 12);
                 const tracks: RtpTracks = {
                     video: {
                         codecCopy: 'h265', payloadType: videoPayloadType, packetSize: rtpPacketSize,
@@ -323,7 +337,7 @@ export function createMultiTierRtpDelegate(device: ScryptedDevice & VideoCamera 
                         encoderArguments: ['-c:v', 'libx265', '-preset', 'ultrafast', '-tune', 'zerolatency',
                             '-pix_fmt', 'yuv420p', '-b:v', `${tier.targetAverageBitrate}k`, '-maxrate', `${tier.peakBitrate}k`,
                             '-bufsize', `${tier.peakBitrate * 2}k`, '-r', `${tier.frameRate}`, '-g', `${tier.frameRate * 2}`],
-                        onMSection: section => { packetizer.codecInfo = getSpsPpsVps(section); },
+                        onMSection: section => { Object.assign(videoOptions, getSpsPpsVps(section)); },
                         onRtp: buffer => {
                             if (!active())
                                 return;
@@ -334,8 +348,21 @@ export function createMultiTierRtpDelegate(device: ScryptedDevice & VideoCamera 
                                 rtp.header.extensions = [];
                                 rtp.header.csrc = [];
                                 rtp.header.csrcLength = 0;
-                                for (const packet of packetizer.repacketize(rtp) || [])
-                                    videoSender.sendRtp(packet);
+                                if (useSystemClock) {
+                                    const sourceTimestamp = rtp.header.timestamp;
+                                    const now = performance.now();
+                                    const clock = session.videoClock ??= {
+                                        start: now, base: sourceTimestamp, sourceTimestamp, ticks: 0,
+                                    };
+                                    if (sourceTimestamp !== clock.sourceTimestamp) {
+                                        // Keep pictures distinct during catch-up bursts, but share
+                                        // one timestamp across every slice/fragment of a picture.
+                                        clock.ticks = Math.max(clock.ticks + 1, Math.round((now - clock.start) * 90));
+                                        clock.sourceTimestamp = sourceTimestamp;
+                                    }
+                                    rtp.header.timestamp = (clock.base + clock.ticks) >>> 0;
+                                }
+                                videoSender.sendRtp(rtp);
                             }
                             catch (error) {
                                 console.error('HSV3 H.265 packetization failed', error);
@@ -344,6 +371,24 @@ export function createMultiTierRtpDelegate(device: ScryptedDevice & VideoCamera 
                         },
                     },
                 };
+                if (ffmpegSender) {
+                    const video = tracks.video;
+                    // Force the FFmpeg path even when the source is native HEVC.
+                    video.codecCopy = 'transcode';
+                    if (input.mediaStreamOptions?.video?.codec === 'h265')
+                        video.encoderArguments = ['-c:v', 'copy', '-bsf:v', 'dump_extra'];
+                    const address = session.request.addressVersion === 'ipv6'
+                        ? `[${session.request.targetAddress}]` : session.request.targetAddress;
+                    video.ffmpegDestination = `${address}:${session.request.controllerVideoPort}`;
+                    video.rtcpPort = session.request.controllerVideoPort;
+                    video.ssrc = videoSSRC;
+                    video.srtp = {
+                        crytoSuite: 'AES_CM_128_HMAC_SHA1_80',
+                        key: Buffer.concat([session.videoConfig.keys.localMasterKey, session.videoConfig.keys.localMasterSalt]),
+                    };
+                    video.onMSection = undefined;
+                    video.onRtp = () => {};
+                }
                 if (request.audioTier !== undefined && input.mediaStreamOptions?.audio !== null) {
                     let audioSender = session.audioSenders.get(audioSSRC);
                     if (!audioSender) {

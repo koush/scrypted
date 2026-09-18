@@ -28,6 +28,13 @@ export function createCameraStorageSettings(device: StorageSettingsDevice) {
             type: 'boolean',
             defaultValue: false,
         },
+        secureVideo3UseSystemClock: {
+            title: 'Use System Clock for Video',
+            subgroup: 'Pairing',
+            description: 'Use local send timing for HomeKit Secure Video 3 native RTP video timestamps to reduce stuttering from irregular camera delivery. Changes apply when the live stream is restarted.',
+            type: 'boolean',
+            defaultValue: true,
+        },
         hasWarnedBridgedCamera: {
             description: 'Setting to warn user that bridged cameras are bad.',
             type: 'boolean',

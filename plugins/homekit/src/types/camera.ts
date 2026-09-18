@@ -199,7 +199,7 @@ addSupportedType({
 
         const controller = secureVideo3
             ? createSecureVideoController(accessory, delegate.handleSnapshotRequest, console, recordingDelegate,
-                tiers => createMultiTierRtpDelegate(device, tiers, console),
+                tiers => createMultiTierRtpDelegate(device, tiers, console, storage),
                 tiers => createHomeKitWebRTCDelegate(systemManager.getDeviceById<RTCSignalingChannel>(device.id), console, tiers[0]),
                 device.resolution)
             : new CameraController({

@@ -10,13 +10,14 @@ import { ntpTime } from './camera-utils';
 import { H264Repacketizer } from './h264-packetizer';
 import { OpusRepacketizer } from './opus-repacketizer';
 import throttle from 'lodash/throttle';
+import { H265Repacketizer } from '../../../../webrtc/src/h265-packetizer';
 
 export function createCameraStreamSender(console: Console, config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number,
     videoOptions?: {
         maxPacketSize: number,
         sps: Buffer,
         pps: Buffer,
-    },
+    } & ({ codec?: 'h264' } | { codec: 'h265'; vps: Buffer }),
     audioOptions?: {
         audioPacketTime: number,
         audioSampleRate: AudioStreamingSamplerate,
@@ -30,12 +31,13 @@ export function createCameraStreamSender(console: Console, config: Config, sende
 
     let firstTimestamp = 0;
     let lastTimestamp = 0;
+    let lastNtpTimestamp: bigint;
     let packetCount = 0;
     let octetCount = 0;
     let lastRtcp = 0;
     let firstSequenceNumber: number;
     let opusPacketizer: OpusRepacketizer;
-    let h264Packetizer: H264Repacketizer;
+    let videoPacketizer: H264Repacketizer | H265Repacketizer;
     let analyzeVideo = true;
 
     const loggedNaluTypes = new Set<number>();
@@ -66,19 +68,22 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     }
     else {
         if (videoOptions?.maxPacketSize) {
-            // adjust packet size for the rtp packet header (12).
             const adjustedMtu = videoOptions.maxPacketSize - 12;
-            h264Packetizer = new H264Repacketizer(console, adjustedMtu, videoOptions);
+            videoPacketizer = videoOptions.codec === 'h265'
+                ? new H265Repacketizer(console, adjustedMtu, videoOptions)
+                : new H264Repacketizer(console, adjustedMtu, videoOptions);
         }
         sender.setSendBufferSize(1024 * 1024);
     }
 
     function sendRtcpInternal(now: number) {
+        if (lastNtpTimestamp === undefined)
+            return;
         lastRtcp = now;
         const sr = new RtcpSrPacket({
             ssrc,
             senderInfo: new RtcpSenderInfo({
-                ntpTimestamp: ntpTime(),
+                ntpTimestamp: lastNtpTimestamp,
                 rtpTimestamp: lastTimestamp,
                 packetCount,
                 octetCount,
@@ -97,13 +102,6 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     function sendPacket(rtp: RtpPacket) {
         const now = Date.now();
 
-        // packet count may be less than zero if rollover counting fails due to heavy packet loss or other
-        // unforseen edge cases.
-        if (now > lastRtcp + rtcpInterval * 1000) {
-            sendRtcpInternal(now);
-        }
-        lastTimestamp = rtp.header.timestamp;
-
         packetCount++;
         octetCount += rtp.payload.length;
 
@@ -113,9 +111,13 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         if (rewriteSequenceNumbers)
             rtp.header.sequenceNumber = (firstSequenceNumber + packetCount - 1) & 0xffff;
 
-
         const srtp = srtpSession.encrypt(rtp.payload, rtp.header);
         sender.send(srtp, port, targetAddress);
+        // Retain a matching wall-clock/RTP pair, including for explicit RTCP sends.
+        lastTimestamp = rtp.header.timestamp;
+        lastNtpTimestamp = ntpTime();
+        if (now > lastRtcp + rtcpInterval * 1000)
+            sendRtcpInternal(now);
     }
 
     function sendRtp(rtp: RtpPacket) {
@@ -154,16 +156,16 @@ export function createCameraStreamSender(console: Console, config: Config, sende
             return;
         }
 
-        if (!h264Packetizer) {
+        if (!videoPacketizer) {
             sendPacket(rtp);
             return;
         }
 
-        const packets = h264Packetizer.repacketize(rtp);
+        const packets = videoPacketizer.repacketize(rtp);
         if (!packets?.length)
             return;
         for (const packet of packets) {
-            if (analyzeVideo) {
+            if (analyzeVideo && videoOptions.codec !== 'h265') {
                 const naluTypes = getNaluTypesInNalu(packet.payload, true);
                 analyzeVideo = !naluTypes.has(H264_NAL_TYPE_IDR);
                 if (analyzeVideo) {

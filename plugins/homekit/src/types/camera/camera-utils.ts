@@ -40,16 +40,12 @@ export function bufferWriter(bytes: number[], values: (number | bigint)[]) {
     return buf;
 }
 
-// from werift
 export const ntpTime = () => {
     const now = performance.timeOrigin + performance.now() - Date.UTC(1900, 0, 1);
-
-    const seconds = now / 1000;
-    const [sec, msec] = seconds.toString().split(".").map(Number);
-
-    const buf = bufferWriter([4, 4], [sec, msec]);
-
-    return buf.readBigUInt64BE();
+    const seconds = Math.floor(now / 1000);
+    // NTP uses a binary 32-bit fraction of a second, not decimal digits.
+    const fraction = Math.floor((now - seconds * 1000) / 1000 * 0x100000000);
+    return (BigInt(seconds >>> 0) << 32n) | BigInt(fraction);
 };
 
 export async function getStreamingConfiguration(device: ScryptedDevice & VideoCamera, isHomeHub: boolean, storage: Storage, request: StartStreamRequest) {
