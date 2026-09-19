@@ -114,8 +114,16 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         try {
             const api = this.api as any;
             const headers: Record<string, string> = {};
-            for (const [header, value] of api.headers) {
-                headers[header] = value;
+            const h = api.headers;
+            if (h) {
+                if (typeof h[Symbol.iterator] === "function") {
+                    for (const [header, value] of h) {
+                        headers[header] = value;
+                    }
+                }
+                else {
+                    Object.assign(headers, h);
+                }
             }
 
             return await axios(url, {
