@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
-import { PushReceiver } from '@eneris/push-receiver';
+import { PushReceiver } from '@koush/push-receiver';
 import { Deferred } from '@scrypted/common/src/deferred';
-import type { Types } from '@eneris/push-receiver/dist/client';
+import type { Types } from '@koush/push-receiver/dist/client';
 
 export declare interface PushManager {
     on(event: 'message', listener: (data: any) => void): this;
