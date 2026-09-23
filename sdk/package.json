@@ -37,7 +37,7 @@
     "@rollup/plugin-typescript": "^12.3.0",
     "@rollup/plugin-virtual": "^3.0.2",
     "@scrypted/auth-fetch": "^1.0.5",
-    "adm-zip": "0.6.0",
+    "adm-zip": "0.6.1",
     "babel-loader": "^10.0.0",
     "babel-plugin-const-enum": "^1.2.0",
     "ncp": "^2.0.0",
