@@ -133,16 +133,17 @@ export class RtmpClient {
     }
     this.console?.log('Got createStream _result');
 
-    // Send getStreamLength then play (matching ffmpeg's order)
+    // Compute playPath from the URL (the part after /app/).
+    // Note: do NOT send a getStreamLength command here. ffmpeg's RTMP client only
+    // sends getStreamLength for seekable/VOD streams (libavformat rtmpproto.c
+    // gen_get_stream_length is guarded on RTMP_PT_*), never for live playback.
+    // Some live RTMP servers (e.g. Reolink cameras) FIN the TCP connection on
+    // receiving an unsolicited getStreamLength, which breaks the rebroadcast
+    // prebuffer instantly.
     const parsedUrl = new URL(this.url);
-    // Extract stream name (after /app/)
     const parts = parsedUrl.pathname.split('/');
     const streamName = parts.length > 2 ? parts.slice(2).join('/') : '';
     const playPath = streamName + parsedUrl.search;
-
-    this.console?.log('Sending getStreamLength with path:', playPath);
-    const getStreamLengthData = this.encodeAMF0Command('getStreamLength', this.transactionId++, null, playPath);
-    this.sendMessage(5, 0, RtmpMessageType.COMMAND_AMF0, 0, getStreamLengthData);
 
     this.console?.log('Sending play command with path:', playPath);
     this.sendPlay(this.streamId, playPath);

@@ -162,7 +162,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         session = {
             socket,
             cp: undefined,
-            generator: parseFragmentedMP4(socket),
+            generator: parseFragmentedMP4(socket, 30000),
         }
     }
     else {
@@ -176,6 +176,10 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
             }
         }
 
+        // ffmpeg's native opus decoder mis-parses SILK in-band FEC (LBRR) frames,
+        // which Ring cameras send, and outputs loud bursts of noise. libopus decodes them correctly.
+        if (audioCodec?.toLowerCase() === 'opus')
+            inputArguments.push('-c:a', 'libopus');
         inputArguments.push(...ffmpegInput.inputArguments);
 
         if (noAudio) {

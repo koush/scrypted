@@ -146,7 +146,9 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
                 throw new Error(`providerId state not found for device ${p._id}`);
             return state.value === provider._id;
         });
-        const devices = deviceManifest.devices || [];
+        if (!deviceManifest.devices)
+            throw new Error(`onDevicesChanged called without devices for provider ${deviceManifest.providerNativeId}`);
+        const devices = deviceManifest.devices;
         const newIds = devices.map(device => device.nativeId);
         const toRemove = existing.filter(e => e.nativeId && !newIds.includes(e.nativeId));
 

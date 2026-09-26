@@ -14,15 +14,17 @@ export abstract class AsyncUsingHolderBase<T> {
 
     detach() {
         const value = this._value;
-        this._value = undefined;
+        this._value = undefined!;
         return value;
     }
 
     async replace(value: T) {
-        if (this._value === value)
-            return;
-        await this.release();
+        const oldValue = this._value;
         this._value = value;
+        if (oldValue === value)
+            return;
+        if (oldValue)
+            await this.asyncDispose(oldValue);
     }
 
     async release() {
@@ -47,7 +49,7 @@ export abstract class UsingHolderBase<T> {
 
     detach() {
         const value = this._value;
-        this._value = undefined;
+        this._value = undefined!;
         return value;
     }
 

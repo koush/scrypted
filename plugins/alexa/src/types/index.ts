@@ -16,6 +16,7 @@ import './camera/handlers';
 import './light';
 import './light/handlers'
 import './fan';
+import './fan/handlers';
 import './doorbell';
 import './garagedoor';
 import './outlet';
@@ -23,3 +24,4 @@ import './switch';
 import './switch/handlers';
 import './sensor';
 import './securitysystem';
+import './securitysystem/handlers';

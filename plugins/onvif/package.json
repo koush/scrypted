@@ -24,6 +24,7 @@
       "camera"
    ],
    "scrypted": {
+      "rollup": true,
       "name": "ONVIF Camera Plugin",
       "type": "DeviceProvider",
       "interfaces": [
@@ -47,7 +48,7 @@
    },
    "devDependencies": {
       "@types/md5": "^2.3.5",
-      "@types/node": "^20.11.0",
+      "@types/node": "^22.20.2",
       "@types/xml2js": "^0.4.14"
    }
 }

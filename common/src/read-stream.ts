@@ -53,7 +53,7 @@ export async function read16BELengthLoop(readable: Readable, options: {
   read();
   readable.on('readable', read);
 
-  await once(readable, 'end');
+  await Promise.any([once(readable, 'end'), once(readable, 'close').catch(() => { })]);
   throw new StreamEndError('read16BELengthLoop');
 }
 
@@ -93,15 +93,17 @@ export async function readLength(readable: Readable, length: number): Promise<Bu
 
     const e = () => {
       cleanup();
-      reject(new StreamEndError('readLength end'));
+      reject(new StreamEndError('readLength done'));
     };
 
     const cleanup = () => {
       readable.removeListener('readable', r);
+      readable.removeListener('close', e);
       readable.removeListener('end', e);
     }
 
     readable.on('readable', r);
+    readable.on('close', e);
     readable.on('end', e);
   });
 }
@@ -147,6 +149,6 @@ export async function readBuffer(readable: Readable | Promise<Readable>) {
     buffers.push(buffer);
   });
   readable.resume();
-  await once(readable, 'end')
+  await Promise.any([once(readable, 'end'), once(readable, 'close').catch(() => { })]);
   return Buffer.concat(buffers);
 }

@@ -1,11 +1,12 @@
 import axios from 'axios';
 import sdk, { HttpRequest, HttpRequestHandler, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, EventDetails, Setting, SettingValue, Settings, HttpResponseOptions, HttpResponse } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import { addBattery, addOnline, deviceErrorResponse, mirroredResponse, authErrorResponse, AlexaHttpResponse } from './common';
+import { addOnline, deviceErrorResponse, mirroredResponse, authErrorResponse, AlexaHttpResponse } from './common';
 import { supportedTypes } from './types';
 import { v4 as createMessageId } from 'uuid';
 import { ChangeReport, Discovery, DiscoveryEndpoint } from './alexa';
 import { alexaHandlers, alexaDeviceHandlers } from './handlers';
+import { setUseTurnServer } from './types/camera/handlers';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -59,6 +60,15 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             type: 'boolean',
             defaultValue: false,
         },
+        useTurnServer: {
+            title: "Use TURN Servers",
+            description: "Allow camera streams to relay through a TURN server when a direct connection can't be established. Alexa streams cross networks and usually need this. Disable only if your server is directly reachable and you want to force peer-to-peer connections.",
+            type: 'boolean',
+            defaultValue: true,
+            onPut(oldValue: boolean, newValue: boolean) {
+                setUseTurnServer(newValue);
+            }
+        },
     });
 
     accessToken: Promise<string>;
@@ -69,6 +79,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         super(nativeId);
 
         DEBUG = this.storageSettings.values.debug ?? false;
+        setUseTurnServer(this.storageSettings.values.useTurnServer);
 
         alexaHandlers.set('Alexa.Authorization/AcceptGrant', this.onAlexaAuthorization);
         alexaHandlers.set('Alexa.Discovery/Discover', this.onDiscoverEndpoints);
@@ -180,10 +191,6 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             report = {};
         }
 
-        if (!report && eventDetails.eventInterface === ScryptedInterface.Battery) {
-            report = {};
-        }
-
         if (!report) {
             debug(`${eventDetails.eventInterface}.${eventDetails.property} not supported for device ${eventSource.type}`);
             return;
@@ -208,7 +215,6 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
         } as ChangeReport;
 
         data = addOnline(data, eventSource);
-        data = addBattery(data, eventSource);
 
         // nothing to report
         if (data.context === undefined && data.event.payload === undefined)
@@ -226,7 +232,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             data.event = {};
 
         if (data.event.endpoint === undefined)
-            data.event.endpoint = [];
+            data.event.endpoint = {};
 
         data.event.endpoint.scope = {
             "type": "BearerToken",
@@ -556,23 +562,14 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
 
         let supportedEndpointHealths: any[] = [];
 
+        // The current Alexa.EndpointHealth spec (v3.1) only defines the connectivity property.
+        // The battery/radioDiagnostics/networkThroughput properties from older drafts are no
+        // longer documented; declaring them (or a 3.2 version) risks Alexa rejecting the entire
+        // capability. https://developer.amazon.com/en-US/docs/alexa/device-apis/alexa-endpointhealth.html
         if (device.interfaces.includes(ScryptedInterface.Online)) {
             supportedEndpointHealths.push({
                 "name": "connectivity"
             });
-        }
-
-        // {
-        //     "name": "radioDiagnostics"
-        // },
-        // {
-        //     "name": "networkThroughput"
-        // }
-
-        if (device.interfaces.includes(ScryptedInterface.Battery)) {
-            supportedEndpointHealths.push({
-                "name": "battery"
-            })
         }
 
         if (supportedEndpointHealths.length > 0) {
@@ -580,7 +577,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
                 {
                     "type": "AlexaInterface",
                     "interface": "Alexa.EndpointHealth",
-                    "version": "3.2",
+                    "version": "3.1",
                     "properties": {
                         "supported": supportedEndpointHealths,
                         "proactivelyReported": true,
@@ -612,6 +609,10 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
     async onRequest(request: HttpRequest, rawResponse: HttpResponse) {
         const response = new HttpResponseLoggingImpl(rawResponse, this.console);
 
+        const body = JSON.parse(request.body);
+        const { directive } = body;
+        const { namespace, name } = directive.header;
+
         const { authorization } = request.headers;
         if (!this.validAuths.has(authorization)) {
             try {
@@ -637,16 +638,12 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler, Mixi
             }
             catch (e) {
                 this.console.error(`request failed due to invalid authorization`, e);
-                response.send(e.message, {
-                    code: 500,
-                });
+                // Alexa expects a v3 ErrorResponse rather than a raw HTTP error, otherwise
+                // the directive is retried and surfaces to the user as a generic skill failure.
+                response.send(authErrorResponse("INVALID_AUTHORIZATION_CREDENTIAL", `Unable to authorize the request: ${e.message}`, directive));
                 return;
             }
         }
-
-        const body = JSON.parse(request.body);
-        const { directive } = body;
-        const { namespace, name } = directive.header;
 
         const mapName = `${namespace}/${name}`;
 

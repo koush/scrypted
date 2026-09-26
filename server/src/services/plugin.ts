@@ -112,8 +112,8 @@ export class PluginComponent {
             }
         }
         return {
-            pid: host.worker?.pid,
-            clientsCount: host.io?.clientsCount,
+            pid: host?.worker?.pid,
+            clientsCount: host?.io?.clientsCount,
             rpcObjects,
             packageJson,
             pendingResults,

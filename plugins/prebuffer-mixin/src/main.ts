@@ -390,41 +390,58 @@ class PrebufferSession {
     }
 
     if (session) {
-      const codecInfo = await this.parseCodecs();
-      const resolution = codecInfo.inputVideoResolution?.width && codecInfo.inputVideoResolution?.height
-        ? `${codecInfo.inputVideoResolution?.width}x${codecInfo.inputVideoResolution?.height}`
-        : 'unknown';
+      try {
+        const codecInfo = await this.parseCodecs();
+        const resolution = codecInfo.inputVideoResolution?.width && codecInfo.inputVideoResolution?.height
+          ? `${codecInfo.inputVideoResolution?.width}x${codecInfo.inputVideoResolution?.height}`
+          : 'unknown';
 
-      const idrInterval = this.getDetectedIdrInterval();
-      settings.push(
-        {
-          key: 'detectedResolution',
-          group,
-          subgroup,
-          title: 'Detected Resolution and Bitrate',
-          readonly: true,
-          value: `${resolution} @ ${bitrate || "unknown"} Kb/s`,
-          description: 'Configuring your camera to 1920x1080, 2000Kb/S, Variable Bit Rate, is recommended.',
-        },
-        {
-          key: 'detectedCodec',
-          group,
-          subgroup,
-          title: 'Detected Video/Audio Codecs',
-          readonly: true,
-          value: (codecInfo?.inputVideoCodec?.toString() || 'unknown') + '/' + (codecInfo?.inputAudioCodec?.toString() || 'unknown'),
-          description: 'Configuring your camera to H264 video, and audio to Opus or PCM-mulaw (G.711ulaw) is recommended.'
-        },
-        {
-          key: 'detectedKeyframe',
-          group,
-          subgroup,
-          title: 'Detected Keyframe Interval',
-          description: "Configuring your camera to 4 seconds is recommended (IDR aka Frame Interval = FPS * 4 seconds).",
-          readonly: true,
-          value: (idrInterval || 0) / 1000 || 'unknown',
-        },
-      );
+        const idrInterval = this.getDetectedIdrInterval();
+        settings.push(
+          {
+            key: 'detectedResolution',
+            group,
+            subgroup,
+            title: 'Detected Resolution and Bitrate',
+            readonly: true,
+            value: `${resolution} @ ${bitrate || "unknown"} Kb/s`,
+            description: 'Configuring your camera to 1920x1080, 2000Kb/S, Variable Bit Rate, is recommended.',
+          },
+          {
+            key: 'detectedCodec',
+            group,
+            subgroup,
+            title: 'Detected Video/Audio Codecs',
+            readonly: true,
+            value: (codecInfo?.inputVideoCodec?.toString() || 'unknown') + '/' + (codecInfo?.inputAudioCodec?.toString() || 'unknown'),
+            description: 'Configuring your camera to H264 video, and audio to Opus or PCM-mulaw (G.711ulaw) is recommended.'
+          },
+          {
+            key: 'detectedKeyframe',
+            group,
+            subgroup,
+            title: 'Detected Keyframe Interval',
+            description: "Configuring your camera to 4 seconds is recommended (IDR aka Frame Interval = FPS * 4 seconds).",
+            readonly: true,
+            value: (idrInterval || 0) / 1000 || 'unknown',
+          },
+        );
+      }
+      catch (e) {
+         settings.push(
+          {
+            key: 'detectedError',
+            group,
+            subgroup,
+            title: 'Detected Error',
+            readonly: true,
+            type: 'textarea',
+            value: (e as any).toString(),
+            description: 'An error occurred while detecting the camera settings.',
+          },
+         );
+      }
+
     }
     else {
       settings.push(

@@ -7,19 +7,28 @@ import { readLength } from './read-stream';
 
 const { mediaManager } = sdk;
 
-export async function* parseFragmentedMP4(readable: Readable): AsyncGenerator<MP4Atom> {
+export async function* parseFragmentedMP4(readable: Readable, timeout = 0): AsyncGenerator<MP4Atom> {
     while (true) {
-        const header = await readLength(readable, 8);
-        const length = header.readInt32BE(0) - 8;
-        const type = header.slice(4).toString();
-        const data = await readLength(readable, length);
+        const t = timeout ? setTimeout(() => {
+            readable.destroy(new Error('Timeout waiting for MP4 atom'));
+        }, timeout) : undefined;
+        try {
+            const header = await readLength(readable, 8);
+            const length = header.readInt32BE(0) - 8;
+            const type = header.slice(4).toString();
+            const data = await readLength(readable, length);
+            clearTimeout(t);
 
-        yield {
-            header,
-            length,
-            type,
-            data,
-        };
+            yield {
+                header,
+                length,
+                type,
+                data,
+            };
+        }
+        finally {
+            clearTimeout(t);
+        }
     }
 }
 

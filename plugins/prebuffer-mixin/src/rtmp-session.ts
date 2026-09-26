@@ -86,8 +86,6 @@ a=fmtp:97 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdelta
                     if (!isActive)
                         break;
 
-                    resetActivityTimer?.();
-
                     if (rtmpPacket.codec === 'audio') {
                         if (options?.audioSoftMuted)
                             continue;
@@ -129,6 +127,8 @@ a=fmtp:97 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdelta
                     const flv = parseFlvVideoTag(rtmpPacket.packet);
                     if (flv.codecId !== VideoCodecId.H264)
                         throw new Error('unsupported rtmp video codec ' + flv.codecId);
+
+                    resetActivityTimer?.();
 
                     const prefix = Buffer.alloc(2);
                     prefix[0] = RTSP_FRAME_MAGIC;

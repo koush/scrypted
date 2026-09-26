@@ -150,8 +150,10 @@ export class OnvifIntercom implements Intercom {
                         return;
                     }
 
-                    const elapsedRtpTimeMs = Math.abs(pending.header.timestamp - p.header.timestamp) / 8000 * 1000;
-                    if (elapsedRtpTimeMs <= 160 && pending.payload.length + p.payload.length <= 1024) {
+                    const clock = defaultMatch.clock || 8000;
+                    const canAggregate = defaultMatch.ffmpegEncoder === 'pcm_mulaw' || defaultMatch.ffmpegEncoder === 'pcm_alaw';
+                    const elapsedRtpTimeMs = Math.abs(pending.header.timestamp - p.header.timestamp) / clock * 1000;
+                    if (canAggregate && elapsedRtpTimeMs <= 160 && pending.payload.length + p.payload.length <= 1024) {
                         pending.payload = Buffer.concat([pending.payload, p.payload]);
                         return;
                     }

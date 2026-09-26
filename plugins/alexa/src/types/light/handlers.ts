@@ -4,7 +4,6 @@ import { deviceErrorResponse, sendDeviceResponse } from "../../common";
 import { v4 as createMessageId } from 'uuid';
 import { alexaDeviceHandlers } from "../../handlers";
 import { Directive, Response } from "../../alexa";
-import { error } from "console";
 
 function commonBrightnessResponse(header, endpoint, payload, response, device: ScryptedDevice & Brightness) {
     const data : Response = {
@@ -16,7 +15,7 @@ function commonBrightnessResponse(header, endpoint, payload, response, device: S
         "context": {
             "properties": [
               {
-                "namespace": "Alexa.PowerController",
+                "namespace": "Alexa.BrightnessController",
                 "name": "brightness",
                 "value": device.brightness,
                 "timeOfSample": new Date().toISOString(),

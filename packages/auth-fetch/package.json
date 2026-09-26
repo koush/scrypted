@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "follow-redirects": "^1.15.4",
-    "http-auth-utils": "^5.0.1"
+    "http-auth-utils": "^7.1.0"
   },
   "author": "",
   "license": "ISC"

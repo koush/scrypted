@@ -1,4 +1,7 @@
 import { HttpFetchOptions, HttpFetchResponseType, checkStatus, createHeadersArray, fetcher, getFetchMethod, hasHeader, setDefaultHttpFetchAccept, setHeader } from '../../../server/src/fetch';
+import type { Mechanism } from 'http-auth-utils';
+import type { DigestWWWAuthenticateData } from 'http-auth-utils/dist/mechanisms/digest';
+import type { BasicWWWAuthenticateData } from 'http-auth-utils/dist/mechanisms/basic';
 
 export interface AuthFetchCredentialState {
     username: string;
@@ -9,17 +12,27 @@ export interface AuthFetchOptions {
     credential?: AuthFetchCredentialState;
 }
 
+interface DigestHeader {
+    type: string;
+    data: DigestWWWAuthenticateData;
+}
+
+interface BasicHeader {
+    type: string;
+    data: BasicWWWAuthenticateData;
+}
+
+type AuthenticatedCredentialState = AuthFetchCredentialState & {
+    count?: number;
+    digest?: DigestHeader;
+    basic?: BasicHeader;
+};
+
 async function getAuth(options: AuthFetchOptions, url: string | URL, method: string) {
     if (!options.credential)
         return;
 
-    const { BASIC, DIGEST, parseWWWAuthenticateHeader } = await import('http-auth-utils');
-
-    const credential = options.credential as AuthFetchCredentialState & {
-        count?: number;
-        digest?: ReturnType<typeof parseWWWAuthenticateHeader<typeof DIGEST>>;
-        basic?: ReturnType<typeof parseWWWAuthenticateHeader<typeof BASIC>>;
-    };
+    const credential = options.credential as AuthenticatedCredentialState;
     const { digest, basic } = credential;
 
     if (digest) {
@@ -44,7 +57,7 @@ async function getAuth(options: AuthFetchOptions, url: string | URL, method: str
             ...digest.data,
         });
 
-        const header = buildAuthorizationHeader(DIGEST, {
+        const header = buildAuthorizationHeader(DIGEST as unknown as Mechanism, {
             username: options.credential.username,
             uri,
             nc,
@@ -60,7 +73,7 @@ async function getAuth(options: AuthFetchOptions, url: string | URL, method: str
     else if (basic) {
         const { BASIC, buildAuthorizationHeader } = await import('http-auth-utils');
 
-        const header = buildAuthorizationHeader(BASIC, {
+        const header = buildAuthorizationHeader(BASIC as unknown as Mechanism, {
             username: options.credential.username,
             password: options.credential.password,
         });
@@ -126,16 +139,12 @@ export function createAuthFetch<B, M>(
         if (typeof authenticateHeaders === 'string')
             authenticateHeaders = [authenticateHeaders];
 
-        const { BASIC, DIGEST, parseWWWAuthenticateHeader } = await import('http-auth-utils');
-        const parsedHeaders = authenticateHeaders.map(h => parseWWWAuthenticateHeader(h));
+const { BASIC, DIGEST, parseWWWAuthenticateHeader } = await import('http-auth-utils');
+        const parsedHeaders: DigestHeader[] = authenticateHeaders.map(h => parseWWWAuthenticateHeader(h) as unknown as DigestHeader);
 
-        const digest = parsedHeaders.find(p => p.type === 'Digest') as ReturnType<typeof parseWWWAuthenticateHeader<typeof DIGEST>>;
-        const basic = parsedHeaders.find(p => p.type === 'Basic') as ReturnType<typeof parseWWWAuthenticateHeader<typeof BASIC>>;
-        const credential = options.credential as AuthFetchCredentialState & {
-            count?: number;
-            digest?: ReturnType<typeof parseWWWAuthenticateHeader<typeof DIGEST>>;
-            basic?: ReturnType<typeof parseWWWAuthenticateHeader<typeof BASIC>>;
-        };
+        const digest = parsedHeaders.find(p => p.type === 'Digest');
+        const basic = parsedHeaders.find(p => p.type === 'Basic');
+        const credential = options.credential as AuthenticatedCredentialState;
 
         credential.digest = digest;
         credential.basic = basic;

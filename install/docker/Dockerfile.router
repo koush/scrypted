@@ -43,6 +43,27 @@ RUN apt -y update && apt -y install coturn && systemctl disable coturn && rm /us
 # ensure the pairing info stays in persistent storage
 RUN apt -y update && apt -y install usbmuxd && rm /usr/lib/systemd/system/usbmuxd.service && ln -sf /server/volume/plugins/\@scrypted/router/usbmuxd /var/lib/lockdown
 
+# journald to RAM only, prevent disk writes from caddy logs
+RUN mkdir -p /etc/systemd/journald.conf.d && \
+    printf '[Journal]\nStorage=volatile\nRuntimeMaxUse=50M\n' > /etc/systemd/journald.conf.d/ram.conf
+
+# crowdsec intrusion prevention
+RUN curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | bash
+RUN apt -y install crowdsec || true
+RUN apt -y install crowdsec-firewall-bouncer || true
+
+COPY ./router/crowdsec/crowdsec-acquis.yaml /etc/crowdsec/acquis.yaml
+
+RUN cscli hub update && \
+    cscli collections install crowdsecurity/linux crowdsecurity/caddy
+
+COPY ./router/crowdsec/crowdsec-persist.sh /usr/local/bin/crowdsec-persist.sh
+RUN chmod +x /usr/local/bin/crowdsec-persist.sh
+COPY ./router/crowdsec/crowdsec-persist.service /etc/systemd/system/crowdsec-persist.service
+RUN systemctl enable crowdsec-persist
+
+RUN systemctl enable crowdsec crowdsec-firewall-bouncer
+
 WORKDIR /
 # cache bust
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache

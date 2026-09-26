@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/alexa",
-   "version": "0.3.7",
+   "version": "0.5.0",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
