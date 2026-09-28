@@ -76,6 +76,87 @@ export class UsersService {
     async addUser(username: string, password: string, aclId: string) {
         await this.addUserInternal(username, password, aclId);
     }
+
+    async getOidcSubject(username: string): Promise<string | undefined> {
+        await this.ensureUsersPromise();
+        return this.users.get(username)?.oidcSubject;
+    }
+
+    async linkOidcSubject(username: string, sub: string): Promise<void> {
+        await this.ensureUsersPromise();
+        const user = this.users.get(username);
+        if (!user)
+            throw new Error(`User "${username}" not found`);
+        const existing = await this.findUserByOidcSubject(sub);
+        if (existing && existing._id !== username)
+            throw new Error('OIDC subject is already linked to another account');
+        const updated = Object.assign(new ScryptedUser(), user, { oidcSubject: sub });
+        await this.scrypted.datastore.upsert(updated);
+        this.users.set(updated._id, updated);
+        this.updateUsersPromise();
+    }
+
+    async unlinkOidcSubject(username: string): Promise<void> {
+        await this.ensureUsersPromise();
+        const user = this.users.get(username);
+        if (!user)
+            throw new Error(`User "${username}" not found`);
+        const updated = Object.assign(new ScryptedUser(), user);
+        delete updated.oidcSubject;
+        await this.scrypted.datastore.upsert(updated);
+        this.users.set(updated._id, updated);
+        this.updateUsersPromise();
+    }
+
+    async findUserByOidcSubject(sub: string): Promise<ScryptedUser | undefined> {
+        await this.ensureUsersPromise();
+        for (const user of this.users.values()) {
+            if (user.oidcSubject === sub)
+                return user;
+        }
+        return undefined;
+    }
+
+    async findOrCreateOidcUser(username: string, sub: string, isAdmin: boolean): Promise<ScryptedUser> {
+        await this.ensureUsersPromise();
+
+        const resolveAclId = (): string | undefined => {
+            if (isAdmin)
+                return undefined;
+            const device = this.scrypted.findPluginDevice('@scrypted/core', `user:${username}`);
+            return device?._id ?? '~oidc-pending~';
+        };
+
+        const syncAndPersist = async (user: ScryptedUser): Promise<ScryptedUser> => {
+            const desiredAclId = resolveAclId();
+            const changed = user.oidcSubject !== sub || user.aclId !== desiredAclId;
+            if (!changed)
+                return user;
+            const updated = Object.assign(new ScryptedUser(), user, { oidcSubject: sub, aclId: desiredAclId });
+            await this.scrypted.datastore.upsert(updated);
+            this.users.set(updated._id, updated);
+            this.updateUsersPromise();
+            return updated;
+        };
+
+        const bySubject = await this.findUserByOidcSubject(sub);
+        if (bySubject)
+            return syncAndPersist(bySubject);
+
+        if (this.users.has(username))
+            throw new Error(`Username "${username}" is already taken by a local account. An admin must resolve the conflict.`);
+
+        const newUser = new ScryptedUser();
+        newUser._id = username;
+        newUser.aclId = resolveAclId();
+        newUser.oidcSubject = sub;
+        newUser.token = crypto.randomBytes(16).toString('hex');
+        setScryptedUserPassword(newUser, crypto.randomBytes(32).toString('hex'), Date.now());
+        await this.scrypted.datastore.upsert(newUser);
+        this.users.set(newUser._id, newUser);
+        this.updateUsersPromise();
+        return newUser;
+    }
 }
 
 export function setScryptedUserPassword(user: ScryptedUser, password: string, timestamp: number) {

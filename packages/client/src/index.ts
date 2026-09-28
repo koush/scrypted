@@ -266,6 +266,8 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         directAddress: response.headers.get('x-scrypted-direct-address'),
         cloudAddress: response.headers.get('x-scrypted-cloud-address'),
         serverId: response.headers.get('x-scrypted-server-id'),
+        authType: body.authType as string | undefined,
+        oidcLinked: body.oidcLinked as boolean | undefined,
     };
 }
 

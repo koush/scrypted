@@ -58,9 +58,11 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
                     ? [
                         // grant this? not sure.
                         addAccessControlsForInterface(self.id, ScryptedInterface.ScryptedDevice),
-                        addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/webrtc').id,
-                            ScryptedInterface.ScryptedDevice,
-                            ScryptedInterface.EngineIOHandler),
+                        ...sdk.systemManager.getDeviceByName('@scrypted/webrtc')
+                            ? [addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/webrtc').id,
+                                ScryptedInterface.ScryptedDevice,
+                                ScryptedInterface.EngineIOHandler)]
+                            : [],
                         addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/core').id,
                             ScryptedInterface.ScryptedDevice,
                             ScryptedInterface.EngineIOHandler),
@@ -83,6 +85,9 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
     async getSettings(): Promise<Setting[]> {
         await this.getAdmin();
 
+        const usersService = await sdk.systemManager.getComponent('users');
+        const oidcSubject: string | undefined = await usersService.getOidcSubject?.(this.username).catch(() => undefined);
+
         return [
             {
                 key: 'username',
@@ -90,6 +95,18 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
                 readonly: true,
                 value: this.username,
             },
+            {
+                key: 'oidcSubject',
+                title: 'OIDC Subject',
+                readonly: true,
+                value: oidcSubject ?? '(not linked)',
+            },
+            ...oidcSubject ? [{
+                key: 'unlinkOidc',
+                title: 'Unlink OIDC Account',
+                description: 'Remove the OIDC association from this account.',
+                type: 'button' as const,
+            }] : [],
             {
                 key: 'password',
                 title: 'Password',
@@ -101,6 +118,11 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
     }
 
     async putSetting(key: string, value: SettingValue): Promise<void> {
+        if (key === 'unlinkOidc') {
+            const usersService = await sdk.systemManager.getComponent('users');
+            await usersService.unlinkOidcSubject(this.username);
+            return;
+        }
         if (key !== 'password')
             return this.storageSettings.putSetting(key, value);
         const usersService = await sdk.systemManager.getComponent('users');
@@ -132,13 +154,8 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
             deviceCreator: 'Scrypted User',
         };
 
-        this.syncUsers()
-        .then(length => {
-            if (!length) {
-                this.console.log('no users found, looping for first user');
-                setInterval(() => this.syncUsers(), 60 * 1000);
-            }
-        })
+        this.syncUsers();
+        setInterval(() => this.syncUsers(), 60 * 1000);
     }
 
     async getDevice(nativeId: string): Promise<any> {
