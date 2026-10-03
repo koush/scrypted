@@ -8,7 +8,7 @@ import { bindUdp, closeQuiet, listenZeroSingleClient } from '@scrypted/common/sr
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
-import sdk, { Camera, FFmpegInput, Intercom, MediaStreamFeedback, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { Camera, FFmpegInput, Intercom, MediaObject, MediaStreamFeedback, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
@@ -300,8 +300,19 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 tool: debugMode.video ? 'ffmpeg' : 'scrypted',
             };
 
-            const mediaObject = await device.getVideoStream(mediaOptions);
-            const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
+            let mediaObject: MediaObject;
+            let videoInput: FFmpegInput;
+            try {
+                mediaObject = await device.getVideoStream(mediaOptions);
+                videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
+            }
+            catch (e) {
+                // the rtcp idle timeout is not armed yet, so without this the session
+                // and its return sockets would leak until homekit sends a STOP.
+                console.error('streaming error, unable to get video stream', e);
+                session.kill();
+                return;
+            }
             let mediaStreamFeedback: MediaStreamFeedback;
             try {
                 // homekit mtu is unusable. webrtc uses 1200 due to weird cell networks, vpns, etc.
