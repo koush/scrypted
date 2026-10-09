@@ -20,6 +20,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
 
         const media = await device.takePicture({
             reason: request.reason === ResourceRequestReason.EVENT ? 'event' : 'periodic',
+            requireFresh: homekitPlugin.storageSettings.values.requireFreshSnapshots || undefined,
             picture: {
                 width: request.width,
                 height: request.height,
@@ -53,7 +54,8 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
         }
         catch (e) {
             console.error('snapshot error', e);
-            recommendSnapshotPlugin(console, homekitPlugin.log, `${device.name} encountered an error while retrieving a new snapshot. Consider installing the Snapshot Plugin to show the most recent snapshot. origin:/#/component/plugin/install/@scrypted/snapshot}`);
+            if (!homekitPlugin.storageSettings.values.requireFreshSnapshots)
+                recommendSnapshotPlugin(console, homekitPlugin.log, `${device.name} encountered an error while retrieving a new snapshot. Consider installing the Snapshot Plugin to show the most recent snapshot. origin:/#/component/plugin/install/@scrypted/snapshot}`);
             callback(e);
         }
     }

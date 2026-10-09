@@ -451,6 +451,12 @@ export interface ResponsePictureOptions extends PictureOptions {
 }
 export interface RequestPictureOptions extends PictureOptions {
   /**
+   * Require a newly acquired image. Implementations may share an in-progress
+   * capture, but must not reuse completed snapshots or return error images.
+   * Reject the request if a fresh image cannot be obtained.
+   */
+  requireFresh?: boolean;
+  /**
    * periodic: The requestor will request the snapshot periodically so a recent cached image may be returned.
    * event: The requestor needs an image for event processing or thumbnail. Cached or error images will not be returned.
    */

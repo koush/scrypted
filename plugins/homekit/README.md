@@ -2,6 +2,16 @@
 
 The HomeKit Plugin bridges compatible devices in Scrypted to HomeKit.
 
+## Snapshot Freshness
+
+**Require Fresh HomeKit Snapshots** in the HomeKit plugin's **Snapshots** settings requests fresh images for all HomeKit cameras and is enabled by default. Disable it to restore the previous snapshot caching and error-image behavior.
+
+Update both HomeKit and Snapshot to versions supporting `requireFresh` to use this setting; older Snapshot versions may ignore the request option.
+
+With the Snapshot plugin installed, simultaneous requests share an in-progress capture, but completed snapshots are not reused. Capture, timeout, and image-processing failures are returned to HomeKit instead of serving an older image or a generated error image. Other integrations retain their existing snapshot behavior.
+
+Home controls whether it retains an earlier preview, shows an error, or updates its age label after a failed request. This setting does not set Home's counter or guarantee the exposure time of images supplied by a camera or another plugin. Camera providers must honor the `requireFresh` request option. Providers advertising cached snapshots use a current video frame through the Snapshot plugin; this requires video snapshots to be available and not disabled. Sleeping cameras may be woken, and capturing a current video frame may take longer than serving a cache.
+
 ## Camera Codec Settings
 
 You can use the admin page provided by your camera manufacturer to configure codec settings as required by HomeKit. It is highly recommended to configure the codec settings for *all* the camera substreams by using the [Scrypted Codec Settings guide](https://github.com/koush/scrypted/wiki/Codec-Settings). This will yield optimal local and remote streaming reliability.

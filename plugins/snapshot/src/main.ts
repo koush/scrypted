@@ -52,7 +52,7 @@ function calculateConstrainedDimensions(originalWidth: number, originalHeight: n
 }
 
 
-class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, Resolution {
+export class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, Resolution {
     storageSettings = new StorageSettings(this, {
         defaultSnapshotChannel: {
             title: 'Default Snapshot Channel',
@@ -161,9 +161,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
             return this.console;
     }
 
-    async takePictureInternal(id: string, eventSnapshot: boolean): Promise<Buffer> {
+    async takePictureInternal(id: string, eventSnapshot: boolean, requireFresh = false): Promise<Buffer> {
         this.debugConsole?.log("Picture requested from camera", { id, eventSnapshot });
         if (this.storageSettings.values.privacyMode) {
+            if (requireFresh)
+                throw new Error('Snapshots are disabled.');
             return await fs.promises.readFile('camera-slash.jpg');
         }
 
@@ -188,14 +190,17 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
         // unifi cameras send stale snapshots which are unusable for events,
         // so force a prebuffer snapshot in this instance.
         // if prebuffer is not available, it will fall back.
-        if (eventSnapshot && usePrebufferSnapshots !== false) {
+        if ((eventSnapshot && usePrebufferSnapshots !== false) || requireFresh) {
+            let psos: ResponsePictureOptions[];
             try {
-                const psos = await this.getPictureOptions();
-                if (psos?.[0]?.staleDuration) {
-                    usePrebufferSnapshots = true;
-                }
+                psos = await this.getPictureOptions();
             }
             catch (e) {
+            }
+            if (psos?.[0]?.staleDuration) {
+                if (requireFresh && usePrebufferSnapshots === false)
+                    throw new Error('Camera snapshots are cached and snapshots from prebuffer are disabled.');
+                usePrebufferSnapshots = true;
             }
         }
 
@@ -207,17 +212,19 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
                 return takePrebufferPicture;
             const msos = await realDevice.getVideoStreamOptions();
             let prebufferChannel = msos?.find(mso => mso.prebuffer);
-            if (prebufferChannel || !this.lastAvailablePicture) {
+            if (prebufferChannel || !this.lastAvailablePicture || requireFresh) {
                 prebufferChannel = prebufferChannel || {
                     id: undefined,
                 };
 
-                const request = prebufferChannel as RequestMediaStreamOptions;
+                const request: RequestMediaStreamOptions = { ...prebufferChannel };
                 request.audio = null;
                 // specify the prebuffer based on the usage. events shouldn't request
                 // lengthy prebuffers as it may not contain the image it needs.
-                request.prebuffer = eventSnapshot ? 1000 : 6000;
-                if (this.lastAvailablePicture)
+                request.prebuffer = requireFresh ? 0 : eventSnapshot ? 1000 : 6000;
+                if (requireFresh)
+                    request.refresh = true;
+                else if (this.lastAvailablePicture)
                     request.refresh = false;
                 takePrebufferPicture = async () => {
                     // this.console.log('snapshotting active prebuffer');
@@ -300,9 +307,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
                 catch (e) {
                 }
             }
+            if (requireFresh)
+                takePictureOptions = { ...takePictureOptions, requireFresh: true };
             try {
                 // consider waking the camera if 
-                if (!eventSnapshot && this.mixinDeviceInterfaces.includes(ScryptedInterface.Sleep) && realDevice.sleeping) {
+                if (!eventSnapshot && !requireFresh && this.mixinDeviceInterfaces.includes(ScryptedInterface.Sleep) && realDevice.sleeping) {
                     this.console.log('Not waking sleeping camera for periodic snapshot.');
                     return this.lastAvailablePicture;
                 }
@@ -320,6 +329,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
     async takePictureRaw(options?: RequestPictureOptions): Promise<Buffer> {
         const eventSnapshot = options?.reason === 'event';
         const periodicSnapshot = options?.reason === 'periodic';
+        const requireFresh = options?.requireFresh === true;
         const hoursDuration = this.mixinDeviceInterfaces.includes(ScryptedInterface.Sleep) ? 5 : 1;
 
         // clear out snapshots that are too old.
@@ -327,15 +337,16 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
             this.currentPicture = undefined;
 
         // always grab/debounce a snapshot
-        // event snapshot are special and should immediately expire.
+        // Event and fresh snapshots share only in-progress captures.
         // other snapshots may be debounced for 4s.
         const debounced = this.snapshotDebouncer({
             id: options?.id,
             type: 'source',
             event: options?.reason === 'event',
-        }, eventSnapshot ? 0 : 4000, async () => {
+            requireFresh,
+        }, eventSnapshot || requireFresh ? 0 : 4000, async () => {
             const snapshotTimer = Date.now();
-            let picture = await this.takePictureInternal(undefined, eventSnapshot);
+            let picture = await this.takePictureInternal(undefined, eventSnapshot, requireFresh);
             picture = await this.cropAndScale(picture);
             this.clearCachedPictures();
             const pictureTime = Date.now();
@@ -360,7 +371,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
             if (!pictureTimeout) {
                 // determine a fetch timeout based on the reason and staleness
                 const allowedSnapshotStaleness = eventSnapshot ? 0 : periodicSnapshot ? 20000 : 10000;
-                if (!availablePicture) {
+                if (!availablePicture || requireFresh) {
                     // none available so wait a while
                     pictureTimeout = 10000;
                 }
@@ -388,7 +399,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
             // it may be ok to use a somewhat stale snapshot depending on reason.
 
             // event snapshot requests must not use cache since they're for realtime processing by homekit and nvr.
-            if (eventSnapshot)
+            if (eventSnapshot || requireFresh)
                 throw e;
 
             if (this.currentPicture) {
@@ -424,7 +435,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
                 needSoftwareResize: true,
                 picture: options.picture,
             };
-            const ret = await this.snapshotDebouncer(key, 10000, async () => {
+            const resize = async () => {
                 this.debugConsole?.log("Resizing picture from camera", key);
 
                 if (loadSharp()) {
@@ -491,12 +502,16 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera, R
                     picture: ret,
                     pictureTime: rawPicture.pictureTime,
                 };
-            });
+            };
+
+            // Do not reuse a completed resize for a fresh acquisition, even if
+            // two acquisitions happen to have the same millisecond timestamp.
+            const ret = requireFresh ? await resize() : await this.snapshotDebouncer(key, 10000, resize);
 
             return ret.picture;
         }
         catch (e) {
-            if (eventSnapshot)
+            if (eventSnapshot || requireFresh)
                 throw e;
             return this.createErrorImage(e);
         }

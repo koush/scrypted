@@ -117,6 +117,13 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             type: 'boolean',
             defaultValue: true,
         },
+        requireFreshSnapshots: {
+            group: 'Snapshots',
+            title: 'Require Fresh HomeKit Snapshots',
+            description: 'Request fresh snapshots for all HomeKit cameras. Snapshot failures are reported to Home instead of returning cached images or error images. This may wake sleeping cameras.',
+            type: 'boolean',
+            defaultValue: true,
+        },
     });
     mergedDevices = new Set<string>();
 

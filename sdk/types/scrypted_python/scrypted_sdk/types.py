@@ -940,6 +940,7 @@ class RequestPictureOptions(TypedDict):
     periodicRequest: bool  # Flag that hints whether this user request is happening due to a periodic refresh.
     picture: PictureDimensions  # The native dimensions of the camera.
     reason: Any | Any  # periodic: The requestor will request the snapshot periodically so a recent cached image may be returned. event: The requestor needs an image for event processing or thumbnail. Cached or error images will not be returned.
+    requireFresh: bool  # Require a newly acquired image. Implementations may share an in-progress capture, but must not reuse completed snapshots or return error images. Reject the request if a fresh image cannot be obtained.
     timeout: float  # The maximum time in milliseconds to wait for the picture.
 
 class RequestRecordingStreamOptions(TypedDict):
