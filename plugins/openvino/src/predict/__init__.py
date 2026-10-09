@@ -202,10 +202,16 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
                 bb = detection["boundingBox"]
                 x, y = convert_to_src_size((bb[0], bb[1]))
                 x2, y2 = convert_to_src_size((bb[0] + bb[2], bb[1] + bb[3]))
-                detection["boundingBox"] = (x, y, x2 - x + 1, y2 - y + 1)
-                if any(map(lambda x: not math.isfinite(x), detection["boundingBox"])):
+                if any(map(lambda v: not math.isfinite(v), (x, y, x2, y2))):
                     print("unexpected nan detected", obj.bbox)
                     continue
+                x = max(0, x)
+                y = max(0, y)
+                x2 = min(size[0], x2)
+                y2 = min(size[1], y2)
+                if x2 <= x or y2 <= y:
+                    continue
+                detection["boundingBox"] = (x, y, x2 - x, y2 - y)
                 # Transform clipPaths coordinates if present
                 if "clipPaths" in detection and detection["clipPaths"] is not None:
                     clip_paths = detection["clipPaths"]
