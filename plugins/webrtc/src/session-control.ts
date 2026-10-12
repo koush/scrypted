@@ -25,11 +25,17 @@ export class ScryptedSessionControl implements RTCSessionControl {
         });
     }
 
+    private findTwoWayAudioTransceiver() {
+        const isTwoWay = (direction?: string) => direction === 'sendrecv' || direction === 'recvonly';
+        return this.connectionManagement.pc.getTransceivers().find(t =>
+            t.receiver.track.kind === 'audio' && (isTwoWay(t.offerDirection) || isTwoWay(t.currentDirection)));
+    }
+
     async setPlayback(options: { audio: boolean | 'on-demand'; video: boolean; }): Promise<void> {
         await this.setPlaybackInternal(options);
 
         if (options.audio === 'on-demand') {
-            const audioTransceiver = this.connectionManagement.pc.getTransceivers().find(t => t.receiver.track.kind === 'audio' && (t.offerDirection === 'sendrecv' || t.offerDirection === 'recvonly'));
+            const audioTransceiver = this.findTwoWayAudioTransceiver();
             const track = audioTransceiver?.receiver?.track;
             if (!track)
                 return;
@@ -54,7 +60,7 @@ export class ScryptedSessionControl implements RTCSessionControl {
         if (!this.intercom)
             return;
 
-        const audioTransceiver = this.connectionManagement.pc.getTransceivers().find(t => t.receiver.track.kind === 'audio' && (t.offerDirection === 'sendrecv' || t.offerDirection === 'recvonly'));
+        const audioTransceiver = this.findTwoWayAudioTransceiver();
         if (!audioTransceiver)
             return;
         if (!audioTransceiver.receiver.track)
