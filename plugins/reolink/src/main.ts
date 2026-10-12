@@ -604,6 +604,13 @@ class ReolinkCamera extends RtspSmartCamera implements Camera, DeviceProvider, R
                     const ai = this.hasPirEvents() ? await client.getEvents() : await client.getAiState();
                     ret.emit('data', JSON.stringify(ai.data));
 
+                    if (!ai.value) {
+                        if (!hasSucceeded)
+                            return;
+                        await sleep(1000);
+                        continue;
+                    }
+
                     const classes: string[] = [];
 
                     for (const key of Object.keys(ai.value)) {
