@@ -79,7 +79,7 @@ export class HikvisionCameraAPI implements HikvisionAPI {
             },
             rejectUnauthorized: false,
             credential: this.credential,
-            body: typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? urlOrOptions?.body : body,
+            body: typeof urlOrOptions !== 'string' && !(urlOrOptions instanceof URL) ? (urlOrOptions?.body ?? body) : body,
         });
         return response;
     }

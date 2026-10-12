@@ -9,9 +9,13 @@ If the camera or NVR do not have motion detection, you will have to use a separa
 
 There are two options for Two Way Audio:
 * ONVIF (Recommended)
-* Hikvision (Untested)
+* Hikvision
 
-Two Way Audio is supported if the audio codec is set to G.711ulaw on the camera, which is usually the default audio codec. This audio codec will also work with HomeKit. Changing the audio codec from G.711ulaw will cause Two Way Audio to fail on the cameras that were tested.
+Two Way Audio is supported if the audio codec is set to G.711ulaw or G.711alaw on the camera. G.711ulaw is usually the default audio codec, and will also work with HomeKit.
+
+The `Hikvision` option uses the camera's ISAPI two way audio endpoint, and is confirmed working with both G.711ulaw and G.711alaw.
+
+Audio codecs other than G.711 (such as AAC) are not supported for Two Way Audio. The plugin will log `Unknown codec` and fall back to G.711ulaw, which results in no audio from the camera speaker.
 
 ## Codec Settings
 Configure optimal codec settings (as required by HomeKit) through Hikvision's configuration webpage or device interface (not Scrypted).

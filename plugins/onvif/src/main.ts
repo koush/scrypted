@@ -6,7 +6,7 @@ import xml2js from 'xml2js';
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI } from "./onvif-api";
 import { autoconfigureSettings, configureCodecs, getCodecs } from "./onvif-configure";
-import { listenEvents } from "./onvif-events";
+import { getMotionMonitorSettings, listenEvents } from "./onvif-events";
 import { OnvifIntercom } from "./onvif-intercom";
 import { OnvifPTZMixinProvider } from "./onvif-ptz";
 import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure, onvifAutoConfigureSettings } from "@scrypted/common/src/autoconfigure-codecs";
@@ -229,6 +229,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
 
         const ret: Setting[] = [
             ...await super.getOtherSettings(),
+            ...getMotionMonitorSettings(this.storage),
             {
                 subgroup: 'Advanced',
                 title: 'Onvif Doorbell',
