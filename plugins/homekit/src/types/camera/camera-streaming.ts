@@ -300,52 +300,56 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 tool: debugMode.video ? 'ffmpeg' : 'scrypted',
             };
 
-            const mediaObject = await device.getVideoStream(mediaOptions);
-            const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
-            let mediaStreamFeedback: MediaStreamFeedback;
-            try {
-                // homekit mtu is unusable. webrtc uses 1200 due to weird cell networks, vpns, etc.
-                // this is the only reliable option without dynamic detection of the mtu.
-                session.startRequest.video.mtu = 1200;
-
-                mediaStreamFeedback = await sdk.mediaManager.convertMediaObject(mediaObject, ScryptedMimeTypes.MediaStreamFeedback);
-
-                // unset the MTU as it will be handled by the upstream adaptive bitrate.
-                session.startRequest.video.mtu = undefined;
-            }
-            catch (e) {
-            }
-
-            session.mediaStreamOptions = videoInput.mediaStreamOptions;
-
-            session.tryReconfigureBitrate = (reason: string, bitrate: number) => {
-                if (!mediaStreamFeedback) {
-                    console.log('Media Stream reconfiguration was requested. Upgrade to Scrypted NVR for adaptive bitrate support.');
-                    return;
-                }
-                mediaStreamFeedback.reconfigureStream({
-                    video: {
-                        bitrate,
-                    }
-                });
-            }
-
-            session.videoReturn.on('message', data => {
-                resetIdleTimeout();
-                const rtcpBuffer = vrtcp.decrypt(data);
-                if (mediaStreamFeedback) {
-                    mediaStreamFeedback.onRtcp(rtcpBuffer);
-                    return;
-                }
-
-                const rtcp = RtcpPacketConverter.deSerialize(rtcpBuffer);
-                const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
-                logPacketLoss(rr);
-            });
-
             resetIdleTimeout();
 
             try {
+                const mediaObject = await device.getVideoStream(mediaOptions);
+                if (session.killed) {
+                    console.log('session ended before streaming could start. bailing.');
+                    return;
+                }
+                const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
+                let mediaStreamFeedback: MediaStreamFeedback;
+                try {
+                    // homekit mtu is unusable. webrtc uses 1200 due to weird cell networks, vpns, etc.
+                    // this is the only reliable option without dynamic detection of the mtu.
+                    session.startRequest.video.mtu = 1200;
+
+                    mediaStreamFeedback = await sdk.mediaManager.convertMediaObject(mediaObject, ScryptedMimeTypes.MediaStreamFeedback);
+
+                    // unset the MTU as it will be handled by the upstream adaptive bitrate.
+                    session.startRequest.video.mtu = undefined;
+                }
+                catch (e) {
+                }
+
+                session.mediaStreamOptions = videoInput.mediaStreamOptions;
+
+                session.tryReconfigureBitrate = (reason: string, bitrate: number) => {
+                    if (!mediaStreamFeedback) {
+                        console.log('Media Stream reconfiguration was requested. Upgrade to Scrypted NVR for adaptive bitrate support.');
+                        return;
+                    }
+                    mediaStreamFeedback.reconfigureStream({
+                        video: {
+                            bitrate,
+                        }
+                    });
+                }
+
+                session.videoReturn.on('message', data => {
+                    resetIdleTimeout();
+                    const rtcpBuffer = vrtcp.decrypt(data);
+                    if (mediaStreamFeedback) {
+                        mediaStreamFeedback.onRtcp(rtcpBuffer);
+                        return;
+                    }
+
+                    const rtcp = RtcpPacketConverter.deSerialize(rtcpBuffer);
+                    const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
+                    logPacketLoss(rr);
+                });
+
                 await startCameraStreamFfmpeg(device,
                     console,
                     storage,
@@ -354,6 +358,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             }
             catch (e) {
                 console.error('streaming error', e);
+                if (!session.killed)
+                    session.kill();
                 return;
             }
 
