@@ -1,6 +1,7 @@
 import { cloneDeep } from "@scrypted/common/src/clone-deep";
 import { read16BELengthLoop } from "@scrypted/common/src/read-stream";
-import { H264_NAL_TYPE_SPS, RTSP_FRAME_MAGIC, findH264NaluType } from "@scrypted/common/src/rtsp-server";
+import { RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
+import { H264_NAL_TYPE_SPS, findH264NaluType } from "@scrypted/common/src/rtp-codec";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { MediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
@@ -69,7 +70,7 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
-    events.on('error', () => {});
+    events.on('error', () => { });
 
     const parsedSdp = parseSdp(sdp);
     const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
@@ -198,7 +199,7 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         },
         killed,
         resetActivityTimer,
-        negotiateMediaStream: (requestMediaStream,inputVideoCodec, inputAudioCodec) => {
+        negotiateMediaStream: (requestMediaStream, inputVideoCodec, inputAudioCodec) => {
             return negotiateMediaStream(sdp, mediaStreamOptions, inputVideoCodec, inputAudioCodec, requestMediaStream);
         },
         emit(container: 'rtsp', chunk: StreamChunk) {

@@ -1,7 +1,8 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { ListenZeroSingleClientTimeoutError, closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { H264_NAL_TYPE_IDR, H264_NAL_TYPE_SPS, RtspServer, RtspTrack, createRtspParser, findH264NaluType, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
+import { H264_NAL_TYPE_IDR, H264_NAL_TYPE_SPS, createRtspParser, findH264NaluType } from '@scrypted/common/src/rtp-codec';
+import { RtspServer, RtspTrack, listenSingleRtspClient } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, getSpsPps, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';

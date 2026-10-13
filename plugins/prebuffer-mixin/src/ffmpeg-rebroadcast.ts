@@ -3,7 +3,7 @@ import { cloneDeep } from '@scrypted/common/src/clone-deep';
 import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import { createRtspParser } from "@scrypted/common/src/rtsp-server";
+import { createRtspParser } from "@scrypted/common/src/rtp-codec";
 import { StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 import sdk, { FFmpegInput, RequestMediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import child_process, { ChildProcess, StdioOptions } from 'child_process';
