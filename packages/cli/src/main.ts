@@ -10,6 +10,7 @@ import semver from 'semver';
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
 import { installServe, serveMain } from './service';
 import { connectShell } from './shell';
+import { connectConsole } from './console';
 import { convertRtspToMp4, printRtspUsage } from './rtsp-file';
 
 if (!semver.gte(process.version, '16.0.0')) {
@@ -236,6 +237,43 @@ async function main() {
         const cmd = separator != -1 ? process.argv.slice(separator + 1) : [];
         await connectShell(sdk, ...cmd);
     }
+    else if (process.argv[2] === 'console') {
+        console.log = () => { };
+
+        const args = process.argv.slice(3);
+        const follow = args.some(arg => arg === '-f' || arg === '--follow');
+        let timeoutSeconds = 5;
+        const idArgs: string[] = [];
+        for (let i = 0; i < args.length; i++) {
+            if (args[i] === '-f' || args[i] === '--follow')
+                continue;
+            if (args[i] === '-t') {
+                timeoutSeconds = parseFloat(args[i + 1]);
+                if (!isFinite(timeoutSeconds))
+                    throw new Error('invalid -t timeout: ' + args[i + 1]);
+                i++;
+                continue;
+            }
+            idArgs.push(args[i]);
+        }
+        const idAndHost = idArgs[0] || '@scrypted/core';
+
+        const at = idAndHost.lastIndexOf('@');
+        const host = toIpAndPort(at > 0 ? idAndHost.slice(at + 1) : '127.0.0.1');
+        const id = at > 0 ? idAndHost.slice(0, at) : idAndHost;
+
+        const login = await getOrDoLogin(host);
+        const sdk = await connectScryptedClient({
+            baseUrl: `https://${host}`,
+            pluginId: '@scrypted/core',
+            username: login.username,
+            password: login.token,
+        });
+
+        await connectConsole(sdk, follow ? 0 : timeoutSeconds, id);
+        // the rpc stream keeps handles open, so exit like shell.
+        process.exit(0);
+    }
     else {
         console.log('usage:');
         console.log('   npx scrypted install npm-package-name [127.0.0.1[:10443]]');
@@ -248,11 +286,13 @@ async function main() {
         console.log('   npx scrypted ffplay name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
         console.log('   npx scrypted shell [127.0.0.1[:10443]] [-- cmd [...cmd-args]]');
+        console.log('   npx scrypted console [-f] [-t seconds] [name-or-id[@127.0.0.1[:10443]]]');
         console.log();
         console.log('examples:');
         console.log('   npx scrypted install @scrypted/rtsp');
         console.log('   npx scrypted install @scrypted/rtsp/0.0.51');
         console.log('   npx scrypted install @scrypted/rtsp/0.0.51 192.168.2.100');
+        console.log('   npx scrypted console -f @scrypted/nvr');
     }
 }
 

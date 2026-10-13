@@ -4,6 +4,7 @@
       "target": "esnext",
       "noImplicitAny": true,
       "outDir": "./dist",
+      "rootDir": "../..",
       "esModuleInterop": true,
       "sourceMap": true,
       "inlineSources": true,
