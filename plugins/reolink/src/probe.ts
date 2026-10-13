@@ -1,9 +1,6 @@
-import https from 'https';
 import { httpFetch } from '../../../server/src/fetch/http-fetch';
 
-export const reolinkHttpsAgent = new https.Agent({
-    rejectUnauthorized: false,
-});
+export type ReolinkProtocol = 'http' | 'https';
 
 export interface DevInfo {
     B485: number;
@@ -27,8 +24,8 @@ export interface DevInfo {
     wifi: number;
 }
 
-async function getDeviceInfoInternal(host: string, parameters: Record<string, string>): Promise<DevInfo> {
-    const url = new URL(`http://${host}/api.cgi`);
+async function getDeviceInfoInternal(host: string, parameters: Record<string, string>, protocol: ReolinkProtocol = 'http'): Promise<DevInfo> {
+    const url = new URL(`${protocol}://${host}/api.cgi`);
     const params = url.searchParams;
     params.set('cmd', 'GetDevInfo');
     for (const [key, value] of Object.entries(parameters)) {
@@ -38,6 +35,8 @@ async function getDeviceInfoInternal(host: string, parameters: Record<string, st
     const response = await httpFetch({
         url,
         responseType: 'json',
+        // Reolink hubs/cameras serve HTTPS with a self-signed certificate.
+        rejectUnauthorized: false,
     });
 
     const error = response.body?.[0]?.error;
@@ -50,18 +49,18 @@ async function getDeviceInfoInternal(host: string, parameters: Record<string, st
     return ret;
 }
 
-export async function getDeviceInfo(host: string, username: string, password: string): Promise<DevInfo> {
-    const parameters = await getLoginParameters(host, username, password);
-    return getDeviceInfoInternal(host, parameters.parameters);
+export async function getDeviceInfo(host: string, username: string, password: string, protocol: ReolinkProtocol = 'http'): Promise<DevInfo> {
+    const parameters = await getLoginParameters(host, username, password, undefined, protocol);
+    return getDeviceInfoInternal(host, parameters.parameters, protocol);
 }
 
-export async function getLoginParameters(host: string, username: string, password: string, forceToken?: boolean) {
+export async function getLoginParameters(host: string, username: string, password: string, forceToken?: boolean, protocol: ReolinkProtocol = 'http') {
     if (!forceToken) {
         try {
             await getDeviceInfoInternal(host, {
                 user: username,
                 password,
-            });
+            }, protocol);
             return {
                 parameters: {
                     user: username,
@@ -75,7 +74,7 @@ export async function getLoginParameters(host: string, username: string, passwor
     }
 
     try {
-        const url = new URL(`http://${host}/api.cgi`);
+        const url = new URL(`${protocol}://${host}/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'Login');
 
