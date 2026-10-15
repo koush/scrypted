@@ -378,6 +378,19 @@ export class AmcrestCameraClient {
         return response.body.includes('OK');
     }
 
+    // table.AccessControl[0].UnlockHoldInterval=7
+    async getUnlockHoldInterval(): Promise<number> {
+        const response = await this.request({
+            // AccessControl[0] is channel 1, which is used by lock and unlock.
+            url: `http://${this.ip}/cgi-bin/configManager.cgi?action=getConfig&name=AccessControl`,
+            responseType: 'text',
+        });
+        const match = /AccessControl\[0\]\.UnlockHoldInterval=(\d+)/.exec(response.body);
+        if (!match)
+            throw new Error('UnlockHoldInterval not found');
+        return parseInt(match[1]);
+    }
+
 
     async resetMotionDetection(cameraNumber: number) {
         const params = new URLSearchParams();
