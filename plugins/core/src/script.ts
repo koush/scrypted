@@ -1,4 +1,4 @@
-import sdk, { Scriptable, Program, ScryptedDeviceBase, ScriptSource, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
+import sdk, { Scriptable, Program, ScryptedDeviceBase, ScriptSource, ScryptedInterface, ScryptedDeviceType, ScryptedNativeId } from "@scrypted/sdk";
 import { scryptedEval } from "./scrypted-eval";
 import { monacoEvalDefaults } from "./monaco";
 import { createScriptDevice, ScriptDeviceImpl } from "@scrypted/common/src/eval/scrypted-eval";
@@ -7,7 +7,7 @@ import { ScriptCoreNativeId } from "./script-core";
 const { deviceManager } = sdk;
 
 export class Script extends ScryptedDeviceBase implements Scriptable, Program, ScriptDeviceImpl {
-    constructor(nativeId: string, public triggerDeviceDiscover?: (name: string, type: ScryptedDeviceType | string, interfaces: string[]) => Promise<string>) {
+    constructor(nativeId: ScryptedNativeId, public triggerDeviceDiscover?: (name: string, type: ScryptedDeviceType | string, interfaces: string[]) => Promise<string>) {
         super(nativeId);
     }
 
@@ -16,12 +16,12 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
             'script.ts': source.script,
         }));
 
-        this.triggerDeviceDiscover?.(this.providedName, this.providedType, this.providedInterfaces);
+        this.triggerDeviceDiscover?.(this.providedName!, this.providedType!, this.providedInterfaces);
     }
 
     async loadScripts(): Promise<{ [filename: string]: ScriptSource; }> {
         try {
-            const scripts = JSON.parse(this.storage.getItem('data'));
+            const scripts = JSON.parse(this.storage.getItem('data')!);
             // currently only support 1 script
             return {
                 'script.ts': {
@@ -44,7 +44,7 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         }
     }
 
-    async postRunScript(defaultExport: any) {
+    async postRunScript(defaultExport: any, refresh = false) {
         if (defaultExport) {
             let deviceInstance = defaultExport;
             // support exporting a plugin class, plugin main function,
@@ -58,13 +58,18 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
 
         const allInterfaces = this.mergeHandler(this);
         if (allInterfaces.length !== 2) {
-            await deviceManager.onDeviceDiscovered({
-                providerNativeId: ScriptCoreNativeId,
-                nativeId: this.nativeId,
-                interfaces: allInterfaces,
-                type: ScryptedDeviceType.Unknown,
-                name: this.providedName,
-            });
+            if (refresh && this.triggerDeviceDiscover) {
+                await this.triggerDeviceDiscover(this.providedName!, this.providedType!, this.providedInterfaces);
+            }
+            else {
+                await deviceManager.onDeviceDiscovered({
+                    providerNativeId: ScriptCoreNativeId,
+                    nativeId: this.nativeId,
+                    interfaces: allInterfaces,
+                    type: ScryptedDeviceType.Unknown,
+                    name: this.providedName!,
+                });
+            }
         }
     }
 
@@ -75,17 +80,17 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         ]));
     }
 
-    async runInternal(script: string, variables?: { [name: string]: any; }): Promise<any> {
+    async runInternal(script: string, variables?: { [name: string]: any; }, refresh = false): Promise<any> {
         this.prepareScript();
 
         try {
-            const data = JSON.parse(this.storage.getItem('data'));
+            const data = JSON.parse(this.storage.getItem('data')!);
 
             const { value, defaultExport } = await scryptedEval(this, script, Object.assign({
                 device: this,
             }, variables));
 
-            await this.postRunScript(defaultExport);
+            await this.postRunScript(defaultExport, refresh);
             return value;
         }
         catch (e) {
@@ -95,12 +100,12 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
     }
 
     async run(variables?: { [name: string]: any; }): Promise<any> {
-        const data = JSON.parse(this.storage.getItem('data'));
+        const data = JSON.parse(this.storage.getItem('data')!);
         return this.runInternal(data['script.ts'], variables)
     }
 
     async eval(source: ScriptSource, variables?: { [name: string]: any }) {
-        return this.runInternal(source.script, variables);
+        return this.runInternal(source.script!, variables, true);
     }
 
     // will be done at runtime
