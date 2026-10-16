@@ -5,6 +5,9 @@ import { createRtspMediaStreamOptions, RtspSmartCamera, UrlMediaStreamOptions } 
 import { connectCameraAPI, OnvifCameraAPI } from '../onvif-api';
 import { OnvifIntercom } from '../onvif-intercom';
 import { AIState, BatteryInfoResponse, DeviceStatusResponse, Enc, EventsResponse } from './api';
+import { isReolinkDoorbell } from './doorbell-events';
+import { BaichuanTalkClient } from './baichuan';
+import { BaichuanIntercom } from './baichuan-intercom';
 import { ReolinkNvrDevice } from './nvr';
 
 export const moToB64 = async (mo: MediaObject) => {
@@ -93,6 +96,7 @@ class ReolinkCameraPirSensor extends ScryptedDeviceBase implements OnOff {
 export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceProvider, Intercom, ObjectDetector, PanTiltZoom, Sleep, VideoTextOverlays {
     onvifClient: OnvifCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
+    baichuanIntercom = new BaichuanIntercom(this.console, () => this.createBaichuanTalkClient());
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     motionTimeout: NodeJS.Timeout;
     siren: ReolinkCameraSiren;
@@ -102,8 +106,23 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     lastSnapshotTaken: number;
     nvrDevice: ReolinkNvrDevice;
     abilities: any;
+    doorbellTimeout: NodeJS.Timeout;
+    private initTimeout: NodeJS.Timeout;
+    private released = false;
+    private detectedDoorbell = false;
 
     storageSettings = new StorageSettings(this, {
+        doorbell: {
+            title: 'Doorbell',
+            description: 'This channel is a Reolink Doorbell. Detected automatically from the camera model; enable manually if the model is not recognized.',
+            type: 'boolean',
+            mapGet: value => {
+                const channelInfo = this.getDeviceData()?.channelInfo;
+                if (typeof channelInfo?.typeInfo === 'string')
+                    this.detectedDoorbell = isReolinkDoorbell(channelInfo);
+                return value ?? this.detectedDoorbell;
+            },
+        },
         debugEvents: {
             title: 'Debug Events',
             type: 'boolean',
@@ -160,6 +179,16 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             subgroup: 'Advanced',
             title: 'Use ONVIF for Two-Way Audio',
             type: 'boolean',
+            onGet: async () => ({ hide: this.isDoorbell() }),
+        },
+        twoWayAudio: {
+            subgroup: 'Advanced',
+            title: 'Two-Way Audio',
+            description: 'Reolink sends talk audio through the NVR using its native protocol. ONVIF requires an audio backchannel on the NVR stream.',
+            type: 'string',
+            choices: ['Reolink', 'ONVIF', 'Disabled'],
+            mapGet: value => value ?? (this.storage.getItem('useOnvifTwoWayAudio') === 'false' ? 'Disabled' : 'Reolink'),
+            onGet: async () => ({ hide: !this.isDoorbell() }),
         },
         prebufferSet: {
             type: 'boolean',
@@ -183,7 +212,9 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             this.nvrDevice.cameraNativeMap.set(this.nativeId, this);
         }
 
-        setTimeout(async () => {
+        this.initTimeout = setTimeout(async () => {
+            if (!this.isAvailable())
+                return;
             await this.init();
         }, 2000);
     }
@@ -196,29 +227,22 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         const logger = this.getLogger();
 
         while (!this.nvrDevice.client || !this.nvrDevice.client.loggedIn) {
+            if (!this.isAvailable())
+                return;
             logger.log('Waiting for plugin connection');
             await sleep(3000);
         }
 
+        if (!this.isAvailable())
+            return;
         await this.reportDevices();
-        this.updateDeviceInfo();
+        if (!this.isAvailable())
+            return;
         this.updatePtzCaps();
 
-        const interfaces = await this.getDeviceInterfaces();
-
-        const device = {
-            nativeId: this.nativeId,
-            providerNativeId: this.nvrDevice.nativeId,
-            name: this.name,
-            interfaces,
-            type: this.type,
-            info: this.info,
-        };
-
-        logger.log(`Updating device interfaces: ${JSON.stringify(interfaces)}`);
-
-        await sdk.deviceManager.onDeviceDiscovered(device);
-        // await this.nvrDevice.plugin.updateDevice(this.nativeId, this.name, interfaces, ScryptedDeviceType.Camera);
+        await this.updateDevice();
+        if (!this.isAvailable())
+            return;
 
         if (this.hasBattery() && !this.storageSettings.getItem('prebufferSet')) {
             const device = sdk.systemManager.getDeviceById<Settings>(this.id);
@@ -226,6 +250,30 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             await device.putSetting('prebuffer:enabledStreams', '[]');
             this.storageSettings.values.prebufferSet = true;
         }
+    }
+
+    async updateDevice() {
+        if (!this.isAvailable())
+            return;
+        this.updateDeviceInfo();
+        const interfaces = await this.getDeviceInterfaces();
+        if (!this.isAvailable())
+            return;
+
+        const device = {
+            nativeId: this.nativeId,
+            providerNativeId: this.nvrDevice.nativeId,
+            name: this.name,
+            interfaces,
+            type: this.isDoorbell() ? ScryptedDeviceType.Doorbell : ScryptedDeviceType.Camera,
+            info: this.info,
+        };
+
+        this.getLogger().log(`Updating device interfaces: ${JSON.stringify(interfaces)}`);
+
+        await sdk.deviceManager.onDeviceDiscovered(device);
+        if (!this.isDoorbell())
+            this.clearDoorbellState();
     }
 
     getClient() {
@@ -316,6 +364,46 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         return this.nvrDevice.storageSettings.values.devicesData?.[channel];
     }
 
+    isAvailable() {
+        // Re-adopting the same nativeId creates a new Scrypted ID. A cached
+        // camera can still point at the old, deleted state even after re-adoption.
+        return !this.released && sdk.deviceManager.getNativeIds().includes(this.nativeId)
+            && !!sdk.systemManager.getDeviceById(this.id);
+    }
+
+    isDoorbell() {
+        return this.isAvailable() && this.storageSettings.values.doorbell;
+    }
+
+    clearDoorbellState() {
+        clearTimeout(this.doorbellTimeout);
+        this.doorbellTimeout = undefined;
+        if (this.isAvailable() && this.binaryState)
+            this.binaryState = false;
+    }
+
+    processDoorbellState(state: boolean) {
+        if (!this.isAvailable())
+            return;
+        if (this.storageSettings.values.debugEvents)
+            this.getLogger().debug('Doorbell button', state ? 'pressed' : 'released');
+        clearTimeout(this.doorbellTimeout);
+        this.doorbellTimeout = undefined;
+        this.binaryState = state;
+        if (state)
+            this.doorbellTimeout = setTimeout(() => this.clearDoorbellState(), 5000);
+    }
+
+    release() {
+        // Scrypted may already have removed this device's state and storage.
+        // Only touch local resources here, never SDK-backed device properties.
+        this.released = true;
+        clearTimeout(this.initTimeout);
+        clearTimeout(this.motionTimeout);
+        this.clearDoorbellState();
+        void this.stopIntercom().catch(error => this.nvrDevice.console.warn('Error stopping removed doorbell audio', error));
+    }
+
     async getObjectTypes(): Promise<ObjectDetectionTypes> {
         try {
             const deviceData = this.getDeviceData();
@@ -341,16 +429,57 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
-        if (!this.onvifIntercom.url) {
+        if (!this.isAvailable())
+            throw new Error('The camera is no longer available.');
+        if (this.isDoorbell()) {
+            const method = this.storageSettings.values.twoWayAudio;
+            if (method === 'Disabled')
+                throw new Error('Two-way audio is disabled.');
+            if (method === 'Reolink') {
+                await this.onvifIntercom.stopIntercom();
+                return this.baichuanIntercom.startIntercom(media);
+            }
+        }
+        await this.baichuanIntercom.stopIntercom();
+        if (this.isDoorbell()) {
+            // The shared intercom reads credentials/IP from the camera's storage.
+            // Refresh the doorbell's copy before each session, using the NVR account.
+            const { username, password, ipAddress } = this.nvrDevice.storageSettings.values;
+            const url = this.getDoorbellIntercomUrl();
+            this.storage.setItem('username', username || '');
+            this.storage.setItem('password', password || '');
+            this.setIPAddress(ipAddress);
+            this.onvifIntercom.url = url;
+        }
+        else if (!this.onvifIntercom.url) {
             const client = await this.getOnvifClient();
-            const streamUrl = await client.getStreamUrl();
-            this.onvifIntercom.url = streamUrl;
+            this.onvifIntercom.url = await client.getStreamUrl();
         }
         return this.onvifIntercom.startIntercom(media);
     }
 
-    stopIntercom(): Promise<void> {
-        return this.onvifIntercom.stopIntercom();
+    createBaichuanTalkClient() {
+        if (!this.isDoorbell())
+            throw new Error('Native talk audio is only supported for NVR doorbell channels.');
+        const { ipAddress, baichuanPort, username, password } = this.nvrDevice.storageSettings.values;
+        const channel = Number(this.getRtspChannel());
+        return new BaichuanTalkClient(ipAddress, baichuanPort, username, password, channel);
+    }
+
+    getDoorbellIntercomUrl() {
+        const { ipAddress, rtspPort } = this.nvrDevice.storageSettings.values;
+        if (!ipAddress)
+            throw new Error('Configure the NVR IP address before starting doorbell two-way audio.');
+        const channel = Number(this.getRtspChannel());
+        const port = rtspPort || 554;
+        if (!Number.isInteger(channel) || channel < 0 || !Number.isInteger(port) || port < 1 || port > 65535)
+            throw new Error('Invalid RTSP channel or port for two-way audio.');
+        const host = ipAddress.includes(':') && !ipAddress.startsWith('[') ? `[${ipAddress}]` : ipAddress;
+        return `rtsp://${host}:${port}/h264Preview_${(channel + 1).toString().padStart(2, '0')}_main`;
+    }
+
+    async stopIntercom(): Promise<void> {
+        await Promise.all([this.baichuanIntercom.stopIntercom(), this.onvifIntercom.stopIntercom()]);
     }
 
     hasSiren() {
@@ -409,8 +538,13 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             ...this.nvrDevice.plugin.getAdditionalInterfaces(),
         ];
 
+        if (this.isDoorbell()) {
+            interfaces.push(ScryptedInterface.BinarySensor);
+        }
+
         try {
-            if (this.storageSettings.values.useOnvifTwoWayAudio) {
+            if (this.isDoorbell() ? this.storageSettings.values.twoWayAudio !== 'Disabled'
+                : this.storageSettings.values.useOnvifTwoWayAudio) {
                 interfaces.push(
                     ScryptedInterface.Intercom
                 );
@@ -492,7 +626,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         info.serialNumber = deviceData?.serial;
         info.firmware = deviceData?.firmVer;
         info.version = deviceData?.boardInfo;
-        info.model = deviceData?.typeInfo;
+        info.model = deviceData?.channelInfo?.typeInfo ?? info.model;
         info.manufacturer = 'Reolink';
         info.managementUrl = `http://${ip}`;
         this.info = info;
@@ -772,7 +906,13 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
 
     async putSetting(key: string, value: string) {
         if (this.storageSettings.keys[key]) {
+            if (key === 'twoWayAudio' && !['Reolink', 'ONVIF', 'Disabled'].includes(value))
+                throw new Error('Select a supported two-way audio method.');
+            if (key === 'doorbell' || key === 'twoWayAudio' || key === 'useOnvifTwoWayAudio')
+                await this.stopIntercom();
             await this.storageSettings.putSetting(key, value);
+            if (key === 'doorbell' || key === 'twoWayAudio' || key === 'useOnvifTwoWayAudio')
+                await this.updateDevice();
         }
         else {
             await super.putSetting(key, value);
