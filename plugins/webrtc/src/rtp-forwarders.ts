@@ -1,3 +1,4 @@
+import { RtspAudioRelay } from '@scrypted/common/src/rtsp-audio-relay';
 import { Deferred } from "@scrypted/common/src/deferred";
 import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
@@ -331,12 +332,13 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         const audioClient = await listenZeroSingleClient('127.0.0.1');
                         let audioPipe: Writable;
                         killDeferred.promise.finally(() => audioClient.clientPromise.then(client => client.destroy()));
-                        let rtspServer: RtspServer;
+                        let rtspServer: RtspAudioRelay;
                         audioClient.clientPromise.then(async client => {
                             const r = new RtspServer(client, audioSdp, !clientIsTcp);
-                            killDeferred.promise.finally(() => r.destroy());
-                            await r.handlePlayback();
-                            rtspServer = r;
+                            const relay = new RtspAudioRelay(r, () => killDeferred.resolve(undefined));
+                            rtspServer = relay;
+                            killDeferred.promise.finally(() => relay.close());
+                            await relay.start();
                         })
                             .catch(e => {
                                 if (!killDeferred.finished)
