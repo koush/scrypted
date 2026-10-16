@@ -1,5 +1,6 @@
 import { H264Repacketizer, depacketizeStapA } from '../src/index';
-import { H264_NAL_TYPE_IDR, H264_NAL_TYPE_PPS, H264_NAL_TYPE_SEI, H264_NAL_TYPE_SPS, H264_NAL_TYPE_STAP_A, RtspServer, getNaluTypesInNalu } from '../../../common/src/rtsp-server';
+import { H264_NAL_TYPE_IDR, H264_NAL_TYPE_PPS, H264_NAL_TYPE_SEI, H264_NAL_TYPE_SPS, H264_NAL_TYPE_STAP_A, getNaluTypesInNalu } from '../../../common/src/rtp-codec';
+import { RtspServer } from '../../../common/src/rtsp-server';
 import fs from 'fs';
 
 import { getNvrSessionStream } from '../../../../nvr/nvr-plugin/src/session-stream';

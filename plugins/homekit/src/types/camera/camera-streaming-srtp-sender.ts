@@ -3,7 +3,7 @@ import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import type { Config } from '@koush/werift-src/packages/rtp/src/srtp/session';
 import { SrtcpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtcp';
 import { SrtpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtp';
-import { getNaluTypesInNalu, H264_NAL_TYPE_IDR } from '@scrypted/common/src/rtsp-server';
+import { getNaluTypesInNalu, H264_NAL_TYPE_IDR } from '@scrypted/common/src/rtp-codec';
 import dgram from 'dgram';
 import { AudioStreamingSamplerate } from '../../hap';
 import { ntpTime } from './camera-utils';
