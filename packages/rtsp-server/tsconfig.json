@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "ES2022",
+        "lib": ["ES2022", "ESNext.Disposable"],
+        "noImplicitAny": true,
+        "outDir": "./dist",
+        "esModuleInterop": true,
+        "sourceMap": true,
+        "inlineSources": true,
+        "declaration": true,
+        "resolveJsonModule": true,
+    },
+    "exclude": ["**/node_modules"],
+    "include": [
+        "src/**/*"
+    ],
+}

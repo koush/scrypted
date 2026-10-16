@@ -1,0 +1,23 @@
+{
+  "name": "@scrypted/rtsp-server",
+  "version": "0.0.2",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "tsc --outDir dist",
+    "prepublishOnly": "npm run build",
+    "test": "ts-node test/test.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "http-auth-utils": "^7.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
