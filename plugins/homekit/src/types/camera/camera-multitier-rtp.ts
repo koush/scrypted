@@ -169,6 +169,9 @@ export function createMultiTierRtpDelegate(device: ScryptedDevice & VideoCamera 
             }
             const server = new RtspServer(client, sdp);
             await server.handlePlayback();
+            // service keepalive and teardown requests from the rtsp client.
+            server.handleSetup(['teardown'])
+                .catch(() => { });
             if (!session.ended.finished && !ended.finished)
                 session.talkback = { server, track: parseSdp(sdp).msections[0].control };
         }

@@ -199,6 +199,9 @@ export async function createRTCPeerConnectionSource(options: {
             // console.log('sdp sent', rtspServer.sdp);
 
             await rtspServer.handlePlayback();
+            // service keepalive and teardown requests from the rtsp client.
+            rtspServer.handleSetup(['teardown'])
+                .catch(() => { });
             console.log('rtsp server playback started');
         }
 

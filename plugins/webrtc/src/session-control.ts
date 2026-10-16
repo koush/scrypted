@@ -124,6 +124,9 @@ export class ScryptedSessionControl implements RTCSessionControl {
             this.rtspServer = rtspServer;
             rtspServer.console = console;
             await rtspServer.handlePlayback();
+            // service keepalive and teardown requests from the rtsp client.
+            rtspServer.handleSetup(['teardown'])
+                .catch(() => { });
             const parsedSdp = parseSdp(rtspServer.sdp);
             const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
 

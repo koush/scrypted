@@ -45,6 +45,9 @@ export async function convertRtspToMp4(rtspFile: string, sessionFile?: string) {
     clientPromise.rtspServerPromise.then(async rtspServer => {
         rtspServer.sdp = sdp;
         await rtspServer.handlePlayback();
+        // service keepalive and teardown requests from the rtsp client.
+        rtspServer.handleSetup(['teardown'])
+            .catch(() => { });
         console.log('playing')
         rtspServer.client.write(rtspContents);
         rtspServer.client.end();

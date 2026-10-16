@@ -1656,6 +1656,9 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       const rtsp = new RtspServer(client, sdp);
       rtsp.console = this.console;
       await rtsp.handlePlayback();
+      // service keepalive and teardown requests from the rtsp client.
+      rtsp.handleSetup(['teardown'])
+        .catch(() => { });
       const socket = net.connect(parseInt(u.port), u.hostname);
 
       client.on('close', () => {

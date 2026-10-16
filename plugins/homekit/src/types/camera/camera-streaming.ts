@@ -412,6 +412,9 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                         rtspServer = new RtspServer(client, sdp);
                         await rtspServer.handlePlayback();
+                        // service keepalive and teardown requests from the rtsp client.
+                        rtspServer.handleSetup(['teardown'])
+                            .catch(() => { });
                         twoWayAudioState = 'started';
                     }
                     catch (e) {

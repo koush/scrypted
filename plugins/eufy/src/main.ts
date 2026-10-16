@@ -125,6 +125,9 @@ class EufyCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
           videoTrack = parsedSdp.msections.find(msection => msection.type === 'video');
           audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio');
           await rtsp.handlePlayback();
+          // service keepalive and teardown requests from the rtsp client.
+          rtsp.handleSetup(['teardown'])
+              .catch(() => { });
         });
 
         const proxyStream = await livestreamManager.getLocalLivestream();
