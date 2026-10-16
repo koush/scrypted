@@ -337,6 +337,15 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                             killDeferred.promise.finally(() => r.destroy());
                             await r.handlePlayback();
                             rtspServer = r;
+                            // handlePlayback returns after the initial PLAY, but ffmpeg
+                            // keeps sending GET_PARAMETER/OPTIONS keepalives (it assumes a
+                            // 60 second session timeout) and its TEARDOWN is a synchronous
+                            // command that blocks until answered. Keep servicing requests
+                            // until TEARDOWN. Detached, since nothing awaits the session
+                            // lifetime: errors need no handling, as the killDeferred
+                            // cleanup destroys the server and unblocks the pending read.
+                            r.handleSetup(['teardown'])
+                                .catch(() => { });
                         })
                             .catch(e => {
                                 if (!killDeferred.finished)
