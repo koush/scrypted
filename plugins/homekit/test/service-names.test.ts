@@ -28,7 +28,7 @@ test('motion, contact, and button services advertise distinct names', () => {
 
 test('merged controls retain their individual names and service identities', () => {
     const light = new Switch('Doorbell Floodlight', 'camera-floodlight');
-    const motionLight = new Switch('Doorbell Motion-Floodlight', 'camera-motion-floodlight');
+    const motionLight = new Switch('Doorbell Motion Floodlight', 'camera-motion-floodlight');
     const siren = new Switch('Doorbell Siren', 'camera-siren');
     const motionSiren = new Switch('Doorbell Motion-Siren', 'camera-motion-siren');
     for (const service of [light, motionLight, siren, motionSiren]) {
@@ -84,4 +84,16 @@ test('recreating a named service preserves existing HomeKit instance IDs', () =>
     for (const characteristic of original.characteristics) {
         assert.equal(updated.characteristics.find(c => c.UUID === characteristic.UUID)?.iid, characteristic.iid);
     }
+});
+
+
+test('legacy motion-floodlight labels are normalized only for HomeKit', () => {
+    const device = { name: 'Doorbell Motion-Floodlight' };
+    const service = new Switch(device.name, 'camera-motion-floodlight');
+    setServiceName(service, device.name);
+    assert.equal(device.name, 'Doorbell Motion-Floodlight');
+    assert.equal(service.getCharacteristic(Name).value, 'Doorbell Motion Floodlight');
+    assert.equal(service.getCharacteristic(ConfiguredName).value, 'Doorbell Motion Floodlight');
+    setServiceName(service, 'TP-Link Porch Light');
+    assert.equal(service.getCharacteristic(Name).value, 'TP-Link Porch Light');
 });
