@@ -4,6 +4,7 @@ import { createCameraStorageSettings } from '../camera-mixin';
 import { DummyDevice, addSupportedType, bindCharacteristic } from '../common';
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, H264Level, H264Profile, MediaContainerType, RecordingPacket, SRTPCryptoSuites, SecureVideoController, Service, VideoCodecType, WithUUID } from '../hap';
 import type { HomeKitPlugin } from '../main';
+import { setServiceName } from '../service-names';
 import { createMultiTierRtpDelegate } from './camera/camera-multitier-rtp';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createSecureVideoController, secureVideoCmafEnabled } from './camera/camera-secure-video';
@@ -233,6 +234,7 @@ addSupportedType({
             const motionDetected = () => !!motionDevice.motionDetected;
 
             const { motionService } = controller;
+            setServiceName(motionService, `${device.name} Motion`);
             bindCharacteristic(motionDevice,
                 ScryptedInterface.MotionSensor,
                 motionService,
