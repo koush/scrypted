@@ -86,14 +86,13 @@ test('recreating a named service preserves existing HomeKit instance IDs', () =>
     }
 });
 
-
-test('legacy motion-floodlight labels are normalized only for HomeKit', () => {
+test('device-provided names are preserved verbatim', () => {
     const device = { name: 'Doorbell Motion-Floodlight' };
     const service = new Switch(device.name, 'camera-motion-floodlight');
     setServiceName(service, device.name);
     assert.equal(device.name, 'Doorbell Motion-Floodlight');
-    assert.equal(service.getCharacteristic(Name).value, 'Doorbell Motion Floodlight');
-    assert.equal(service.getCharacteristic(ConfiguredName).value, 'Doorbell Motion Floodlight');
+    assert.equal(service.getCharacteristic(Name).value, 'Doorbell Motion-Floodlight');
+    assert.equal(service.getCharacteristic(ConfiguredName).value, 'Doorbell Motion-Floodlight');
     setServiceName(service, 'TP-Link Porch Light');
     assert.equal(service.getCharacteristic(Name).value, 'TP-Link Porch Light');
 });
