@@ -3,6 +3,7 @@ import { addSupportedType, DummyDevice, supportedTypes } from '../common';
 import { Characteristic, CharacteristicEventTypes, Service, StatelessProgrammableSwitch } from '../hap';
 import { makeAccessory } from './common';
 import type { HomeKitPlugin } from "../main";
+import { setServiceName } from "../service-names";
 import { createCameraStorageSettings } from '../camera-mixin';
 
 addSupportedType({
@@ -20,12 +21,14 @@ addSupportedType({
         const accessory = cameraCheck.probe(faux) ? await cameraCheck.getAccessory(device, homekitPlugin) : makeAccessory(device, homekitPlugin);
 
         const service = accessory.addService(Service.Doorbell);
+        setServiceName(service, `${device.name} Button`);
 
         const storage = sdk.deviceManager.getMixinStorage(device.id, homekitPlugin.nativeId);
         const cameraStorage = createCameraStorageSettings({ storage, onDeviceEvent: undefined });
 
         const stateless = cameraStorage.values.doorbellAutomationButton ? new StatelessProgrammableSwitch(device.name, undefined) : undefined;
         if (stateless) {
+            setServiceName(stateless, `${device.name} Automation Button`);
             stateless.getCharacteristic(Characteristic.ProgrammableSwitchEvent)
                 .setProps({
                     maxValue: Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS,
