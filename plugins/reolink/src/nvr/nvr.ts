@@ -73,14 +73,6 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             defaultValue: 8000,
             onPut: () => this.resetDoorbellEvents(),
         },
-        baichuanPort: {
-            subgroup: 'Advanced',
-            title: 'Reolink Server Port',
-            description: 'Native Reolink service port for NVR doorbell talk audio. Enable the Server Port on the NVR.',
-            type: 'number',
-            defaultValue: 9000,
-            onPut: async () => await this.stopIntercom(),
-        },
         rtmpPort: {
             subgroup: 'Advanced',
             title: 'RTMP Port',
@@ -142,14 +134,9 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
     }
 
     async reinit() {
-        await this.stopIntercom();
         this.resetDoorbellEvents();
         this.client = undefined;
         // await this.init();
-    }
-
-    async stopIntercom() {
-        await Promise.all([...this.cameraNativeMap.values()].map(camera => camera.stopIntercom()));
     }
 
     async init() {
