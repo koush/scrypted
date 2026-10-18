@@ -326,7 +326,7 @@ export function addFan(device: ScryptedDevice & Fan, accessory: Accessory): Serv
 
 /*
  * mergeOnOffDevicesByType looks for the specified type of child devices under the
- * given device provider and merges them as switches to the accessory represented
+ * given device provider and merges them into the accessory represented
  * by the device provider.
  *
  * Returns the services created as well as all of the child OnOff devices which have
@@ -342,7 +342,8 @@ export function mergeOnOffDevicesByType(device: ScryptedDevice & DeviceProvider,
         if (child.type !== type || !child.interfaces.includes(ScryptedInterface.OnOff) || !child.interfaces.includes(HOMEKIT_MIXIN))
             return undefined;
 
-        const onOffService = getOnOffService(child, accessory, Service.Switch)
+        const serviceType = type === ScryptedDeviceType.Light ? Service.Lightbulb : Service.Switch;
+        const onOffService = getOnOffService(child, accessory, serviceType);
         mergedDevices.push(child);
         return onOffService;
     });

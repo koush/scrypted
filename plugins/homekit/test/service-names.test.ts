@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ConfiguredName, Name, On } from '@homebridge/hap-nodejs/dist/lib/definitions/CharacteristicDefinitions.js';
-import { ContactSensor, Doorbell, MotionSensor, StatelessProgrammableSwitch, Switch } from '@homebridge/hap-nodejs/dist/lib/definitions/ServiceDefinitions.js';
+import { ContactSensor, Doorbell, Lightbulb, MotionSensor, StatelessProgrammableSwitch, Switch } from '@homebridge/hap-nodejs/dist/lib/definitions/ServiceDefinitions.js';
 import { IdentifierCache } from '@homebridge/hap-nodejs/dist/lib/model/IdentifierCache.js';
 import { toShortForm } from '@homebridge/hap-nodejs/dist/lib/util/uuid.js';
 import { setServiceName } from '../src/service-names.ts';
@@ -27,8 +27,8 @@ test('motion, contact, and button services advertise distinct names', () => {
 });
 
 test('merged controls retain their individual names and service identities', () => {
-    const light = new Switch('Doorbell Floodlight', 'camera-floodlight');
-    const motionLight = new Switch('Doorbell Motion Floodlight', 'camera-motion-floodlight');
+    const light = new Lightbulb('Doorbell Floodlight', 'camera-floodlight');
+    const motionLight = new Lightbulb('Doorbell Motion Floodlight', 'camera-motion-floodlight');
     const siren = new Switch('Doorbell Siren', 'camera-siren');
     const motionSiren = new Switch('Doorbell Motion-Siren', 'camera-motion-siren');
     for (const service of [light, motionLight, siren, motionSiren]) {
