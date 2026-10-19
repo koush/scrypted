@@ -39,6 +39,12 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
             ],
             defaultValue: 'Default',
         },
+        ptzContinuousMoveDuration: {
+            title: 'Continuous Move Duration',
+            description: 'The duration in milliseconds of a Continuous movement, after which an explicit Stop is sent. Increase this if Continuous movements are too small to be useful.',
+            type: 'number',
+            defaultValue: 1000,
+        },
         presets: {
             title: 'Presets',
             description: 'PTZ Presets in the format "key=name". Where key is the PTZ Preset identifier and name is a friendly name.',
@@ -145,12 +151,28 @@ export class OnvifPtzMixin extends SettingsMixinDeviceBase<Settings> implements 
                 y *= command.speed.tilt;
             if (command.speed?.zoom)
                 zoom *= command.speed.zoom;
-            return new Promise<void>((r, f) => {
+            const duration = command.timeout || this.storageSettings.values.ptzContinuousMoveDuration || 1000;
+            await new Promise<void>((r, f) => {
                 client.cam.continuousMove({
-                    x: command.pan,
-                    y: command.tilt,
-                    zoom: command.zoom,
-                    timeout: command.timeout || 1000,
+                    x,
+                    y,
+                    zoom,
+                    timeout: duration,
+                }, (e, result, xml) => {
+                    if (e)
+                        return f(e);
+                    r();
+                })
+            });
+            // The ContinuousMove Timeout element is optional in the ONVIF spec and is not
+            // universally honored. Some cameras ignore it entirely and will move indefinitely,
+            // so send an explicit Stop rather than relying on the camera to self terminate.
+            // Stop is idempotent, so this is harmless on cameras that do honor Timeout.
+            await new Promise(r => setTimeout(r, duration));
+            return new Promise<void>((r, f) => {
+                client.cam.stop({
+                    panTilt: true,
+                    zoom: true,
                 }, (e, result, xml) => {
                     if (e)
                         return f(e);
