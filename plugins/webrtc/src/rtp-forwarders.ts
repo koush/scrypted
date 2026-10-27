@@ -352,6 +352,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         inputArguments = [
                             '-analyzeduration', '0',
                             '-probesize', '512',
+                            // ffmpeg's native opus decoder produces loud noise/clipping on some streams
+                            // (e.g. Ring 60ms SILK frames). libopus decodes them cleanly.
+                            // https://github.com/koush/scrypted/issues/1617
+                            ...(audioSection.codec === 'opus' ? ['-c:a', 'libopus'] : []),
                             '-i', `rtsp://${audioClient.host}:${audioClient.port}`,
                         ];
                     }

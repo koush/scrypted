@@ -3,6 +3,7 @@ import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
 import type { HomeKitPlugin } from "../main";
+import { setServiceName } from "../service-names";
 
 function airQualityToHomekit(airQuality: AirQuality) {
     switch (airQuality) {
@@ -53,59 +54,69 @@ addSupportedType({
 
         if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
             const service = accessory.addService(Service.ContactSensor, device.name);
+            setServiceName(service, `${device.name} Contact`);
             bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.ContactSensorState,
                 () => !!device.entryOpen);
         }
         else if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
             const service = accessory.addService(Service.ContactSensor, device.name);
+            setServiceName(service, `${device.name} Contact`);
             bindCharacteristic(device, ScryptedInterface.BinarySensor, service, Characteristic.ContactSensorState,
                 () => !!device.binaryState);
         }
 
         if (device.interfaces.includes(ScryptedInterface.OccupancySensor)) {
             const service = accessory.addService(Service.OccupancySensor, device.name);
+            setServiceName(service, `${device.name} Occupancy`);
             bindCharacteristic(device, ScryptedInterface.OccupancySensor, service, Characteristic.OccupancyDetected,
                 () => !!device.occupied);
         }
 
         if (device.interfaces.includes(ScryptedInterface.AmbientLightSensor)) {
             const service = accessory.addService(Service.LightSensor, device.name);
+            setServiceName(service, `${device.name} Light Level`);
             bindCharacteristic(device, ScryptedInterface.AmbientLightSensor, service, Characteristic.CurrentAmbientLightLevel,
                 () => device.ambientLight || 0);
         }
 
         if (device.interfaces.includes(ScryptedInterface.AudioSensor)) {
             const service = accessory.addService(Service.ContactSensor, device.name + ' Alarm Sound', 'AudioSensor');
+            setServiceName(service, `${device.name} Alarm Sound`);
             bindCharacteristic(device, ScryptedInterface.AudioSensor, service, Characteristic.ContactSensorState,
                 () => !!device.audioDetected);
         }
 
         if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
             const service = accessory.addService(Service.MotionSensor, device.name);
+            setServiceName(service, `${device.name} Motion`);
             bindCharacteristic(device, ScryptedInterface.MotionSensor, service, Characteristic.MotionDetected,
                 () => !!device.motionDetected, true);
         }
 
         if (device.interfaces.includes(ScryptedInterface.Thermometer)) {
             const service = accessory.addService(Service.TemperatureSensor, device.name);
+            setServiceName(service, `${device.name} Temperature`);
             bindCharacteristic(device, ScryptedInterface.Thermometer, service, Characteristic.CurrentTemperature,
                 () => device.temperature || 0);
         }
 
         if (device.interfaces.includes(ScryptedInterface.HumiditySensor)) {
             const service = accessory.addService(Service.HumiditySensor, device.name);
+            setServiceName(service, `${device.name} Humidity`);
             bindCharacteristic(device, ScryptedInterface.HumiditySensor, service, Characteristic.CurrentRelativeHumidity,
                 () => device.humidity || 0);
         }
 
         if (device.interfaces.includes(ScryptedInterface.FloodSensor)) {
             const service = accessory.addService(Service.LeakSensor, device.name);
+            setServiceName(service, `${device.name} Leak`);
             bindCharacteristic(device, ScryptedInterface.FloodSensor, service, Characteristic.LeakDetected,
                 () => !!device.flooded);
         }
 
         if (device.interfaces.includes(ScryptedInterface.AirQualitySensor)) {
             const service = accessory.addService(Service.AirQualitySensor, device.name);
+            setServiceName(service, `${device.name} Air Quality`);
             bindCharacteristic(device, ScryptedInterface.AirQualitySensor, service, Characteristic.AirQuality,
                 () => airQualityToHomekit(device.airQuality));
           
@@ -130,6 +141,7 @@ addSupportedType({
 
         if (device.interfaces.includes(ScryptedInterface.CO2Sensor)) {
             const service = accessory.addService(Service.CarbonDioxideSensor, device.name);
+            setServiceName(service, `${device.name} Carbon Dioxide`);
             bindCharacteristic(device, ScryptedInterface.CO2Sensor, service, Characteristic.CarbonDioxideLevel,
                 () => device.co2ppm || 0);
             bindCharacteristic(device, ScryptedInterface.CO2Sensor, service, Characteristic.CarbonDioxideDetected,
