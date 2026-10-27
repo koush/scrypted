@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "module": "Node16",
-        "target": "ES2021",
+        "target": "ES2022",
         "resolveJsonModule": true,
         "moduleResolution": "Node16",
         "esModuleInterop": true,

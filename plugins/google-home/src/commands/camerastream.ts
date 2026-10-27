@@ -2,6 +2,7 @@ import { RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingOptions, RTCSigna
 import { executeResponse } from "../common";
 import { commandHandlers } from "../handlers";
 import { Deferred } from '@scrypted/common/src/deferred';
+import { randomBytes } from 'crypto';
 
 import sdk from "@scrypted/sdk";
 const { mediaManager, endpointManager, systemManager } = sdk;
@@ -16,7 +17,7 @@ export function canAccess(token: string) {
 commandHandlers['action.devices.commands.GetCameraStream'] = async (device: ScryptedDevice & RTCSignalingChannel, execution) => {
     const ret = executeResponse(device);
 
-    const cameraStreamAuthToken = `tok-${Math.round(Math.random() * 10000).toString(16)}`;
+    const cameraStreamAuthToken = `tok-${randomBytes(32).toString('hex')}`;
     tokens[cameraStreamAuthToken] = device.id;
 
     if (execution.params.SupportedStreamProtocols.length === 1 && execution.params.SupportedStreamProtocols.includes('webrtc')) {

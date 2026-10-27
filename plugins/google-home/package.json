@@ -50,5 +50,5 @@
       "@types/node": "^22.13.11",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.61"
+   "version": "0.0.62"
 }
