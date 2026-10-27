@@ -43,6 +43,7 @@ import { ClusterForkService } from './services/cluster-fork';
 import { CORSControl } from './services/cors';
 import { EnvControl } from './services/env';
 import { Info } from './services/info';
+import { OIDCService } from './services/oidc';
 import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
@@ -91,6 +92,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     corsControl = new CORSControl(this);
     addressSettings = new AddressSettings(this);
     usersService = new UsersService(this);
+    oidcService = new OIDCService(this);
     clusterFork = new ClusterForkService(this);
     envControl = new EnvControl();
     info = new Info();
@@ -359,6 +361,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 return this.addressSettings;
             case "users":
                 return this.usersService;
+            case 'oidc':
+                return this.oidcService;
             case 'backup':
                 return this.backup;
             case 'cluster-fork':
