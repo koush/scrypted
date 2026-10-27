@@ -6,7 +6,7 @@ import { httpFetch } from '../../../server/src/fetch/http-fetch';
 
 export async function installCloudflared() {
     const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
-    const version = 6;
+    const version = 7;
     const cloudflareD = path.join(pluginVolume, 'cloudflare.d', `v${version}`, `${process.platform}-${process.arch}`);
     const bin = path.join(cloudflareD, cloudflared.bin);
 

@@ -2,7 +2,7 @@ import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { HttpRequest, HttpRequestHandler, HttpResponse, MediaConverter, MediaObject, MediaObjectOptions, OauthClient, PushHandler, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from "@scrypted/sdk";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import bpmux from 'bpmux';
-import { ChildProcess } from "child_process";
+import { ChildProcess, execFile } from "child_process";
 import * as cloudflared from 'cloudflared';
 import crypto from 'crypto';
 import { once } from 'events';
@@ -1024,6 +1024,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 this.console.log('starting cloudflared');
                 this.cloudflared = await backOff(async () => {
                     const { cloudflareD, bin } = await installCloudflared();
+                    execFile(bin, ['-v'], (error, stdout, stderr) => {
+                        if (error)
+                            this.console.error('cloudflared version check failed', error);
+                        else
+                            this.console.log((stdout || stderr).trim());
+                    });
 
                     if (this.storageSettings.values.cloudflaredTunnelCredentials && this.storageSettings.values.cloudflaredTunnelCustomDomain) {
                         const tunnelUrl = `http://127.0.0.1:${quickTunnelPort}`;
