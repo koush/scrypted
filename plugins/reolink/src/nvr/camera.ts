@@ -5,6 +5,7 @@ import { createRtspMediaStreamOptions, RtspSmartCamera, UrlMediaStreamOptions } 
 import { connectCameraAPI, OnvifCameraAPI } from '../onvif-api';
 import { OnvifIntercom } from '../onvif-intercom';
 import { AIState, BatteryInfoResponse, DeviceStatusResponse, Enc, EventsResponse } from './api';
+import { isReolinkDoorbell } from './doorbell-events';
 import { ReolinkNvrDevice } from './nvr';
 
 export const moToB64 = async (mo: MediaObject) => {
@@ -102,8 +103,23 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     lastSnapshotTaken: number;
     nvrDevice: ReolinkNvrDevice;
     abilities: any;
+    doorbellTimeout: NodeJS.Timeout;
+    private initTimeout: NodeJS.Timeout;
+    private released = false;
+    private detectedDoorbell = false;
 
     storageSettings = new StorageSettings(this, {
+        doorbell: {
+            title: 'Doorbell',
+            description: 'This channel is a Reolink Doorbell. Detected automatically from the camera model; enable manually if the model is not recognized.',
+            type: 'boolean',
+            mapGet: value => {
+                const channelInfo = this.getDeviceData()?.channelInfo;
+                if (typeof channelInfo?.typeInfo === 'string')
+                    this.detectedDoorbell = isReolinkDoorbell(channelInfo);
+                return value ?? this.detectedDoorbell;
+            },
+        },
         debugEvents: {
             title: 'Debug Events',
             type: 'boolean',
@@ -183,7 +199,9 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             this.nvrDevice.cameraNativeMap.set(this.nativeId, this);
         }
 
-        setTimeout(async () => {
+        this.initTimeout = setTimeout(async () => {
+            if (!this.isAvailable())
+                return;
             await this.init();
         }, 2000);
     }
@@ -196,29 +214,22 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         const logger = this.getLogger();
 
         while (!this.nvrDevice.client || !this.nvrDevice.client.loggedIn) {
+            if (!this.isAvailable())
+                return;
             logger.log('Waiting for plugin connection');
             await sleep(3000);
         }
 
+        if (!this.isAvailable())
+            return;
         await this.reportDevices();
-        this.updateDeviceInfo();
+        if (!this.isAvailable())
+            return;
         this.updatePtzCaps();
 
-        const interfaces = await this.getDeviceInterfaces();
-
-        const device = {
-            nativeId: this.nativeId,
-            providerNativeId: this.nvrDevice.nativeId,
-            name: this.name,
-            interfaces,
-            type: this.type,
-            info: this.info,
-        };
-
-        logger.log(`Updating device interfaces: ${JSON.stringify(interfaces)}`);
-
-        await sdk.deviceManager.onDeviceDiscovered(device);
-        // await this.nvrDevice.plugin.updateDevice(this.nativeId, this.name, interfaces, ScryptedDeviceType.Camera);
+        await this.updateDevice();
+        if (!this.isAvailable())
+            return;
 
         if (this.hasBattery() && !this.storageSettings.getItem('prebufferSet')) {
             const device = sdk.systemManager.getDeviceById<Settings>(this.id);
@@ -226,6 +237,30 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             await device.putSetting('prebuffer:enabledStreams', '[]');
             this.storageSettings.values.prebufferSet = true;
         }
+    }
+
+    async updateDevice() {
+        if (!this.isAvailable())
+            return;
+        this.updateDeviceInfo();
+        const interfaces = await this.getDeviceInterfaces();
+        if (!this.isAvailable())
+            return;
+
+        const device = {
+            nativeId: this.nativeId,
+            providerNativeId: this.nvrDevice.nativeId,
+            name: this.name,
+            interfaces,
+            type: this.isDoorbell() ? ScryptedDeviceType.Doorbell : ScryptedDeviceType.Camera,
+            info: this.info,
+        };
+
+        this.getLogger().log(`Updating device interfaces: ${JSON.stringify(interfaces)}`);
+
+        await sdk.deviceManager.onDeviceDiscovered(device);
+        if (!this.isDoorbell())
+            this.clearDoorbellState();
     }
 
     getClient() {
@@ -314,6 +349,45 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     getDeviceData() {
         const channel = this.getRtspChannel();
         return this.nvrDevice.storageSettings.values.devicesData?.[channel];
+    }
+
+    isAvailable() {
+        // Re-adopting the same nativeId creates a new Scrypted ID. A cached
+        // camera can still point at the old, deleted state even after re-adoption.
+        return !this.released && sdk.deviceManager.getNativeIds().includes(this.nativeId)
+            && !!sdk.systemManager.getDeviceById(this.id);
+    }
+
+    isDoorbell() {
+        return this.isAvailable() && this.storageSettings.values.doorbell;
+    }
+
+    clearDoorbellState() {
+        clearTimeout(this.doorbellTimeout);
+        this.doorbellTimeout = undefined;
+        if (this.isAvailable() && this.binaryState)
+            this.binaryState = false;
+    }
+
+    processDoorbellState(state: boolean) {
+        if (!this.isAvailable())
+            return;
+        if (this.storageSettings.values.debugEvents)
+            this.getLogger().debug('Doorbell button', state ? 'pressed' : 'released');
+        clearTimeout(this.doorbellTimeout);
+        this.doorbellTimeout = undefined;
+        this.binaryState = state;
+        if (state)
+            this.doorbellTimeout = setTimeout(() => this.clearDoorbellState(), 5000);
+    }
+
+    release() {
+        // Scrypted may already have removed this device's state and storage.
+        // Only touch local resources here, never SDK-backed device properties.
+        this.released = true;
+        clearTimeout(this.initTimeout);
+        clearTimeout(this.motionTimeout);
+        this.clearDoorbellState();
     }
 
     async getObjectTypes(): Promise<ObjectDetectionTypes> {
@@ -409,6 +483,10 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             ...this.nvrDevice.plugin.getAdditionalInterfaces(),
         ];
 
+        if (this.isDoorbell()) {
+            interfaces.push(ScryptedInterface.BinarySensor);
+        }
+
         try {
             if (this.storageSettings.values.useOnvifTwoWayAudio) {
                 interfaces.push(
@@ -492,7 +570,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
         info.serialNumber = deviceData?.serial;
         info.firmware = deviceData?.firmVer;
         info.version = deviceData?.boardInfo;
-        info.model = deviceData?.typeInfo;
+        info.model = deviceData?.channelInfo?.typeInfo ?? info.model;
         info.manufacturer = 'Reolink';
         info.managementUrl = `http://${ip}`;
         this.info = info;
@@ -773,6 +851,8 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     async putSetting(key: string, value: string) {
         if (this.storageSettings.keys[key]) {
             await this.storageSettings.putSetting(key, value);
+            if (key === 'doorbell')
+                await this.updateDevice();
         }
         else {
             await super.putSetting(key, value);
