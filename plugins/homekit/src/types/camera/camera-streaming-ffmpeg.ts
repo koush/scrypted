@@ -1,5 +1,5 @@
 import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
-import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
+import { getTranscodeDecoderArgs, getTranscodeEncoderArgs } from './camera-transcode-args';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { getSpsPps } from '@scrypted/common/src/sdp-utils';
@@ -46,7 +46,8 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // encoder args
     if (debugMode.video) {
         if (debugMode.video) {
-            videoArgs.push(...getDebugModeH264EncoderArgs());
+            videoArgs.push(...getTranscodeEncoderArgs());
+            ffmpegInput = { ...ffmpegInput, inputArguments: [...getTranscodeDecoderArgs(), ...(ffmpegInput.inputArguments || [])] };
         }
         const videoRecordingFilter = `scale=w='min(${request.video.width},iw)':h=-2`;
         addVideoFilterArguments(videoArgs, videoRecordingFilter);
