@@ -587,6 +587,10 @@ export class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, 
             }
             else if (nativeId.startsWith('0.')) {
                 ret = new MqttDevice(this, nativeId);
+                // register before the async bind: the runtime probes the device while
+                // bind() is still running, which would otherwise create a second instance
+                // with its own client and script.
+                this.devices.set(nativeId, ret);
                 await ret.bind();
             }
             if (ret)
