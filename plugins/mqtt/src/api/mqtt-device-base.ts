@@ -88,8 +88,8 @@ export class MqttDeviceBase extends ScriptableDeviceBase implements Settings {
 
         const client = this.client = connect(urlWithoutPath.toString(), {
             rejectUnauthorized: false,
-            username: this.storage.getItem('username') || undefined,
-            password: this.storage.getItem('password') || undefined,
+            username,
+            password,
         });
         client.setMaxListeners(Infinity);
 
