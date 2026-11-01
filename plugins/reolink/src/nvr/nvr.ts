@@ -160,6 +160,11 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                     this.storageSettings.values.devicesData = devicesData;
 
                     await this.discoverDevices(true);
+
+                    // Re-sync each camera's floodlight / PIR / siren children against the
+                    // fresh abilities, so a channel that was offline at startup gets them
+                    // back without a plugin restart (no-op when nothing changed).
+                    await this.forEachCamera('reportDevices', camera => camera.reportDevices());
                 }
 
                 const devicesMap = new Map<number, DeviceInputData>();
