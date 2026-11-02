@@ -63,6 +63,9 @@ export class AuthRequst {
                             return;
                         }
 
+                        // Drain the challenge body, otherwise its socket stays open and the
+                        // station refuses new connections once ~50 are leaked.
+                        resp.resume();
                         const newAuth = this.createAuth(resp.headers['www-authenticate'], !!this.auth);
                         // Clear cached auth to avoid stale nonce reuse
                         this.auth = undefined;
