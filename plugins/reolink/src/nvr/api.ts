@@ -907,9 +907,9 @@ export class ReolinkNvrClient {
             method: 'POST',
         }, this.createReadable(channelsBody));
 
-        const channels = channelsResponse.body?.[0]?.value?.status
-            ?.filter(elem => !!elem.uid)
-            ?.map(elem => elem.channel)
+        const channels: number[] = channelsResponse.body?.[0]?.value?.status
+            ?.filter(elem => !!elem?.uid)
+            ?.map(elem => elem.channel) ?? [];
 
         return {
             channels,
@@ -1036,9 +1036,9 @@ export class ReolinkNvrClient {
         for (const channel of channels) {
             const indexMultilpier = currentChannelIndex * 3;
 
-            const chnInfoItem = response.body[indexMultilpier];
-            const aiItem = response.body[indexMultilpier + 1];
-            const encItem = response.body[indexMultilpier + 2];
+            const chnInfoItem = response.body?.[indexMultilpier];
+            const aiItem = response.body?.[indexMultilpier + 1];
+            const encItem = response.body?.[indexMultilpier + 2];
 
             const channelStatus = channelsResponse.body?.[0]?.value?.status?.find(item => item?.channel === channel);
 
