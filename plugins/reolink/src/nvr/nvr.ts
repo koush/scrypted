@@ -4,6 +4,7 @@ import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { DevInfo } from "../probe";
 import { ReolinkNvrCamera } from "./camera";
 import { DeviceInputData, HTTPS_API_SETTING_DESCRIPTION, ReolinkNvrClient } from "./api";
+import { isReolinkDoorbell, ReolinkDoorbellEvents } from './doorbell-events';
 
 export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, DeviceDiscovery, DeviceProvider, Reboot {
     storageSettings = new StorageSettings(this, {
@@ -64,6 +65,14 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
             type: 'number',
             onPut: async () => await this.reinit()
         },
+        onvifPort: {
+            subgroup: 'Advanced',
+            title: 'ONVIF Port',
+            description: 'ONVIF service port for doorbell event subscriptions. Enable ONVIF on the NVR if available. This is separate from the API port.',
+            type: 'number',
+            defaultValue: 8000,
+            onPut: () => this.resetDoorbellEvents(),
+        },
         rtmpPort: {
             subgroup: 'Advanced',
             title: 'RTMP Port',
@@ -104,6 +113,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
     lastDevicesStatusCheck = undefined;
     cameraNativeMap = new Map<string, ReolinkNvrCamera>();
     processing = false;
+    doorbellEvents: ReolinkDoorbellEvents;
 
     constructor(nativeId: string, plugin: ReolinkProvider) {
         super(nativeId);
@@ -124,6 +134,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
     }
 
     async reinit() {
+        this.resetDoorbellEvents();
         this.client = undefined;
         // await this.init();
     }
@@ -163,11 +174,12 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                 }
 
                 const devicesMap = new Map<number, DeviceInputData>();
+                this.updateDoorbellEvents();
                 let anyBattery = false;
                 let anyAwaken = false;
 
                 this.cameraNativeMap.forEach((camera) => {
-                    if (camera) {
+                    if (camera?.isAvailable()) {
                         const channel = camera.storageSettings.values.rtspChannel;
 
                         const abilities = camera.getAbilities();
@@ -205,7 +217,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                         logger.debug(`Events call result: ${JSON.stringify(eventsRes)}`);
                     }
                     this.cameraNativeMap.forEach((camera) => {
-                        if (camera) {
+                        if (camera?.isAvailable()) {
                             const channel = camera.storageSettings.values.rtspChannel;
                             const cameraEventsData = eventsRes?.parsed[channel];
                             if (cameraEventsData) {
@@ -223,7 +235,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                     }
 
                     this.cameraNativeMap.forEach((camera) => {
-                        if (camera) {
+                        if (camera?.isAvailable()) {
                             const channel = camera.storageSettings.values.rtspChannel;
                             const cameraBatteryData = batteryInfoData[channel];
                             if (cameraBatteryData) {
@@ -243,7 +255,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                         }
 
                         this.cameraNativeMap.forEach((camera) => {
-                            if (camera) {
+                            if (camera?.isAvailable()) {
                                 const channel = camera.storageSettings.values.rtspChannel;
                                 const cameraDeviceStatusData = deviceStatusData[channel];
                                 if (cameraDeviceStatusData) {
@@ -280,6 +292,38 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
         return this.client;
     }
 
+    resetDoorbellEvents() {
+        this.doorbellEvents?.stop();
+        this.doorbellEvents = undefined;
+    }
+
+    updateDoorbellEvents() {
+        // A device can disappear before releaseDevice runs. Prune it before
+        // asking any camera for SDK-backed storage or state.
+        for (const [nativeId, camera] of this.cameraNativeMap) {
+            if (!camera.isAvailable()) {
+                this.cameraNativeMap.delete(nativeId);
+                camera.release();
+            }
+        }
+        const hasDoorbell = [...this.cameraNativeMap.values()].some(camera => camera.isDoorbell());
+        if (!hasDoorbell) {
+            this.resetDoorbellEvents();
+            return;
+        }
+        if (!this.doorbellEvents) {
+            const { ipAddress, onvifPort, username, password } = this.storageSettings.values;
+            this.doorbellEvents = new ReolinkDoorbellEvents(`${ipAddress}:${onvifPort || 8000}`,
+                username, password, this.console, (channel, state) => {
+                    for (const camera of this.cameraNativeMap.values()) {
+                        if (camera.isDoorbell() && Number(camera.getRtspChannel()) === channel)
+                            camera.processDoorbellState(state);
+                    }
+                }, () => this.storageSettings.values.debugEvents);
+        }
+        void this.doorbellEvents.start();
+    }
+
     updateDeviceInfo(devInfo: DevInfo) {
         const info = this.info || {};
         info.ip = this.storageSettings.values.ipAddress;
@@ -304,11 +348,19 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
 
 
     async releaseDevice(id: string, nativeId: string) {
+        const camera = this.cameraNativeMap.get(nativeId);
         this.cameraNativeMap.delete(nativeId);
+        camera?.release();
+        this.updateDoorbellEvents();
     }
 
     async getDevice(nativeId: string): Promise<ReolinkNvrCamera> {
         let device = this.cameraNativeMap.get(nativeId);
+        if (device && !device.isAvailable()) {
+            this.cameraNativeMap.delete(nativeId);
+            device.release();
+            device = undefined;
+        }
 
         if (!device) {
             device = new ReolinkNvrCamera(nativeId, this);
@@ -337,27 +389,39 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
     async syncEntitiesFromRemote() {
         const api = this.getClient();
         const { channels, devicesData } = await api.getDevicesInfo();
+        this.storageSettings.values.devicesData = devicesData;
 
         for (const channel of channels) {
-            const { channelStatus, channelInfo } = devicesData[channel];
+            const { channelStatus, channelInfo } = devicesData[channel] || {};
+            if (!channelStatus?.uid) {
+                this.console.warn('Skipping NVR channel without a device identity:', channel);
+                continue;
+            }
             const name = channelStatus.name || `Channel ${channel}`;
 
             const nativeId = this.buildNativeId(channelStatus.uid);
+            const isDoorbell = isReolinkDoorbell(channelInfo);
+            const interfaces = this.getCameraInterfaces() ?? [];
+            if (isDoorbell) {
+                interfaces.push(ScryptedInterface.BinarySensor);
+            }
             const device: Device = {
                 nativeId,
                 name,
                 providerNativeId: this.nativeId,
-                interfaces: this.getCameraInterfaces() ?? [],
-                type: ScryptedDeviceType.Camera,
+                interfaces,
+                type: isDoorbell ? ScryptedDeviceType.Doorbell : ScryptedDeviceType.Camera,
                 info: {
                     manufacturer: 'Reolink',
-                    model: channelInfo.typeInfo
+                    model: channelInfo?.typeInfo
                 }
             };
 
             if (sdk.deviceManager.getNativeIds().includes(nativeId)) {
-                // const device = sdk.systemManager.getDeviceById<Device>(this.pluginId, nativeId);
-                // sdk.deviceManager.onDeviceDiscovered(device);
+                const camera = this.cameraNativeMap.has(nativeId) || isDoorbell
+                    ? await this.getDevice(nativeId) : undefined;
+                if (camera && (camera.isDoorbell() || camera.type === ScryptedDeviceType.Doorbell))
+                    await camera.updateDevice();
                 continue;
             }
 
