@@ -7,6 +7,7 @@ import { Destroyable } from "../../rtsp/src/rtsp";
 import { EventEmitter } from 'events';
 import { getDeviceInfo } from './probe';
 import { AuthRequestOptions, AuthRequst, AuthRequestBody } from './auth-request'
+import { inlineAcsEvent } from './alert-events';
 import { OutgoingHttpHeaders } from 'http';
 import libip from 'ip';
 import xml2js from 'xml2js';
@@ -1206,7 +1207,13 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
         }
 
         this.console.debug (`AlertStream JSON: ${JSON.stringify (eventData, null, 2)}`);
-    
+
+        const inline = inlineAcsEvent (eventData);
+        if (inline) {
+            this.processAcsEvent ({ ...inline, time: '', remoteHostAddr: '', mask: '' });
+            return;
+        }
+
         // Poll ACS events (errors are handled internally)
         this.pollAndProcessAcsEvents (this.lastAcsEventTime);
     }
