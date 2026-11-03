@@ -1,5 +1,5 @@
 
-import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
+import { getTranscodeDecoderArgs, getTranscodeEncoderArgs } from './camera-transcode-args';
 import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { FFmpegFragmentedMP4Session, parseFragmentedMP4, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
@@ -184,6 +184,8 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         // which Ring cameras send, and outputs loud bursts of noise. libopus decodes them correctly.
         if (audioCodec?.toLowerCase() === 'opus')
             inputArguments.push('-c:a', 'libopus');
+        if (debugMode.video)
+            inputArguments.push(...getTranscodeDecoderArgs());
         inputArguments.push(...ffmpegInput.inputArguments);
 
         if (noAudio) {
@@ -226,7 +228,7 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         const videoArgs: string[] = [];
         if (debugMode.video) {
             if (debugMode.video) {
-                videoArgs.push(...getDebugModeH264EncoderArgs());
+                videoArgs.push(...getTranscodeEncoderArgs());
             }
             const videoRecordingFilter = `scale=w='min(${configuration.videoCodec.resolution[0]},iw)':h=-2`;
             addVideoFilterArguments(videoArgs, videoRecordingFilter);

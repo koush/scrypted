@@ -1,3 +1,4 @@
+import { TRANSCODE_DECODER_CHOICES, TRANSCODE_DECODER_SOFTWARE, TRANSCODE_ENCODER_CHOICES, TRANSCODE_ENCODER_SOFTWARE } from './types/camera/camera-transcode-args';
 import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import sdk, { DeviceProvider, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings, WritableDeviceState } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
@@ -106,6 +107,20 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     choices: [...this.seenConnections],
                 }
             }
+        },
+        transcodeEncoder: {
+            group: 'Transcoding',
+            title: 'Transcode Video Encoder',
+            description: 'Encoder used when a camera has "Transcode Video" enabled (live streaming and HomeKit Secure Video). Hardware encoders need the matching GPU and an FFmpeg build that supports them.',
+            choices: TRANSCODE_ENCODER_CHOICES,
+            defaultValue: TRANSCODE_ENCODER_SOFTWARE,
+        },
+        transcodeDecoder: {
+            group: 'Transcoding',
+            title: 'Transcode Video Decoder',
+            description: 'Hardware decoder used when transcoding. Helps most with H.265 and 4K sources.',
+            choices: TRANSCODE_DECODER_CHOICES,
+            defaultValue: TRANSCODE_DECODER_SOFTWARE,
         },
         lastKnownHomeHub: {
             hide: true,
