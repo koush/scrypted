@@ -179,6 +179,16 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
                 title: 'Speech Enhancement',
                 value: this.storage.getItem('audioSpeechEnhancement') === 'true',
                 description: 'Apply band filtering and dynamic normalization to both audio streams.',
+            },
+            {
+                key: 'continuousAudio',
+                type: 'boolean',
+                subgroup: 'Advanced',
+                title: 'Continuous Audio',
+                value: (this.storage.getItem('continuousAudio') ?? 'true') === 'true',
+                description: 'Continuously stream audio from the Doorbird microphone. '
+                    + 'When disabled, audio is only available during two-way intercom. '
+                    + 'Enable this for HomeKit Secure Video recording audio and live view audio.',
             }
         ];
     }
@@ -476,35 +486,56 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         if (this.audioSilenceProcess)
             return;
 
-        this.console.log('Doorbird: starting audio silence generator...')
-
         const ffmpegPath = await mediaManager.getFFmpegPath();
-        const ffmpegArgs = [
-            // Suppress printing the FFmpeg banner.
-            '-hide_banner',
-            // Disable periodic progress/statistics logging.
-            '-nostats',
-            // Read input at its native frame rate to ensure real-time processing.
-            '-re',
-            // Use the lavfi (libavfilter) virtual input device.
-            '-f', 'lavfi',
-            // Specify the input source as a null audio source (silence) with a sample rate of 8000 Hz and mono channel layout.
-            '-i', 'anullsrc=r=8000:cl=mono',
+        let ffmpegArgs: string[];
 
-            // --- Low-latency Output Flags ---
-            // Bypass FFmpeg's internal I/O buffering, writing directly to the output pipe.
-            '-avioflags', 'direct',
-            // Force flushing packets to the output immediately after encoding.
-            '-flush_packets', '1',
-            // Set the maximum demux-decode delay to zero, preventing buffering in the muxer.
-            '-muxdelay', '0',
-
-            // --- Output Format Specification ---
-            // Force the output container format to raw µ-law.
-            '-f', 'mulaw',
-            // Output the processed audio to file descriptor 3 (the pipe).
-            'pipe:3'
-        ];
+        if (this.getContinuousAudio()) {
+            // Connect to the Doorbird's microphone for continuous audio.
+            // The Doorbird does not include audio in its RTSP video stream — audio is only
+            // available via the separate HTTP audio-receive.cgi endpoint. Without this,
+            // HomeKit live view and HKSV recordings have no audio.
+            const audioRxUrl = `${this.getHttpBaseAddress()}/bha-api/audio-receive.cgi`;
+            this.console.log('Doorbird: starting continuous audio receiver...');
+            ffmpegArgs = [
+                '-hide_banner',
+                '-nostats',
+                '-fflags', '+flush_packets+nobuffer',
+                '-analyzeduration', '0',
+                '-probesize', '32',
+                // Auto-reconnect if the HTTP stream drops or the Doorbird reboots.
+                '-reconnect', '1',
+                '-reconnect_at_eof', '1',
+                '-reconnect_streamed', '1',
+                '-reconnect_delay_max', '5',
+                '-re',
+                '-ar', '8000',
+                '-ac', '1',
+                '-f', 'mulaw',
+                '-i', audioRxUrl,
+                '-flags', '+global_header+low_delay',
+                '-avioflags', 'direct',
+                '-flush_packets', '1',
+                '-muxdelay', '0',
+                '-acodec', 'copy',
+                '-f', 'mulaw',
+                'pipe:3'
+            ];
+        } else {
+            // Generate silence as a placeholder audio track.
+            this.console.log('Doorbird: starting audio silence generator...');
+            ffmpegArgs = [
+                '-hide_banner',
+                '-nostats',
+                '-re',
+                '-f', 'lavfi',
+                '-i', 'anullsrc=r=8000:cl=mono',
+                '-avioflags', 'direct',
+                '-flush_packets', '1',
+                '-muxdelay', '0',
+                '-f', 'mulaw',
+                'pipe:3'
+            ];
+        }
 
         safePrintFFmpegArguments(console, ffmpegArgs);
         const cp = child_process.spawn(ffmpegPath, ffmpegArgs, {
@@ -514,8 +545,14 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
         ffmpegLogInitialOutput(console, cp);
 
         cp.on('exit', () => {
-            this.console.log('Doorbird: audio silence generator ended.')
             this.audioSilenceProcess = undefined;
+            if (this.getContinuousAudio() && this.audioRXClientSocket) {
+                // Auto-restart if the connection drops and the socket is still active.
+                this.console.log('Doorbird: continuous audio receiver ended, restarting...');
+                setTimeout(() => this.startSilenceGenerator(), 2000);
+            } else {
+                this.console.log('Doorbird: audio silence generator ended.');
+            }
         });
         cp.stdout.on('data', data => this.console.log(data.toString()));
         cp.stderr.on('data', data => this.console.log(data.toString()));
@@ -618,6 +655,10 @@ class DoorbirdCamera extends ScryptedDeviceBase implements Intercom, Camera, Vid
 
     getAudioSpeechEnhancement(): boolean {
         return this.storage.getItem('audioSpeechEnhancement') === 'true';
+    }
+
+    getContinuousAudio(): boolean {
+        return (this.storage.getItem('continuousAudio') ?? 'true') === 'true';
     }
 
     private getAudioFilter() {
