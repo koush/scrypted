@@ -594,6 +594,11 @@ async function start(mainFilename: string, options?: {
         };
     }
 
+    async function updateUser(user: ScryptedUser) {
+        await db.upsert(user);
+        scrypted.usersService.users.set(user._id, user);
+    }
+
     app.post('/login', async (req, res) => {
         const { username, password, change_password, maxAge: maxAgeRequested } = req.body;
         const timestamp = Date.now();
@@ -633,8 +638,7 @@ async function start(mainFilename: string, options?: {
 
             if (change_password) {
                 setScryptedUserPassword(user, change_password, timestamp);
-                await db.upsert(user);
-                scrypted.usersService.users.set(username, user);
+                await updateUser(user);
             }
 
             res.send({
@@ -726,7 +730,7 @@ async function start(mainFilename: string, options?: {
             const user = await db.tryGet(ScryptedUser, username) as ScryptedUser;
             if (!user.token) {
                 user.token = crypto.randomBytes(16).toString('hex');
-                await db.upsert(user);
+                await updateUser(user);
             }
 
             const userToken = new UserToken(user._id, user.aclId, Date.now());
