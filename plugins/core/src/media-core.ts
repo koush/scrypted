@@ -1,6 +1,7 @@
 import path from 'path';
 import { ScryptedDeviceBase, DeviceProvider, ScryptedInterface, ScryptedDeviceType, BufferConverter, MediaObject, VideoCamera, Camera, ScryptedMimeTypes, RequestMediaStreamOptions, HttpRequestHandler, HttpRequest, HttpResponse, RequestMediaObject } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
+import { checkUserId } from '@scrypted/sdk/acl';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import { RequestMediaObjectHost, FileHost, BufferHost } from './converters';
 import url from 'url';
@@ -74,6 +75,13 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
         }
         const pathname = request.url.substring(request.rootPath.length);
         const [_, id, iface] = pathname.split('/');
+        if (!request.username || (request.aclId && !await checkUserId(id, request.aclId))) {
+            response.send('', {
+                code: 401,
+            });
+            return;
+        }
+
         try {
             if (iface !== ScryptedInterface.Camera)
                 throw new Error();
