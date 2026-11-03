@@ -101,7 +101,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     lastB64Snapshot: string;
     lastSnapshotTaken: number;
     nvrDevice: ReolinkNvrDevice;
-    abilities: any;
+    lastReportedChildren: string;
 
     storageSettings = new StorageSettings(this, {
         debugEvents: {
@@ -287,12 +287,12 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     getAbilities() {
-        if (!this.abilities) {
-            const channel = Number(this.getRtspChannel());
-            this.abilities = this.nvrDevice.storageSettings.values.abilities?.Ability?.abilityChn?.[channel];
-        }
-
-        return this.abilities;
+        // Read through to the hub's latest GetAbility payload (the NVR refreshes it every
+        // 5 minutes) rather than caching the first answer forever: a channel that is
+        // offline at startup reports reduced abilities, and the camera must see them
+        // come back without a plugin restart.
+        const channel = Number(this.getRtspChannel());
+        return this.nvrDevice.storageSettings.values.abilities?.Ability?.abilityChn?.[channel];
     }
 
     getEncoderSettings() {
@@ -424,7 +424,12 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             if ((await this.getObjectTypes()).classes.length > 0) {
                 interfaces.push(ScryptedInterface.ObjectDetector);
             }
-            if (this.hasSiren() || this.hasFloodlight() || this.hasPirEvents())
+            // Stay a DeviceProvider while any child still exists in Scrypted (not just while
+            // the hub currently advertises the ability), or the server cannot deliver
+            // releaseDevice() when it removes a child.
+            const nativeIds = sdk.deviceManager.getNativeIds();
+            const hasChildren = ['-siren', '-floodlight', '-pir'].some(suffix => nativeIds.includes(`${this.nativeId}${suffix}`));
+            if (this.hasSiren() || this.hasFloodlight() || this.hasPirEvents() || hasChildren)
                 interfaces.push(ScryptedInterface.DeviceProvider);
             if (this.hasBattery()) {
                 interfaces.push(ScryptedInterface.Battery, ScryptedInterface.Sleep);
@@ -463,13 +468,11 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             logger.info(`Device status received: ${JSON.stringify(data)}`);
         }
 
-        if (this.floodlight && floodlightEnabled !== this.floodlight.on) {
-            this.floodlight.on = floodlightEnabled;
-        }
+        if (this.floodlight && !this.trySetChildOn(this.floodlight, floodlightEnabled))
+            delete this.floodlight;
 
-        if (this.pirSensor && pirEnabled !== this.pirSensor.on) {
-            this.pirSensor.on = pirEnabled;
-        }
+        if (this.pirSensor && !this.trySetChildOn(this.pirSensor, pirEnabled))
+            delete this.pirSensor;
 
         if (ptzPresets) {
             this.storageSettings.values.cachedPresets = ptzPresets
@@ -477,6 +480,24 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
 
         if (osd) {
             this.storageSettings.values.cachedOsd = osd
+        }
+    }
+
+    /**
+     * Pushes a polled on/off value into a child device. Returns false if the child is
+     * dead: the SDK's lazy state lookup throws `Cannot read properties of undefined
+     * (reading 'id')` for a nativeId the server has already removed, and letting that
+     * escape aborted the whole status update (PTZ presets and OSD included) on every
+     * 15 s poll. The caller drops the instance so the next poll is clean.
+     */
+    private trySetChildOn(child: ScryptedDeviceBase & OnOff, on: boolean) {
+        try {
+            if (on !== child.on)
+                child.on = on;
+            return true;
+        } catch (e) {
+            this.getLogger().warn(`Child device ${child.nativeId} is no longer available, dropping it:`, e?.message ?? e);
+            return false;
         }
     }
 
@@ -794,6 +815,24 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     async reportDevices() {
+        const logger = this.getLogger();
+
+        // The hub cannot describe a camera it has lost contact with. Observed on the Home
+        // Hub Pro with four battery cameras that ran flat: GetChannelstatus drops the
+        // channel's uid (so the plugin no longer has deviceData for it) and GetAbility
+        // returns an all-zero stub, so trusting them here deleted the floodlight / PIR /
+        // siren children. Treat "not listed", "offline" and "no abilities" all as unknown
+        // and leave the previously reported children alone until the camera is back.
+        const deviceData = this.getDeviceData();
+        const reason = !deviceData ? 'not listed by the hub'
+            : deviceData.channelStatus?.online === 0 ? 'offline'
+                : !this.getAbilities() ? 'missing abilities'
+                    : undefined;
+        if (reason) {
+            logger.log(`Not updating child devices: channel ${this.getRtspChannel()} is ${reason}`);
+            return;
+        }
+
         const hasSiren = this.hasSiren();
         const hasFloodlight = this.hasFloodlight();
         const hasPirEvents = this.hasPirEvents();
@@ -854,7 +893,25 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
             devices.push(pirDevice);
         }
 
-        sdk.deviceManager.onDevicesChanged({
+        // Drop cached instances of children we no longer report. The server removes the
+        // devices, but its releaseDevice() callback is not guaranteed to reach us
+        // (observed as "releaseDevice not implemented" at startup), and a stale instance
+        // throws from the SDK's lazy state lookup on every status poll.
+        if (!hasSiren)
+            delete this.siren;
+        if (!hasFloodlight)
+            delete this.floodlight;
+        if (!hasPirEvents)
+            delete this.pirSensor;
+
+        // reportDevices now also runs after every hub-info refresh; only bother the
+        // server when the set of children actually changed.
+        const reported = devices.map(d => d.nativeId).join(',');
+        if (reported === this.lastReportedChildren)
+            return;
+        this.lastReportedChildren = reported;
+
+        await sdk.deviceManager.onDevicesChanged({
             providerNativeId: this.nativeId,
             devices
         });

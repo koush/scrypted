@@ -160,6 +160,11 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                     this.storageSettings.values.devicesData = devicesData;
 
                     await this.discoverDevices(true);
+
+                    // Re-sync each camera's floodlight / PIR / siren children against the
+                    // fresh abilities, so a channel that was offline at startup gets them
+                    // back without a plugin restart (no-op when nothing changed).
+                    await this.forEachCamera('reportDevices', camera => camera.reportDevices());
                 }
 
                 const devicesMap = new Map<number, DeviceInputData>();
@@ -352,13 +357,36 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
 
     async syncEntitiesFromRemote() {
         const api = this.getClient();
+        const logger = this.getLogger();
         const { channels, devicesData } = await api.getDevicesInfo();
 
-        for (const channel of channels) {
-            const { channelStatus, channelInfo } = devicesData[channel];
+        for (const channel of channels ?? []) {
+            // A flaky hub answers in pieces: a channel can be listed without a uid, or
+            // GetChnTypeInfo can fail ("rcv failed", rspCode -17) so channelInfo is absent.
+            // Skip such channels instead of throwing; the next 5-minute fetch retries.
+            const { channelStatus, channelInfo } = devicesData?.[channel] ?? {};
+            if (!channelStatus?.uid) {
+                logger.log(`Skipping channel ${channel}: no uid in the hub's channel status`);
+                continue;
+            }
             const name = channelStatus.name || `Channel ${channel}`;
-
             const nativeId = this.buildNativeId(channelStatus.uid);
+
+            if (sdk.deviceManager.getNativeIds().includes(nativeId)) {
+                // const device = sdk.systemManager.getDeviceById<Device>(this.pluginId, nativeId);
+                // sdk.deviceManager.onDeviceDiscovered(device);
+                continue;
+            }
+
+            if (this.discoveredDevices.has(nativeId)) {
+                continue;
+            }
+
+            if (!channelInfo?.typeInfo) {
+                logger.log(`Deferring discovery of channel ${channel} (${name}): the hub did not return its type info`);
+                continue;
+            }
+
             const device: Device = {
                 nativeId,
                 name,
@@ -370,16 +398,6 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                     model: channelInfo.typeInfo
                 }
             };
-
-            if (sdk.deviceManager.getNativeIds().includes(nativeId)) {
-                // const device = sdk.systemManager.getDeviceById<Device>(this.pluginId, nativeId);
-                // sdk.deviceManager.onDeviceDiscovered(device);
-                continue;
-            }
-
-            if (this.discoveredDevices.has(nativeId)) {
-                continue;
-            }
 
             this.discoveredDevices.set(nativeId, {
                 device,
