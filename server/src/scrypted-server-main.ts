@@ -551,8 +551,10 @@ async function start(mainFilename: string, options?: {
             return undefined;
         try {
             const userToken = UserToken.validateToken(token);
-            if (scrypted.usersService.users.has(userToken.username))
-                return userToken;
+            const user = scrypted.usersService.users.get(userToken.username);
+            if (!user || userToken.timestamp < user.passwordDate || userToken.aclId !== user.aclId)
+                return undefined;
+            return userToken;
         }
         catch (e) {
             // console.warn('invalid token', e.message);
@@ -601,7 +603,6 @@ async function start(mainFilename: string, options?: {
 
     app.post('/login', async (req, res) => {
         const { username, password, change_password, maxAge: maxAgeRequested } = req.body;
-        const timestamp = Date.now();
         const maxAge = parseInt(maxAgeRequested) || ONE_DAY_MILLISECONDS;
         const alternateAddresses = await getAlternateAddresses();
 
@@ -627,7 +628,12 @@ async function start(mainFilename: string, options?: {
                 return;
             }
 
-            const userToken = new UserToken(username, user.aclId, timestamp, maxAge);
+            if (change_password) {
+                setScryptedUserPassword(user, change_password, Date.now());
+                await updateUser(user);
+            }
+
+            const userToken = new UserToken(username, user.aclId, Date.now(), maxAge);
             const login_user_token = userToken.toString();
             res.cookie(getLoginUserToken(req), login_user_token, {
                 maxAge,
@@ -635,11 +641,6 @@ async function start(mainFilename: string, options?: {
                 signed: true,
                 httpOnly: true,
             });
-
-            if (change_password) {
-                setScryptedUserPassword(user, change_password, timestamp);
-                await updateUser(user);
-            }
 
             res.send({
                 ...createTokens(userToken),
@@ -662,7 +663,7 @@ async function start(mainFilename: string, options?: {
         const user = await scrypted.usersService.addUserInternal(username, password, undefined);
         hasLogin = true;
 
-        const userToken = new UserToken(username, user.aclId, timestamp);
+        const userToken = new UserToken(username, user.aclId, Date.now());
         const login_user_token = userToken.toString();
         res.cookie(getLoginUserToken(req), login_user_token, {
             maxAge,
