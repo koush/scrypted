@@ -231,12 +231,17 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings,
         this.console.log('login success, trying discovery');
         this.locations = await this.api.getLocations();
 
-        const locationDevices: Device[] = this.locations.map(location => {
+        const locationDevices: Device[] = await Promise.all(this.locations.map(async location => {
             const interfaces = [
                 ScryptedInterface.DeviceProvider,
             ];
             let type = ScryptedDeviceType.DeviceProvider;
-            if (location.hasAlarmBaseStation) {
+            // locations without a base station can still switch Ring Location Modes (Home/Away/Disarmed) for their cameras
+            const supportsLocationModes = !location.hasAlarmBaseStation && await location.supportsLocationModeSwitching().catch(e => {
+                this.console.warn('could not read location mode', location.name, e);
+                return false;
+            });
+            if (location.hasAlarmBaseStation || supportsLocationModes) {
                 interfaces.push(ScryptedInterface.SecuritySystem);
                 type = ScryptedDeviceType.SecuritySystem;
             }
@@ -246,7 +251,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, Settings,
                 type,
                 interfaces,
             };
-        });
+        }));
 
         await deviceManager.onDevicesChanged({
             devices: locationDevices,
