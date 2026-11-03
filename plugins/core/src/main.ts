@@ -142,7 +142,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {
-                    name: 'Terminal Service',
+                    name: 'Scrypted Terminal',
                     nativeId: TerminalServiceNativeId,
                     interfaces: [ScryptedInterface.StreamService, ScryptedInterface.TTY, ScryptedInterface.ClusterForkInterface],
                     type: ScryptedDeviceType.Internal,
