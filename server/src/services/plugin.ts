@@ -172,6 +172,12 @@ export class PluginComponent {
         consoleServer.clear(pluginDevice.nativeId);
     }
 
+    async readConsole(id: string) {
+        const pluginDevice = this.scrypted.findPluginDeviceById(id)!;
+        const consoleServer = await this.scrypted.plugins[pluginDevice.pluginId]!.consoleServer;
+        return consoleServer.read(pluginDevice.nativeId).toString();
+    }
+
     async getRemoteServicePort(pluginId: string, name: string, ...args: any[]): Promise<[number, string]> {
         if (name === 'console') {
             const consoleServer = await this.scrypted.plugins[pluginId]!.consoleServer;

@@ -11,6 +11,7 @@ export interface ConsoleServer {
     writePort: number,
     destroy(): void;
     clear(nativeId: ScryptedNativeId): void;
+    read(nativeId: ScryptedNativeId): Buffer;
 }
 
 export interface StdPassThroughs {
@@ -305,11 +306,21 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
 
     return {
         clear(nativeId: ScryptedNativeId) {
+            if (!nativeId)
+                nativeId = undefined;
             const pt = outputs.get(nativeId);
             if (pt) {
                 pt.buffers = [];
                 addHeader(pt);
             }
+        },
+        read(nativeId: ScryptedNativeId) {
+            if (!nativeId)
+                nativeId = undefined;
+            const pt = outputs.get(nativeId);
+            if (!pt)
+                return Buffer.alloc(0);
+            return Buffer.concat(pt.buffers);
         },
         destroy() {
             for (const socket of sockets) {
