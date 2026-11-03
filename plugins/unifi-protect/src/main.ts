@@ -254,6 +254,10 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     }];
 
                     if (payload.type === 'ring') {
+                        // unchanged property values do not emit events, so a ring during
+                        // the ring timeout would be dropped. toggle the state to emit it.
+                        if (unifiCamera.binaryState)
+                            unifiCamera.binaryState = false;
                         unifiCamera.binaryState = true;
                         unifiCamera.lastRing = payload.start;
                         unifiCamera.resetRingTimeout();

@@ -1,9 +1,10 @@
 import sdk, { AdoptDevice, Device, DeviceCreatorSettings, DeviceDiscovery, DeviceInformation, DiscoveredDevice, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, PictureOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, SettingValue, VideoCamera, VideoCameraConfiguration, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
+import { EventEmitter } from "events";
 import { AddressInfo } from "net";
 import onvif from 'onvif';
 import { Stream } from "stream";
 import xml2js from 'xml2js';
-import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI } from "./onvif-api";
 import { autoconfigureSettings, configureCodecs, getCodecs } from "./onvif-configure";
 import { getMotionMonitorSettings, listenEvents } from "./onvif-events";
@@ -183,7 +184,20 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
     }
 
 
-    async listenEvents() {
+    async listenEvents(): Promise<Destroyable> {
+        if (this.storage.getItem('disableOnvifEvents') === 'true') {
+            // some cameras advertise the ONVIF events service but do not implement it,
+            // failing every subscription attempt. park the listen loop with an inert
+            // listener; periodic keepalive data prevents the 5 minute idle restart.
+            const events = new EventEmitter();
+            const keepalive = setInterval(() => events.emit('data', 'onvif events disabled'), 240000);
+            return {
+                on: events.on.bind(events),
+                emit: events.emit.bind(events),
+                destroy: () => clearInterval(keepalive),
+            };
+        }
+
         const client = await this.createClient();
         try {
             const eventTypes = await client.getEventTypes();
@@ -230,6 +244,14 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom, V
         const ret: Setting[] = [
             ...await super.getOtherSettings(),
             ...getMotionMonitorSettings(this.storage),
+            {
+                subgroup: 'Advanced',
+                title: 'Disable ONVIF Events',
+                type: 'boolean',
+                description: 'Disable the ONVIF event listener. Use on cameras whose firmware advertises but does not implement the events service (Optional Action Not Implemented faults).',
+                key: 'disableOnvifEvents',
+                value: (this.storage.getItem('disableOnvifEvents') === 'true').toString(),
+            },
             {
                 subgroup: 'Advanced',
                 title: 'Onvif Doorbell',
