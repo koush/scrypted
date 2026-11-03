@@ -63,7 +63,7 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
         const nativeId = 'script:' + randomBytes(8).toString('hex');
         await this.reportScript(nativeId, name?.toString());
         if (labels?.length)
-            new Script(nativeId).clusterLabels = labels;
+            await new Script(nativeId).setClusterLabels(labels);
         return nativeId;
     }
 
@@ -124,11 +124,12 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
             let script = new Script(nativeId);
 
             if (script.providedInterfaces.length > 2) {
+                const clusterLabels = await script.getClusterLabels();
                 const fork = sdk.fork<{
                     newScript: typeof newScript,
-                }>(script.clusterLabels.length ? {
+                }>(clusterLabels.length ? {
                     labels: {
-                        require: script.clusterLabels,
+                        require: clusterLabels,
                     },
                 } : undefined);
                 worker = fork.worker;

@@ -12,7 +12,7 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         super(nativeId);
     }
 
-    get clusterLabels(): string[] {
+    async getClusterLabels(): Promise<string[]> {
         try {
             return JSON.parse(this.storage.getItem(ScriptClusterLabelsKey) || '[]');
         }
@@ -21,7 +21,7 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         }
     }
 
-    set clusterLabels(labels: string[]) {
+    async setClusterLabels(labels: string[]): Promise<void> {
         this.storage.setItem(ScriptClusterLabelsKey, JSON.stringify(labels));
     }
 
