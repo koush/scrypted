@@ -20,6 +20,7 @@
     "node-dijkstra": "^2.5.0",
     "node-forge": "^1.3.1",
     "node-gyp": "^11.2.0",
+    "openid-client": "^5.7.1",
     "py": "npm:@bjia56/portable-python@^0.1.141",
     "semver": "^7.7.2",
     "sharp": "^0.34.2",
