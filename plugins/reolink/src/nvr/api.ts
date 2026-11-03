@@ -440,11 +440,48 @@ export class ReolinkNvrClient {
         }
     }
 
+    /**
+     * Rate-limits repeats of an identical API error.
+     *
+     * The Home Hub Pro emits a transient batch-wide "device offline" (rspCode -99)
+     * every time its media bus stalls -- a known, unfixed firmware behaviour that
+     * self-clears within minutes. This line echoes the entire request body with it,
+     * averaging ~605 characters. Unthrottled on a 7-camera hub that measured at 62%
+     * of ALL Scrypted log bytes (~50 MB/day), which buried every other diagnostic and
+     * made the log useless for anything else.
+     *
+     * The first occurrence is always logged, then identical ones are suppressed for
+     * ERROR_LOG_INTERVAL_MS and reported as a count on the next emission -- so the
+     * signal (and its true frequency) survives without the volume.
+     */
+    private static readonly ERROR_LOG_INTERVAL_MS = 60_000;
+    private errorLogState = new Map<string, { at: number, suppressed: number }>();
+
     printErrors(response: any, action: string, body: any[]) {
         const errors = response?.body?.filter(elem => elem.error).map(elem => ({ ...elem.error, cmd: elem.cmd }));
-        if (errors.length) {
-            this.console.error(`error during call to ${action}`, JSON.stringify({ errors, body }));
+        // Guard the length read: filter() on an undefined body yields undefined, and
+        // the original `errors.length` threw a TypeError on a malformed response.
+        if (!errors?.length)
+            return;
+
+        // Key on the action plus the distinct cmd/rspCode pairs, so a genuinely NEW
+        // failure is never swallowed by an ongoing one.
+        const signature = [...new Set(errors.map(e => `${e.cmd}/${e.rspCode}`))].sort().join(',');
+        const key = `${action}:${signature}`;
+        const now = Date.now();
+        const prev = this.errorLogState.get(key);
+
+        if (prev && now - prev.at < ReolinkNvrClient.ERROR_LOG_INTERVAL_MS) {
+            prev.suppressed++;
+            return;
         }
+
+        const suppressed = prev?.suppressed ?? 0;
+        this.errorLogState.set(key, { at: now, suppressed: 0 });
+        const repeated = suppressed
+            ? ` (+${suppressed} identical suppressed in the last ${ReolinkNvrClient.ERROR_LOG_INTERVAL_MS / 1000}s)`
+            : '';
+        this.console.error(`error during call to ${action}${repeated}`, JSON.stringify({ errors, body }));
     }
 
     async getHubInfo() {
@@ -870,9 +907,9 @@ export class ReolinkNvrClient {
             method: 'POST',
         }, this.createReadable(channelsBody));
 
-        const channels = channelsResponse.body?.[0]?.value?.status
-            ?.filter(elem => !!elem.uid)
-            ?.map(elem => elem.channel)
+        const channels: number[] = channelsResponse.body?.[0]?.value?.status
+            ?.filter(elem => !!elem?.uid)
+            ?.map(elem => elem.channel) ?? [];
 
         return {
             channels,
@@ -999,9 +1036,9 @@ export class ReolinkNvrClient {
         for (const channel of channels) {
             const indexMultilpier = currentChannelIndex * 3;
 
-            const chnInfoItem = response.body[indexMultilpier];
-            const aiItem = response.body[indexMultilpier + 1];
-            const encItem = response.body[indexMultilpier + 2];
+            const chnInfoItem = response.body?.[indexMultilpier];
+            const aiItem = response.body?.[indexMultilpier + 1];
+            const encItem = response.body?.[indexMultilpier + 2];
 
             const channelStatus = channelsResponse.body?.[0]?.value?.status?.find(item => item?.channel === channel);
 
