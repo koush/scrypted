@@ -634,6 +634,7 @@ async function start(mainFilename: string, options?: {
             if (change_password) {
                 setScryptedUserPassword(user, change_password, timestamp);
                 await db.upsert(user);
+                scrypted.usersService.users.set(username, user);
             }
 
             res.send({
