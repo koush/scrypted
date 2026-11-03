@@ -5,10 +5,24 @@ import { createScriptDevice, ScriptDeviceImpl } from "@scrypted/common/src/eval/
 import { ScriptCoreNativeId } from "./script-core";
 
 const { deviceManager } = sdk;
+export const ScriptClusterLabelsKey = 'clusterLabels';
 
 export class Script extends ScryptedDeviceBase implements Scriptable, Program, ScriptDeviceImpl {
     constructor(nativeId: ScryptedNativeId, public triggerDeviceDiscover?: (name: string, type: ScryptedDeviceType | string, interfaces: string[]) => Promise<string>) {
         super(nativeId);
+    }
+
+    get clusterLabels(): string[] {
+        try {
+            return JSON.parse(this.storage.getItem(ScriptClusterLabelsKey) || '[]');
+        }
+        catch (e) {
+            return [];
+        }
+    }
+
+    set clusterLabels(labels: string[]) {
+        this.storage.setItem(ScriptClusterLabelsKey, JSON.stringify(labels));
     }
 
     async saveScript(source: ScriptSource): Promise<void> {

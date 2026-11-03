@@ -25,7 +25,7 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
     }
 
     async getCreateDeviceSettings(): Promise<Setting[]> {
-        return [
+        const settings: Setting[] = [
             {
                 key: 'name',
                 title: 'Name',
@@ -36,13 +36,34 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
                 type: 'html',
                 value: `Learn more about scripts at <a href='https://scripts.scrypted.app'>scripts.scrypted.app.</a>`,
             }
-        ]
+        ];
+
+        if (sdk.clusterManager?.getClusterMode?.() === 'server') {
+            const workers = await sdk.clusterManager.getClusterWorkers();
+            const clients = Object.values(workers).filter(worker => worker.mode === 'client');
+            if (clients.length) {
+                const labels = [...new Set(clients.flatMap(worker => worker.labels))].sort();
+                settings.splice(1, 0, {
+                    key: 'labels',
+                    title: 'Cluster Labels',
+                    description: 'The labels of the cluster workers where this script will run. This cannot be changed later.',
+                    multiple: true,
+                    combobox: true,
+                    choices: labels,
+                });
+            }
+        }
+
+        return settings;
     }
 
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {
         const { name } = settings;
+        const labels = settings.labels as string[] | undefined;
         const nativeId = 'script:' + randomBytes(8).toString('hex');
         await this.reportScript(nativeId, name?.toString());
+        if (labels?.length)
+            new Script(nativeId).clusterLabels = labels;
         return nativeId;
     }
 
@@ -68,15 +89,18 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
                 break;
             const resolved = await e;
             const script = resolved.script;
-            if (script)
-                return script;
+            if (script) {
+                if (!resolved.worker && script.providedInterfaces.length > 2)
+                    resolved.script = undefined;
+                else
+                    return script;
+            }
             resolved.worker?.terminate();
             if (this.scripts.get(nativeId) === e)
                 this.scripts.delete(nativeId);
         }
 
         const scriptWorker: Promise<ScriptWorker> = (async () => {
-            let script = new Script(nativeId);
             let worker: ForkWorker | undefined;
 
             const triggerDeviceDiscover = async (name: string, type: ScryptedDeviceType | string, interfaces: string[]) => {
@@ -97,10 +121,16 @@ export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, De
                 return await deviceManager.onDeviceDiscovered(device);
             };
 
+            let script = new Script(nativeId);
+
             if (script.providedInterfaces.length > 2) {
                 const fork = sdk.fork<{
                     newScript: typeof newScript,
-                }>();
+                }>(script.clusterLabels.length ? {
+                    labels: {
+                        require: script.clusterLabels,
+                    },
+                } : undefined);
                 worker = fork.worker;
                 try {
                     script = await (await fork.result).newScript(nativeId, triggerDeviceDiscover);
