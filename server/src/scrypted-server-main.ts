@@ -24,7 +24,7 @@ import { createClusterServer } from './scrypted-cluster-main';
 import { SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { getNpmPackageInfo } from './services/plugin';
 import type { ServiceControl } from './services/service-control';
-import { setScryptedUserPassword, UsersService } from './services/users';
+import { checkScryptedUserPassword, checkScryptedUserToken, setScryptedUserPassword, UsersService } from './services/users';
 import { sleep } from './sleep';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 
@@ -182,12 +182,13 @@ async function start(mainFilename: string, options?: {
             return;
         }
 
-        const salted = user.salt + password;
-        const hash = crypto.createHash('sha256');
-        hash.update(salted);
-        const sha = hash.digest().toString('hex');
-
-        callback(sha === user.passwordHash || password === user.token);
+        try {
+            callback(await checkScryptedUserPassword(db, user, password));
+        }
+        catch (e) {
+            console.error('basic auth password check failed', e);
+            callback(false);
+        }
     });
 
     // the default http-auth will returns a WWW-Authenticate header if login fails.
@@ -287,7 +288,7 @@ async function start(mainFilename: string, options?: {
             }
 
             for (const user of scrypted.usersService.users.values()) {
-                if (user.token === token) {
+                if (checkScryptedUserToken(user, token)) {
                     res.locals.username = user._id;
                     res.locals.aclId = user.aclId;
                     break;
@@ -610,11 +611,7 @@ async function start(mainFilename: string, options?: {
                 return;
             }
 
-            const salted = user.salt + password;
-            const hash = crypto.createHash('sha256');
-            hash.update(salted);
-            const sha = hash.digest().toString('hex');
-            if (user.passwordHash !== sha && user.token !== password) {
+            if (!await checkScryptedUserPassword(db, user, password)) {
                 res.send({
                     error: 'Incorrect password.',
                     hasLogin,
@@ -632,7 +629,7 @@ async function start(mainFilename: string, options?: {
             });
 
             if (change_password) {
-                setScryptedUserPassword(user, change_password, timestamp);
+                await setScryptedUserPassword(user, change_password, timestamp);
                 await db.upsert(user);
             }
 
