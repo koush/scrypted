@@ -103,6 +103,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
     lastErrorsCheck = undefined;
     lastDevicesStatusCheck = undefined;
     cameraNativeMap = new Map<string, ReolinkNvrCamera>();
+    uidlessChannelSeenCount = new Map<number, number>();
     processing = false;
 
     constructor(nativeId: string, plugin: ReolinkProvider) {
@@ -358,23 +359,28 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
     async syncEntitiesFromRemote() {
         const api = this.getClient();
         const logger = this.getLogger();
-        const { channels, devicesData } = await api.getDevicesInfo();
+        const { allChannels, devicesData } = await api.getDevicesInfo();
 
-        for (const channel of channels ?? []) {
-            // A flaky hub answers in pieces: a channel can be listed without a uid, or
-            // GetChnTypeInfo can fail ("rcv failed", rspCode -17) so channelInfo is absent.
-            // Skip such channels instead of throwing; the next 5-minute fetch retries.
+        for (const channel of allChannels ?? []) {
             const { channelStatus, channelInfo } = devicesData?.[channel] ?? {};
-            if (!channelStatus?.uid) {
-                logger.log(`Skipping channel ${channel}: no uid in the hub's channel status`);
-                continue;
+            const isAddIn = !channelStatus?.uid;
+
+            if (isAddIn) {
+                const seenCount = (this.uidlessChannelSeenCount.get(channel) ?? 0) + 1;
+                this.uidlessChannelSeenCount.set(channel, seenCount);
+                if (seenCount < 2) {
+                    logger.log(`Channel ${channel} has no uid (seen ${seenCount}x) — waiting for stability`);
+                    continue;
+                }
+            } else {
+                this.uidlessChannelSeenCount.delete(channel);
             }
-            const name = channelStatus.name || `Channel ${channel}`;
-            const nativeId = this.buildNativeId(channelStatus.uid);
+
+            const uid = channelStatus?.uid || `ch${channel}`;
+            const name = channelStatus?.name || `Channel ${channel}`;
+            const nativeId = this.buildNativeId(uid);
 
             if (sdk.deviceManager.getNativeIds().includes(nativeId)) {
-                // const device = sdk.systemManager.getDeviceById<Device>(this.pluginId, nativeId);
-                // sdk.deviceManager.onDeviceDiscovered(device);
                 continue;
             }
 
@@ -382,7 +388,7 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                 continue;
             }
 
-            if (!channelInfo?.typeInfo) {
+            if (!isAddIn && !channelInfo?.typeInfo) {
                 logger.log(`Deferring discovery of channel ${channel} (${name}): the hub did not return its type info`);
                 continue;
             }
@@ -395,13 +401,13 @@ export class ReolinkNvrDevice extends ScryptedDeviceBase implements Settings, De
                 type: ScryptedDeviceType.Camera,
                 info: {
                     manufacturer: 'Reolink',
-                    model: channelInfo.typeInfo
+                    model: channelInfo?.typeInfo || 'Add-in Camera',
                 }
             };
 
             this.discoveredDevices.set(nativeId, {
                 device,
-                description: `${name}`,
+                description: isAddIn ? `${name} (Add-in)` : `${name}`,
                 rtspChannel: channel,
             });
         }

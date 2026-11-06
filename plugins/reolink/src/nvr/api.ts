@@ -907,13 +907,14 @@ export class ReolinkNvrClient {
             method: 'POST',
         }, this.createReadable(channelsBody));
 
-        const channels: number[] = channelsResponse.body?.[0]?.value?.status
-            ?.filter(elem => !!elem?.uid)
-            ?.map(elem => elem.channel) ?? [];
+        const allStatus: any[] = channelsResponse.body?.[0]?.value?.status ?? [];
+        const channels: number[] = allStatus.filter(e => !!e?.uid).map(e => e.channel);
+        const uidlessChannels: number[] = allStatus.filter(e => !e?.uid && e?.online === 1).map(e => e.channel);
 
         return {
             channels,
-            channelsResponse
+            uidlessChannels,
+            channelsResponse,
         };
     }
 
@@ -1005,18 +1006,12 @@ export class ReolinkNvrClient {
     async getDevicesInfo() {
         const url = new URL(`${this.protocol}://${this.host}/api.cgi`);
 
-        const { channels, channelsResponse } = await this.getChannels();
+        const { channels, uidlessChannels, channelsResponse } = await this.getChannels();
+        const allChannels = [...channels, ...(uidlessChannels ?? [])];
 
         const body: any[] = [];
 
-        const responseMap: Record<number, { chnInfo: number, ai: number, enc: number }> = {};
-
-        for (const channel of channels) {
-            responseMap[channel] = {
-                ai: body.length,
-                chnInfo: body.length + 1,
-                enc: body.length + 2,
-            }
+        for (const channel of allChannels) {
             body.push(
                 { cmd: "GetChnTypeInfo", action: 0, param: { channel } },
                 { cmd: "GetAiState", action: 0, param: { channel } },
@@ -1033,7 +1028,7 @@ export class ReolinkNvrClient {
         const ret: Record<number, DeviceInfoResponse> = {};
 
         let currentChannelIndex = 0;
-        for (const channel of channels) {
+        for (const channel of allChannels) {
             const indexMultilpier = currentChannelIndex * 3;
 
             const chnInfoItem = response.body?.[indexMultilpier];
@@ -1060,6 +1055,8 @@ export class ReolinkNvrClient {
             devicesData: ret,
             response: response.body,
             channels,
+            uidlessChannels,
+            allChannels,
             channelsResponse,
             requestBody: body,
         };
