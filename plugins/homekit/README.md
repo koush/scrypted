@@ -39,6 +39,7 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 * Ensure the Docker installation (if applicable) is using host networking. This configuration is the default if the official Scrypted Docker compose install script was used.
 * Try switching the mDNS advertiser used in the HomeKit plugin settings.
 * Try disabling IGMP Snooping on your router.
+* On macOS, ensure Scrypted is running with the signed Node.js installer from nodejs.org rather than Homebrew node. macOS Local Network privacy blocks multicast from unsigned node binaries, which prevents mDNS advertisement while cameras and other unicast traffic continue to work. Installations created with older versions of the macOS install script may be using Homebrew node.
 
 ### HomeKit Live Streaming Timeout (Recordings may be working)
 
