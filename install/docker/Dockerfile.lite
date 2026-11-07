@@ -17,7 +17,11 @@ RUN apt-get install -y ca-certificates curl gnupg
 RUN mkdir -p /etc/apt/keyrings
 RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg
 RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_"$NODE_VERSION".x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-RUN apt-get update && apt-get install -y nodejs
+# Minimum runtime for the October 2026 Node.js security fixes.
+# Changing this argument also invalidates the cached Node.js installation layer.
+ARG NODE_MIN_VERSION=22.23.4
+RUN apt-get update && apt-get install -y nodejs \
+    && dpkg --compare-versions "$(node -p process.versions.node)" ge "$NODE_MIN_VERSION"
 
 ENV SCRYPTED_INSTALL_ENVIRONMENT="docker"
 ENV SCRYPTED_CAN_RESTART="true"
