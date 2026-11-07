@@ -98,6 +98,11 @@ export function setupCluster(peer: RpcPeer) {
                 }
 
                 const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, socket, socket);
+                // createDuplexRpcPeer kills the peer when the socket closes, but not the other way
+                // around. When the owning peer is killed (e.g. HttpResponse.sendStream's finally),
+                // the cluster peer is killed too, and without this the socket stays ESTABLISHED
+                // on both ends until the process exits.
+                clusterPeer.killedSafe.finally(() => socket.destroy());
                 // set params from the primary peer, needed for get getRemote in cluster mode.
                 Object.assign(clusterPeer.params, peer.params);
                 clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
