@@ -148,7 +148,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             peer.params['createMediaManager'] = async () => createMediaManager!(systemManager, deviceManager);
         }
         const mediaManager = hostMediaManager || await createMediaManager!(systemManager, deviceManager);
-        peer.params['mediaManager'] = mediaManager;
 
         systemManager.api = api;
         deviceManager.api = api;
