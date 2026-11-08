@@ -46,6 +46,18 @@ if (SCRYPTED_SERVER_LISTEN_HOSTNAMES) {
     }
 }
 
+// constant time comparison for password hashes and tokens so the string comparison
+// does not leak how many leading characters matched.
+function timingSafeStringEqual(a: string | undefined, b: string | undefined) {
+    if (typeof a !== 'string' || typeof b !== 'string')
+        return false;
+    const ab = Buffer.from(a);
+    const bb = Buffer.from(b);
+    if (ab.length !== bb.length)
+        return false;
+    return crypto.timingSafeEqual(ab, bb);
+}
+
 async function listenServerPort(env: string, port: number, server: http.Server | https.Server | net.Server) {
     server.listen(port);
     try {
@@ -187,7 +199,7 @@ async function start(mainFilename: string, options?: {
         hash.update(salted);
         const sha = hash.digest().toString('hex');
 
-        callback(sha === user.passwordHash || password === user.token);
+        callback(timingSafeStringEqual(sha, user.passwordHash) || timingSafeStringEqual(password, user.token));
     });
 
     // the default http-auth will returns a WWW-Authenticate header if login fails.
@@ -273,7 +285,7 @@ async function start(mainFilename: string, options?: {
         // lack of login from cookie auth.
 
         const checkToken = (token: string) => {
-            if (process.env.SCRYPTED_ADMIN_TOKEN === token) {
+            if (process.env.SCRYPTED_ADMIN_TOKEN && timingSafeStringEqual(process.env.SCRYPTED_ADMIN_TOKEN, token)) {
                 let username = process.env.SCRYPTED_ADMIN_USERNAME;
                 if (!username) {
                     const firstAdmin = [...scrypted.usersService.users.values()].find(u => !u.aclId);
@@ -287,7 +299,7 @@ async function start(mainFilename: string, options?: {
             }
 
             for (const user of scrypted.usersService.users.values()) {
-                if (user.token === token) {
+                if (timingSafeStringEqual(user.token, token)) {
                     res.locals.username = user._id;
                     res.locals.aclId = user.aclId;
                     break;
@@ -302,7 +314,7 @@ async function start(mainFilename: string, options?: {
                 hash.update(salted);
                 const sha = hash.digest().toString('hex');
 
-                if (checkHash === sha) {
+                if (timingSafeStringEqual(checkHash, sha)) {
                     const userToken = checkValidUserToken(tokenPart);
                     if (userToken) {
                         res.locals.username = userToken.username;
@@ -620,7 +632,7 @@ async function start(mainFilename: string, options?: {
             const hash = crypto.createHash('sha256');
             hash.update(salted);
             const sha = hash.digest().toString('hex');
-            if (user.passwordHash !== sha && user.token !== password) {
+            if (!timingSafeStringEqual(user.passwordHash, sha) && !timingSafeStringEqual(user.token, password)) {
                 res.send({
                     error: 'Incorrect password.',
                     hasLogin,
