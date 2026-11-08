@@ -19,6 +19,10 @@ export function createDuplexRpcPeer(selfName: string, peerName: string, readable
     readable.on('data', data => serializer.onData(data));
     readable.on('close', serializer.onDisconnected);
     readable.on('error', serializer.onDisconnected);
+    rpcPeer.killedSafe.finally(() => {
+        readable.destroy();
+        writable.destroy();
+    });
     return rpcPeer;
 }
 
