@@ -45,6 +45,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     secureServer: https.Server;
     proxy: HttpProxy;
     whitelisted = new Map<string, string>();
+    cloudLoginNonces = new Set<string>();
     reregisterTimer: NodeJS.Timeout;
     storageSettings = new StorageSettings(this, {
         token_info: {
@@ -788,6 +789,15 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     async getOauthUrl(): Promise<string> {
         const authority = this.getAuthority();
 
+        // The login callback is a top level navigation, so the admin's session cookie alone
+        // does not prove that the login was started from this server (login CSRF). Mint a
+        // short lived, single use nonce and require it to be echoed back on the callback.
+        // It is carried in the redirect_uri path because home.scrypted.app does not echo a
+        // state parameter back on the cloud login callback.
+        const nonce = crypto.randomBytes(32).toString('base64url');
+        this.cloudLoginNonces.add(nonce);
+        setTimeout(() => this.cloudLoginNonces.delete(nonce), 10 * 60 * 1000).unref();
+
         const args = qsstringify({
             ...authority,
 
@@ -797,7 +807,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             server_id: this.storageSettings.values.serverId,
             server_name: this.storageSettings.values.serverName,
             sender_id: DEFAULT_SENDER_ID,
-            redirect_uri: `https://${SCRYPTED_SERVER}/web/oauth/callback`,
+            redirect_uri: `https://${SCRYPTED_SERVER}/web/oauth/callback/${nonce}`,
         })
         return `https://${SCRYPTED_SERVER}/_punch/login?${args}`;
         // this is disabled because we can't assume that custom domains will implement this oauth endpoint.
@@ -832,6 +842,15 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             if (url.pathname.startsWith('/web/oauth/callback') && url.search) {
                 const query = qsparse(url.searchParams);
                 if (!query.callback_url && query.token_info && query.user_info) {
+                    const nonce = url.pathname.startsWith('/web/oauth/callback/')
+                        ? url.pathname.substring('/web/oauth/callback/'.length)
+                        : undefined;
+                    if (!nonce || !this.cloudLoginNonces.delete(nonce)) {
+                        this.console.warn('rejected cloud login callback with a missing or invalid nonce', req.socket?.remoteAddress);
+                        res.writeHead(401);
+                        res.end();
+                        return;
+                    }
                     this.storageSettings.values.token_info = query.token_info;
                     this.storageSettings.values.lastPersistedRegistrationId = await this.getCachedRegistrationId();
                     res.setHeader('Location', `https://${this.getHostname()}/endpoint/@scrypted/core/public/`);
