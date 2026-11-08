@@ -101,8 +101,22 @@ export class HttpResponseImpl implements HttpResponse {
                         return;
 
                     const more = this.res.write(chunk);
-                    if (!more)
-                        await new Promise<void>(r => this.res.once('drain', r));
+                    // a closed socket emits 'close', not 'drain', so wait on both.
+                    // otherwise a client disconnecting under backpressure hangs
+                    // this loop and the finally below never kills the peer.
+                    if (!more) {
+                        await new Promise<void>(r => {
+                            const done = () => {
+                                this.res.off('drain', done);
+                                this.res.off('close', done);
+                                this.res.off('error', done);
+                                r();
+                            };
+                            this.res.once('drain', done);
+                            this.res.once('close', done);
+                            this.res.once('error', done);
+                        });
+                    }
 
                     if (this.res.closed || this.res.destroyed)
                         return;
