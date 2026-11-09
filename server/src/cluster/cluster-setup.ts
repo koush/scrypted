@@ -260,10 +260,15 @@ export function setupCluster(peer: RpcPeer) {
         const clusterObject = getClusterObject(clusterId, value);
         if (!clusterObject)
             return value;
+        // invalidate cluster objects that do not have a valid signature for this cluster.
+        if (computeClusterObjectHash(clusterObject, clusterSecret) !== clusterObject.sha256)
+            return value;
         const { address, port, proxyId } = clusterObject;
         // handle the case when trying to connect to an object is on this cluster node,
         // returning the actual object, rather than initiating a loopback connection.
-        if (port === clusterPort)
+        // ports alone are not unique across hosts, so this must also verify that the
+        // object's address belongs to this node.
+        if (isClusterAddress(address) && port === clusterPort)
             return connectClusterObject(clusterObject);
 
         // can use worker to worker ipc if the address and pid matches and both side are node.
