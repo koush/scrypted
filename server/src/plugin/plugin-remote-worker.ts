@@ -77,7 +77,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
     attachPluginRemote(peer, {
         createMediaManager: async (sm, dm) => {
             systemManager = sm;
-            deviceManager = dm
+            deviceManager = dm;
             return new MediaManagerImpl(systemManager, dm);
         },
         onGetRemote: async (_api, _pluginId) => {

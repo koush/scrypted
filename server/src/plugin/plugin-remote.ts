@@ -2,13 +2,48 @@ import { EventDetails, MediaManager, ScryptedInterface, ScryptedInterfacePropert
 import { RpcPeer, RPCResultError } from '../rpc';
 import { BufferSerializer } from '../rpc-buffer-serializer';
 import { AccessControls } from './acl';
+import { ClusterManagerImpl } from './cluster';
 import { DeviceManagerImpl, StorageImpl } from './device';
 import { EndpointManagerImpl } from './endpoint';
 import { PluginAPI, PluginHostInfo, PluginRemote, PluginRemoteLoadZipOptions, PluginZipAPI } from './plugin-api';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketConnection, WebSocketMethods, WebSocketSerializer } from './plugin-remote-websocket';
 import { SystemManagerImpl } from './system';
-import { ClusterManagerImpl } from './cluster';
 
+function getAccessControlDeviceState(accessControls: AccessControls | undefined, getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } }, id: string, state?: { [property: string]: SystemDeviceState }) {
+    state = state || getSystemState()[id];
+    if (accessControls && state) {
+        state = Object.assign({}, state);
+        for (const property of Object.keys(state)) {
+            if (accessControls.shouldRejectProperty(id, property))
+                delete state[property];
+        }
+        let interfaces: ScryptedInterface[] = state.interfaces?.value;
+        if (interfaces) {
+            interfaces = interfaces.filter(scryptedInterface => !accessControls.shouldRejectInterface(id, scryptedInterface));
+            state.interfaces = {
+                value: interfaces,
+            }
+        }
+    }
+    return state;
+}
+
+
+export function getAccessControlSystemState(accessControls: AccessControls | undefined, getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } }) {
+    let state = getSystemState();
+    if (accessControls) {
+        state = Object.assign({}, state);
+        for (const id of Object.keys(state)) {
+            if (accessControls.shouldRejectDevice(id)) {
+                delete state[id];
+                continue;
+            }
+            state[id] = getAccessControlDeviceState(accessControls, getSystemState, id, state[id]!)!;
+        }
+    }
+
+    return state;
+}
 
 export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string, hostInfo: PluginHostInfo, getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } }): Promise<PluginRemote> {
     try {
@@ -23,42 +58,8 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
 
         const accessControls: AccessControls = peer.tags.acl;
 
-        const getAccessControlDeviceState = (id: string, state?: { [property: string]: SystemDeviceState }) => {
-            state = state || getSystemState()[id];
-            if (accessControls && state) {
-                state = Object.assign({}, state);
-                for (const property of Object.keys(state)) {
-                    if (accessControls.shouldRejectProperty(id, property))
-                        delete state[property];
-                }
-                let interfaces: ScryptedInterface[] = state.interfaces?.value;
-                if (interfaces) {
-                    interfaces = interfaces.filter(scryptedInterface => !accessControls.shouldRejectInterface(id, scryptedInterface));
-                    state.interfaces = {
-                        value: interfaces,
-                    }
-                }
-            }
-            return state;
-        }
 
-        const getAccessControlSystemState = () => {
-            let state = getSystemState();
-            if (accessControls) {
-                state = Object.assign({}, state);
-                for (const id of Object.keys(state)) {
-                    if (accessControls.shouldRejectDevice(id)) {
-                        delete state[id];
-                        continue;
-                    }
-                    state[id] = getAccessControlDeviceState(id, state[id]!)!;
-                }
-            }
-
-            return state;
-        }
-
-        await remote.setSystemState(getAccessControlSystemState());
+        await remote.setSystemState(getAccessControlSystemState(accessControls, getSystemState));
         api.listen((id, eventDetails, eventData) => {
             if (accessControls?.shouldRejectEvent(eventDetails.property === ScryptedInterfaceProperty.id ? eventData : id, eventDetails))
                 return;
@@ -71,7 +72,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
                 }
                 else {
                     // a change on anything else is a descriptor update
-                    remote.updateDeviceState(id, getAccessControlDeviceState(id)!);
+                    remote.updateDeviceState(id, getAccessControlDeviceState(accessControls, getSystemState, id)!);
                 }
                 return;
             }
@@ -97,6 +98,11 @@ export interface WebSocketCustomHandler {
 }
 
 export interface PluginRemoteAttachOptions {
+    /**
+     * Injected by the host/plugin worker to create the media manager implementation.
+     * This keeps the media manager and its Node-only dependencies out of the web
+     * client bundle, where attachPluginRemote is also used.
+     */
     createMediaManager?: (systemManager: SystemManager, deviceManager: DeviceManagerImpl) => Promise<MediaManager>;
     getServicePort?: (name: string, ...args: any[]) => Promise<[number, string]>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
@@ -144,9 +150,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         const endpointManager = new EndpointManagerImpl();
         const clusterManager = new ClusterManagerImpl(undefined, api, undefined!);
         const hostMediaManager = await api.getMediaManager();
-        if (!hostMediaManager) {
-            peer.params['createMediaManager'] = async () => createMediaManager!(systemManager, deviceManager);
-        }
         const mediaManager = hostMediaManager || await createMediaManager!(systemManager, deviceManager);
 
         systemManager.api = api;

@@ -23,7 +23,7 @@ import { ConsoleServer, createConsoleServer } from './plugin-console';
 import { PluginDebug } from './plugin-debug';
 import { PluginHostAPI } from './plugin-host-api';
 import { LazyRemote } from './plugin-lazy-remote';
-import { setupPluginRemote } from './plugin-remote';
+import { getAccessControlSystemState, setupPluginRemote } from './plugin-remote';
 import { WebSocketConnection } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { createClusterForkWorker } from './runtime/cluster-fork-worker';
@@ -210,7 +210,7 @@ export class PluginHost {
 
         const { runtime } = this.packageJson.scrypted;
         const mediaManager = runtime && runtime !== 'node'
-            ? new MediaManagerHostImpl(pluginDeviceId, () => scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id))
+            ? new MediaManagerHostImpl(pluginDeviceId, () => scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id), true)
             : undefined;
 
         this.api = new PluginHostAPI(scrypted, this.pluginId, this, mediaManager!);
@@ -498,8 +498,18 @@ export class PluginHost {
         serializer.setupRpcPeer(rpcPeer);
 
         // wrap the host api with a connection specific api that can be torn down on disconnect
-        const createMediaManager = await this.peer.getParam('createMediaManager');
-        const api = new PluginAPIProxy(this.api, await createMediaManager());
+        const pluginDeviceId = this.scrypted.findPluginDevice(this.pluginId)!._id;
+        const getSystemState = accessControls
+            ? () => getAccessControlSystemState(accessControls, () => this.scrypted.stateManager.getSystemState())
+            : () => this.scrypted.stateManager.getSystemState();
+        const mediaManager = new MediaManagerHostImpl(
+            pluginDeviceId,
+            getSystemState,
+            console,
+            id => this.scrypted.getDevice(id),
+            !accessControls,
+        );
+        const api = new PluginAPIProxy(this.api, mediaManager);
         api.acl = accessControls;
         const kill = () => {
             serializer.onDisconnected();
