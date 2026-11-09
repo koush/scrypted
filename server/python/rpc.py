@@ -1,3 +1,4 @@
+import asyncio
 import dataclasses
 import inspect
 import random
@@ -5,7 +6,7 @@ import string
 import traceback
 import weakref
 from asyncio.futures import Future
-from typing import Any, Callable, Dict, List, Mapping, TypedDict
+from typing import Any, Callable, Dict, List, Mapping, Optional, TypedDict
 
 jsonSerializable = set()
 jsonSerializable.add(float)
@@ -394,7 +395,6 @@ class RpcPeer:
         if self.killed:
             return
         id = localProxiedEntry["id"]
-        self.remoteWeakProxies.pop(id, None)
         rpcFinalize = {
             "__local_proxy_id": id,
             "__local_proxy_finalizer_id": localProxiedEntry["finalizerId"],
@@ -422,8 +422,37 @@ class RpcPeer:
         )
         wr = weakref.ref(proxy)
         self.remoteWeakProxies[proxyId] = wr
-        weakref.finalize(proxy, lambda: self.finalize(localProxiedEntry))
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        weakref.finalize(
+            proxy, lambda: self.onProxyCollected(localProxiedEntry, wr, loop)
+        )
         return proxy
+
+    def onProxyCollected(
+        self,
+        localProxiedEntry: LocalProxiedEntry,
+        wr: weakref.ref,
+        loop: Optional[asyncio.AbstractEventLoop],
+    ):
+        # The cyclic GC runs finalizers on whatever allocation triggers it, including one
+        # inside send() while the transport holds its non-reentrant write lock. Sending
+        # the finalize from here would deadlock that thread (and with it the event loop
+        # and the host's ping), so do only the bookkeeping now and send from the loop.
+        id = localProxiedEntry["id"]
+        # The remote may have re-sent this id before the deferred send; keep the new proxy.
+        if self.remoteWeakProxies.get(id, None) is wr:
+            self.remoteWeakProxies.pop(id, None)
+        if not loop:
+            self.finalize(localProxiedEntry)
+            return
+        try:
+            loop.call_soon_threadsafe(self.finalize, localProxiedEntry)
+        except RuntimeError:
+            # Event loop closed: the peer is shutting down along with its proxies.
+            pass
 
     def deserialize(self, value, deserializationContext: Dict):
         if not value:
