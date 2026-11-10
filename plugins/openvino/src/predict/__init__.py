@@ -488,7 +488,7 @@ class PredictPlugin(DetectPlugin, scrypted_sdk.ClusterForkInterface, scrypted_sd
         ret.append({
             "key": "url",
             "title": "Model URL",
-            "description": "The URL of the model. This should be a Github repo or url path to the model's config.json."
+            "description": "The URL of the model. This should be a Github repo or url path to the model's config.json. You must trust the model's author as model execution may execute custom code."
         })
 
         ret.append({
