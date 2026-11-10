@@ -41,15 +41,20 @@ async def generateVideoFramesLibav(
             container.options["probesize"] = "500000"
             stream = container.streams.video[0]
 
+            def putFrame(frame):
+                try:
+                    # non blocking put may fail if queue is not empty
+                    sampleQueue.put_nowait(frame)
+                except asyncio.QueueFull:
+                    pass
+
             for idx, frame in enumerate(container.decode(stream)):
                 if finished:
                     break
 
-                try:
-                    # non blocking put may fail if queue is not empty
-                    sampleQueue.put_nowait(frame)
-                except:
-                    pass
+                # asyncio.Queue is not thread safe, and put_nowait from this thread
+                # does not wake the event loop. hand the frame over on the loop thread.
+                loop.call_soon_threadsafe(putFrame, frame)
         except:
             traceback.print_exc()
             raise
