@@ -20,12 +20,7 @@ export class OnvifIntercom implements Intercom {
     }
 
     async checkIntercom() {
-        const username = this.camera.storage.getItem("username");
-        const password = this.camera.storage.getItem("password");
-        const url = new URL(this.url);
-        url.username = username;
-        url.password = password;
-        const intercomClient = this.intercomClient = new RtspClient(url.toString());
+        const intercomClient = this.intercomClient = new RtspClient(this.camera.addRtspCredentials(this.url));
         intercomClient.console = this.camera.console;
         await intercomClient.options();
 
@@ -68,7 +63,7 @@ export class OnvifIntercom implements Intercom {
             const response = await intercomClient.request('SETUP', headers, audioBackchannel.control);
             transportDict = parseSemicolonDelimited(response.headers.transport);
             intercomClient.session = response.headers.session.split(';')[0];
-            ip = this.camera.getIPAddress();
+            ip = new URL(this.url).hostname;
 
             const { server_port } = transportDict;
             const serverPorts = server_port.split('-');
