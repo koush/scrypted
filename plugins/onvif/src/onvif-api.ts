@@ -94,6 +94,17 @@ export class OnvifCameraAPI {
     listenEvents() {
         const ret = new EventEmitter();
 
+        // Reolink Home Hub / NVR AI rule topics -> Reolink object class keys. These
+        // match the keys used by the polled path (AIState / getObjectTypes), so a
+        // channel can gate ONVIF-pushed detections the same way it gates polled ones.
+        const reolinkRuleClasses: Record<string, string> = {
+            PeopleDetect: 'people',
+            VehicleDetect: 'vehicle',
+            DogCatDetect: 'dog_cat',
+            FaceDetect: 'face',
+            Package: 'package',
+        };
+
         this.cam.on('event', (event: any, xml: string) => {
             ret.emit('data', xml);
 
@@ -103,9 +114,43 @@ export class OnvifCameraAPI {
             const dataValue = event.message.message.data.simpleItem.$.Value;
             const eventTopic = stripNamespaces(event.topic._);
 
+            // Legacy raw signal: (topic, value). Existing consumers (e.g. the standalone
+            // Reolink camera in the reolink plugin) parse the topic themselves. Preserved
+            // verbatim for backward compatibility; the interpreted/channel-aware signal is
+            // emitted separately as 'onvifChannelEvent' below.
             ret.emit('onvifEvent', eventTopic, dataValue);
 
+            // Extract the source channel token. Reolink hubs/NVRs multiplex every channel's
+            // events over a single subscription; the Source SimpleItem carries the (zero-padded)
+            // channel, e.g. <tt:Source><tt:SimpleItem Name="Source" Value="003"/></tt:Source>.
+            let sourceChannel: number;
+            try {
+                const sourceItems = event.message.message.source?.simpleItem;
+                const items = Array.isArray(sourceItems) ? sourceItems : (sourceItems ? [sourceItems] : []);
+                for (const item of items) {
+                    const name = item?.$?.Name;
+                    if (name === 'VideoSourceConfigurationToken' || name === 'Source' || name === 'VideoSourceToken') {
+                        const parsed = parseInt(item?.$?.Value, 10);
+                        if (!Number.isNaN(parsed))
+                            sourceChannel = parsed;
+                    }
+                }
+            }
+            catch (e) {
+                // Malformed/unexpected source shape; the event simply won't be channel-routed.
+                // Optional chaining handles the common "no source element" case without
+                // throwing, so reaching here means genuinely unexpected data worth surfacing.
+                this.console.warn('error parsing onvif event source channel', e);
+            }
+
+            // Interpret the topic into a motion/object-class signal once, here, so
+            // multiplexed hub/NVR consumers can route by channel without re-parsing
+            // ONVIF topics. Emitted (with the channel) as 'onvifChannelEvent' below.
+            let pushMotion = false;
+            let pushClass: string | undefined;
+
             if (eventTopic.includes('MotionAlarm')) {
+                pushMotion = !!dataValue;
                 // ret.emit('event', OnvifEvent.MotionBuggy);
                 if (dataValue)
                     ret.emit('event', OnvifEvent.MotionStart)
@@ -149,6 +194,16 @@ export class OnvifCameraAPI {
                 // unclear if the IsMotion false is indicative of motion stop?
                 if (event.message.message.data.simpleItem.$.Name === 'IsMotion' && dataValue) {
                     ret.emit('event', OnvifEvent.MotionBuggy);
+                    pushMotion = true;
+                }
+            }
+            // Reolink Home Hub / NVR AI rules. The object class is the final topic
+            // segment; these topics are not part of the standalone OnvifEvent mapping,
+            // so they are surfaced on the channel-aware push signal only.
+            else if (eventTopic.includes('RuleEngine/MyRuleDetector/')) {
+                if (dataValue) {
+                    pushClass = reolinkRuleClasses[eventTopic.split('/').pop()];
+                    pushMotion = true;
                 }
             }
             else if (eventTopic.includes('RuleEngine/ObjectDetector')) {
@@ -158,12 +213,17 @@ export class OnvifCameraAPI {
                         const className = this.detections.get(eventName);
                         this.console.log('object detected:', className);
                         ret.emit('event', OnvifEvent.Detection, className);
+                        pushClass = className;
+                        pushMotion = true;
                     }
                     catch (e) {
                         this.console.warn('error parsing detection', e);
                     }
                 }
             }
+
+            if (sourceChannel !== undefined && (pushMotion || pushClass))
+                ret.emit('onvifChannelEvent', pushMotion, pushClass, sourceChannel);
         });
         return ret;
     }
