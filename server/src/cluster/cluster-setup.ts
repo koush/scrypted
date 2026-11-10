@@ -262,7 +262,7 @@ export function setupCluster(peer: RpcPeer) {
             return value;
         // invalidate cluster objects that do not have a valid signature for this cluster.
         if (computeClusterObjectHash(clusterObject, clusterSecret) !== clusterObject.sha256)
-            return value;
+            throw new Error('invalid cluster object signature');
         const { address, port, proxyId } = clusterObject;
         // handle the case when trying to connect to an object is on this cluster node,
         // returning the actual object, rather than initiating a loopback connection.
@@ -286,22 +286,16 @@ export function setupCluster(peer: RpcPeer) {
             }
         }
 
-        try {
-            const clusterPeerPromise = ensureClusterPeer(address, port);
-            const clusterPeer = await clusterPeerPromise;
-            // may already have this proxy so check first.
-            const existing = clusterPeer.remoteWeakProxies[proxyId]?.deref();
-            if (existing)
-                return existing;
-            const newValue = await peerConnectRPCObject(clusterPeer, clusterObject);
-            if (!newValue)
-                throw new Error('rpc object not found?');
-            return newValue;
-        }
-        catch (e) {
-            console.error('failure rpc', clusterObject, e);
-            return value;
-        }
+        const clusterPeerPromise = ensureClusterPeer(address, port);
+        const clusterPeer = await clusterPeerPromise;
+        // may already have this proxy so check first.
+        const existing = clusterPeer.remoteWeakProxies[proxyId]?.deref();
+        if (existing)
+            return existing;
+        const newValue = await peerConnectRPCObject(clusterPeer, clusterObject);
+        if (!newValue)
+            throw new Error('rpc object not found?');
+        return newValue;
     }
 
     const onProxySerialization = (peer: RpcPeer, value: any, sourceKey: string) => {

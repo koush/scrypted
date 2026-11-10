@@ -212,7 +212,7 @@ class ClusterSetup:
         return clusterPeerPromise
 
     async def connectRPCObject(self, value):
-        __cluster = getattr(value, "__cluster")
+        __cluster = getattr(value, "__cluster", None)
         if type(__cluster) is not dict:
             return value
 
@@ -221,31 +221,31 @@ class ClusterSetup:
         if clusterObject.get("id", None) != self.clusterId:
             return value
 
+        if self.computeClusterObjectHash(clusterObject) != clusterObject.get("sha256", None):
+            raise Exception("invalid cluster object signature")
+
         address = clusterObject.get("address", None)
         port = clusterObject["port"]
         proxyId = clusterObject["proxyId"]
-        if port == self.clusterPort:
+        if isClusterAddress(address) and port == self.clusterPort:
             return await self.connectClusterObject(clusterObject)
 
         clusterPeerPromise = self.ensureClusterPeer(address, port)
 
-        try:
-            clusterPeer = await clusterPeerPromise
-            weakref = clusterPeer.remoteWeakProxies.get(proxyId, None)
-            existing = weakref() if weakref else None
-            if existing:
-                return existing
+        clusterPeer = await clusterPeerPromise
+        weakref = clusterPeer.remoteWeakProxies.get(proxyId, None)
+        existing = weakref() if weakref else None
+        if existing:
+            return existing
 
-            peerConnectRPCObject = clusterPeer.tags.get("connectRPCObject")
-            if not peerConnectRPCObject:
-                peerConnectRPCObject = await clusterPeer.getParam("connectRPCObject")
-                clusterPeer.tags["connectRPCObject"] = peerConnectRPCObject
-            newValue = await peerConnectRPCObject(clusterObject)
-            if not newValue:
-                raise Exception("rpc object not found?")
-            return newValue
-        except Exception as e:
-            return value
+        peerConnectRPCObject = clusterPeer.tags.get("connectRPCObject")
+        if not peerConnectRPCObject:
+            peerConnectRPCObject = await clusterPeer.getParam("connectRPCObject")
+            clusterPeer.tags["connectRPCObject"] = peerConnectRPCObject
+        newValue = await peerConnectRPCObject(clusterObject)
+        if not newValue:
+            raise Exception("rpc object not found?")
+        return newValue
 
 
 class ClusterServerListener(TypedDict):
