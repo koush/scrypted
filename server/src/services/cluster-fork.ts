@@ -95,6 +95,11 @@ export class ClusterForkService {
             forkResult.waitKilled().catch(() => { }).finally(() => {
                 worker.forks.delete(options);
             });
+        }).catch(() => {
+            // the fork failed before it could be tracked by waitKilled (e.g. no
+            // matching worker on the remote, or the peer is unreachable).
+            // release the fork slot so retries do not accumulate indefinitely.
+            worker.forks.delete(options);
         });
 
         const ret: ClusterForkResultInterface = new WrappedForkResult(worker.id, forkResultPromise);
