@@ -2,6 +2,7 @@ import asyncio
 import time
 import traceback
 import os
+import threading
 from typing import Any, AsyncGenerator, List, Union
 
 import scrypted_sdk
@@ -24,6 +25,14 @@ try:
     import av
 except:
     pass
+
+
+# How long a frame session may go without the consumer pulling a frame, or without the
+# decoder producing one, before the fork exits.
+FRAME_TIMEOUT = 10
+# How long the parent waits to hand a pooled fork to a caller. A hang here comes before
+# the fork's own watchdog is armed, so the parent is the only side that can reap it.
+HANDOFF_TIMEOUT = 30
 
 
 def terminate_zygote(fork: scrypted_sdk.PluginFork) -> None:
@@ -50,8 +59,10 @@ class LibavGenerator(scrypted_sdk.ScryptedDeviceBase, scrypted_sdk.VideoFrameGen
     ) -> scrypted_sdk.VideoFrame:
         fork = self.zygote()
         try:
-            forked: CodecFork = await fork.result
-            return await forked.generateVideoFramesLibav(mediaObject, options)
+            forked: CodecFork = await asyncio.wait_for(fork.result, HANDOFF_TIMEOUT)
+            return await asyncio.wait_for(
+                forked.generateVideoFramesLibav(mediaObject, options), HANDOFF_TIMEOUT
+            )
         except:
             terminate_zygote(fork)
             raise
@@ -76,14 +87,17 @@ class GstreamerGenerator(
         start = time.time()
         fork = self.zygote()
         try:
-            forked: CodecFork = await fork.result
+            forked: CodecFork = await asyncio.wait_for(fork.result, HANDOFF_TIMEOUT)
             print("fork", time.time() - start)
-            return await forked.generateVideoFramesGstreamer(
-                mediaObject,
-                options,
-                self.storage.getItem("h264Decoder"),
-                self.storage.getItem("h265Decoder"),
-                self.storage.getItem("postProcessPipeline"),
+            return await asyncio.wait_for(
+                forked.generateVideoFramesGstreamer(
+                    mediaObject,
+                    options,
+                    self.storage.getItem("h264Decoder"),
+                    self.storage.getItem("h265Decoder"),
+                    self.storage.getItem("postProcessPipeline"),
+                ),
+                HANDOFF_TIMEOUT,
             )
         except:
             terminate_zygote(fork)
@@ -223,21 +237,30 @@ def multiprocess_exit():
 
 
 class CodecFork:
-    def timeoutExit(self):
-        print("Frame yield timed out, exiting pipeline.")
-        multiprocess_exit()
+    def __init__(self):
+        self.lastActivity = 0
+
+    def startWatchdog(self):
+        # The watchdog runs on its own thread rather than as an event loop timer: a fork
+        # whose event loop is wedged can't fire a loop timer, and would idle forever.
+        self.lastActivity = time.monotonic()
+
+        def watch():
+            while time.monotonic() - self.lastActivity < FRAME_TIMEOUT:
+                time.sleep(1)
+            print("Frame yield timed out, exiting pipeline.")
+            multiprocess_exit()
+
+        threading.Thread(target=watch, name="frame-watchdog", daemon=True).start()
 
     async def generateVideoFrames(self, iter, src: str, firstFrameOnly=False):
         start = time.time()
-        loop = asyncio.get_event_loop()
 
         try:
             while True:
-                self.timeout.cancel()
-                self.timeout = loop.call_later(10, self.timeoutExit)
-                data = await asyncio.wait_for(iter.__anext__(), timeout=10)
-                self.timeout.cancel()
-                self.timeout = loop.call_later(10, self.timeoutExit)
+                self.lastActivity = time.monotonic()
+                data = await asyncio.wait_for(iter.__anext__(), timeout=FRAME_TIMEOUT)
+                self.lastActivity = time.monotonic()
                 yield data
 
                 if firstFrameOnly:
@@ -260,8 +283,7 @@ class CodecFork:
         # armed here rather than inside the generator body: the body does not run
         # until the caller requests a frame, so a session that is never iterated
         # would otherwise have no watchdog at all.
-        loop = asyncio.get_event_loop()
-        self.timeout = loop.call_later(10, self.timeoutExit)
+        self.startWatchdog()
 
         return self.generateVideoFrames(
             gstreamer.generateVideoFramesGstreamer(
@@ -279,8 +301,7 @@ class CodecFork:
         # armed here rather than inside the generator body: the body does not run
         # until the caller requests a frame, so a session that is never iterated
         # would otherwise have no watchdog at all.
-        loop = asyncio.get_event_loop()
-        self.timeout = loop.call_later(10, self.timeoutExit)
+        self.startWatchdog()
 
         return self.generateVideoFrames(
             libav.generateVideoFramesLibav(mediaObject, options),
