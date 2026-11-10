@@ -404,6 +404,30 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
             }
         }
         peer.params['connectForkWorker'] = connectForkWorker;
+
+        let lastCheck = Date.now();
+        let killed = false;
+
+        const healthInterval = setInterval(() => {
+            if (Date.now() - lastCheck > 60000)
+                peer.kill('Cluster liveness timeout.');
+        }, 15000);
+
+        peer.killedSafe.finally(() => {
+            killed = true;
+            clearInterval(healthInterval);
+        });
+
+        (async () => {
+            while (!killed) {
+                await sleep(15000);
+                if (killed)
+                    return;
+                const info = await peer.getParam('info').catch(() => { });
+                if (info)
+                    lastCheck = Date.now();
+            }
+        })();
     });
 
     return server;

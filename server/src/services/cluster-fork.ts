@@ -92,9 +92,9 @@ export class ClusterForkService {
         });
         forkResultPromise.then(forkResult => {
             forkResult.clusterWorkerId = worker.id;
-            forkResult.waitKilled().catch(() => { }).finally(() => {
-                worker.forks.delete(options);
-            });
+            return forkResult.waitKilled().catch(() => { });
+        }).catch(() => { }).finally(() => {
+            worker.forks.delete(options);
         });
 
         const ret: ClusterForkResultInterface = new WrappedForkResult(worker.id, forkResultPromise);
