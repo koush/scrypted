@@ -1,6 +1,6 @@
 {
    "name": "@vityevato/hikvision-doorbell",
-   "version": "2.0.9",
+   "version": "2.1.0",
    "description": "Hikvision Doorbell Plugin for Scrypted",
    "author": "Roman Sokolov",
    "license": "Apache",
@@ -31,7 +31,9 @@
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
-         "DeviceCreator"
+         "DeviceCreator",
+         "HttpRequestHandler",
+         "EngineIOHandler"
       ],
       "pluginDependencies": [
          "@scrypted/prebuffer-mixin"
@@ -42,6 +44,7 @@
       "@scrypted/sdk": "file:../../sdk",
       "@scrypted/server": "file:../../server",
       "@types/xml2js": "^0.4.11",
+      "adm-zip": "0.6.1",
       "http-auth-client": "^0.4.1",
       "ip": "^1.1.8",
       "lodash": "^4.17.21",

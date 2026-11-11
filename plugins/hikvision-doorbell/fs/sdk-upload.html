@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hikvision SDK</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1f2328;
+    --muted: #59636e;
+    --line: #d1d9e0;
+    --accent: #0969da;
+    --ok: #1a7f37;
+    --err: #cf222e;
+    --track: #eff2f5;
+    --tonal: rgba(31, 35, 40, 0.08);
+    --tonal-hover: rgba(31, 35, 40, 0.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --fg: #e6edf3;
+      --muted: #9198a1;
+      --line: #3d444d;
+      --accent: #4493f8;
+      --ok: #3fb950;
+      --err: #f85149;
+      --track: #21262d;
+      --tonal: rgba(230, 237, 243, 0.12);
+      --tonal-hover: rgba(230, 237, 243, 0.2);
+    }
+  }
+  * { box-sizing: border-box; }
+  /* flow-root keeps the last margin inside the body, which sizes the iframe */
+  body {
+    display: flow-root;
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .muted { color: var(--muted); }
+  .status { padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; margin-bottom: 16px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  input[type=file] { max-width: 100%; color: var(--fg); font: inherit; }
+  /* Vuetify tonal buttons, like the UI's choice chips; colors come from the UI, see matchHost */
+  button, input[type=file]::file-selector-button {
+    height: 32px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--tonal);
+    color: var(--fg);
+    font-size: 0.9em;
+    font-weight: 500;
+    letter-spacing: 0.0892em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  input[type=file]::file-selector-button { margin-right: 8px; }
+  button:hover:not(:disabled), input[type=file]:hover::file-selector-button { background: var(--tonal-hover); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .bar { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; margin-bottom: 8px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+  .ok { color: var(--ok); }
+  .err { color: var(--err); }
+</style>
+</head>
+<body>
+<main>
+  <div class="status" id="status">Checking the SDK...</div>
+
+  <div class="row">
+    <input type="file" id="file" accept=".zip,application/zip">
+    <button id="upload" disabled>Upload</button>
+  </div>
+  <div class="bar" hidden><div id="progress"></div></div>
+  <div id="result" class="muted"></div>
+</main>
+<script>
+(() => {
+  // The box in a doorbell's settings, which explain where to get the SDK.
+  matchHost();
+
+  // Take the Scrypted UI's theme and grow the iframe to fit. The page is served from the
+  // same origin, so the iframe element's styles (Vuetify theme variables) are readable.
+  function matchHost() {
+    const host = window.frameElement;
+    if (!host)
+      return;
+    const root = document.documentElement.style;
+    let applied = '';
+    // false outside the Vuetify UI
+    const applyTheme = () => {
+      const cs = getComputedStyle(host);
+      const color = (name, alpha) => {
+        const v = cs.getPropertyValue('--v-theme-' + name).trim();
+        return v && (alpha ? 'rgba(' + v + ', ' + alpha + ')' : 'rgb(' + v + ')');
+      };
+      const theme = {
+        '--bg': 'transparent',
+        '--fg': color('on-surface'),
+        '--muted': color('on-surface', 0.7),
+        '--line': color('on-surface', 0.38),
+        '--accent': color('primary'),
+        '--ok': color('success'),
+        '--err': color('error'),
+        '--track': color('on-surface', 0.12),
+        '--tonal': color('on-surface', 0.12),
+        '--tonal-hover': color('on-surface', 0.2),
+      };
+      if (!theme['--fg'])
+        return false;
+      const key = JSON.stringify(theme) + cs.colorScheme;
+      if (key === applied)
+        return true;
+      applied = key;
+      for (const [name, value] of Object.entries(theme))
+        root.setProperty(name, value);
+      // a color-scheme different from the host's makes the browser paint the iframe opaque
+      root.colorScheme = cs.colorScheme;
+      return true;
+    };
+    if (!applyTheme())
+      return;
+    // the UI's light/dark switch changes the theme while the box is open
+    setInterval(() => document.hidden || applyTheme(), 1000);
+    const cs = getComputedStyle(host);
+    root.overflow = 'hidden';
+    document.body.style.font = cs.fontSize + '/1.5 ' + cs.fontFamily;
+
+    // the UI's web font is declared in its own stylesheets; copy those @font-face rules,
+    // with their URLs made absolute, since they are relative to the stylesheet
+    const families = cs.fontFamily.split(',').map((f) => f.trim().replace(/["']/g, ''));
+    const faces = [];
+    for (const sheet of host.ownerDocument.styleSheets) {
+      let rules;
+      try {
+        rules = sheet.cssRules;
+      }
+      catch (e) {
+        continue;
+      }
+      for (const rule of rules) {
+        if (rule.type === CSSRule.FONT_FACE_RULE
+          && families.includes(rule.style.getPropertyValue('font-family').trim().replace(/["']/g, '')))
+          faces.push(rule.cssText.replace(/url\("([^"]*)"\)/g, (_, url) => 'url("' + new URL(url, sheet.href || host.ownerDocument.baseURI) + '")'));
+      }
+    }
+    const style = document.createElement('style');
+    style.textContent = faces.join('\n');
+    document.head.appendChild(style);
+    // the body, not the document: the document is never shorter than the iframe
+    new ResizeObserver(() => host.style.height = Math.ceil(document.body.getBoundingClientRect().height) + 'px').observe(document.body);
+  }
+  const CHUNK = 256 * 1024 - 1;          // data frame = 0x00 marker + chunk, at most 256 KB
+  const MAX_BUFFERED = 4 * 1024 * 1024;
+  const base = location.pathname.replace(/\/sdk\/?$/, '/sdk');
+  const statusEl = document.getElementById('status');
+  const fileEl = document.getElementById('file');
+  const button = document.getElementById('upload');
+  const bar = document.getElementById('progress');
+  const result = document.getElementById('result');
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  // the doorbell whose settings show the box: the status then includes its push state
+  const device = new URLSearchParams(location.search).get('device');
+
+  function show(text, kind) {
+    result.textContent = text;
+    result.className = kind || 'muted';
+  }
+
+  async function loadStatus() {
+    try {
+      const query = device ? '?device=' + encodeURIComponent(device) : '';
+      const response = await fetch(base + '/status' + query, { cache: 'no-store', credentials: 'same-origin' });
+      if (!response.ok)
+        throw new Error('HTTP ' + response.status);
+      const s = await response.json();
+      const parts = [s.installed ? 'Version: ' + s.installed.version : 'No SDK installed'];
+      // without an SDK, or on an unsupported server, the rest already says why push is off
+      if (s.push && s.installed && s.supported)
+        parts.push('Status: ' + s.push);
+      let text = parts.join(' | ');
+      if (!s.supported)
+        text += '. ' + s.reason + ' Call detection keeps polling.';
+      statusEl.textContent = text;
+    }
+    catch (e) {
+      statusEl.textContent = 'Could not read the SDK status (' + e.message + '). Are you signed in to Scrypted?';
+    }
+  }
+
+  async function upload(file) {
+    const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + base + '/upload';
+    const ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+    let finished = false;
+
+    const done = new Promise((resolve) => {
+      ws.onmessage = (event) => {
+        const message = JSON.parse(typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data));
+        if ('progress' in message) {
+          bar.style.width = Math.round(message.progress / file.size * 100) + '%';
+          if (message.progress >= file.size)
+            show('Installing...');
+        }
+        else if (message.ok) {
+          finished = true;
+          bar.style.width = '100%';
+          show('Installed Hikvision SDK ' + message.ok.version + ' (' + message.ok.arch + ').', 'ok');
+          resolve();
+        }
+        else if (message.error) {
+          finished = true;
+          show(message.error, 'err');
+          resolve();
+        }
+      };
+      ws.onclose = () => {
+        if (!finished)
+          show('The connection closed before the upload finished. Try again.', 'err');
+        finished = true;
+        resolve();
+      };
+      ws.onerror = () => {};
+    });
+
+    await new Promise((resolve, reject) => {
+      ws.onopen = resolve;
+      setTimeout(() => reject(new Error('Could not connect to Scrypted.')), 10000);
+    });
+
+    ws.send(JSON.stringify({ start: { size: file.size, name: file.name } }));
+    for (let offset = 0; offset < file.size && !finished; offset += CHUNK) {
+      const chunk = new Uint8Array(await file.slice(offset, offset + CHUNK).arrayBuffer());
+      const frame = new Uint8Array(chunk.length + 1);
+      frame.set(chunk, 1);
+      while (ws.bufferedAmount > MAX_BUFFERED && !finished)
+        await sleep(20);
+      ws.send(frame);
+    }
+    if (!finished) {
+      ws.send(JSON.stringify({ end: true }));
+      show('Installing...');
+    }
+    await done;
+    ws.close();
+  }
+
+  fileEl.onchange = () => {
+    button.disabled = !fileEl.files.length;
+    bar.style.width = '0';
+    show('');
+  };
+
+  button.onclick = async () => {
+    const file = fileEl.files[0];
+    if (!file)
+      return;
+    button.disabled = true;
+    fileEl.disabled = true;
+    bar.style.width = '0';
+    // the bar only shows while an upload runs
+    bar.parentElement.hidden = false;
+    show('Uploading ' + file.name + '...');
+    try {
+      await upload(file);
+    }
+    catch (e) {
+      show(e.message, 'err');
+    }
+    bar.parentElement.hidden = true;
+    button.disabled = false;
+    fileEl.disabled = false;
+    loadStatus();
+  };
+
+  loadStatus();
+  // push state changes (starting, armed, down) without a page reload
+  if (device)
+    setInterval(() => document.hidden || loadStatus(), 3000);
+})();
+</script>
+</body>
+</html>

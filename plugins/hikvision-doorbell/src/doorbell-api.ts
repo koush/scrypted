@@ -10,23 +10,16 @@ import { AuthRequestOptions, AuthRequst, AuthRequestBody } from './auth-request'
 import { inlineAcsEvent } from './alert-events';
 import { OutgoingHttpHeaders } from 'http';
 import libip from 'ip';
+import path from 'path';
 import xml2js from 'xml2js';
 import { HttpFetchResponse } from "@scrypted/server/src/fetch";
+import { HikvisionDoorbellEvent } from './doorbell-events';
+import { CallDetection, CallStatusController, PolledCallStatus, PushSdkConfig } from './call-status-controller';
+import { SdkCallSource } from './sdk/sdk-call-source';
+import { DiagnosticsLog } from './sdk/diagnostics-log';
+import { PushState } from './sdk/sdk-host';
 
-
-export enum HikvisionDoorbellEvent {
-    Motion,
-    CaseTamperAlert,
-    TalkInvite,
-    TalkHangup,
-    TalkOnCall,
-    Unlock,
-    Lock,
-    DoorOpened,
-    DoorClosed,
-    DoorAbnormalOpened,
-    AccessDenied,
-}
+export { HikvisionDoorbellEvent };
 
 interface AcsEventInfo {
     major: number;
@@ -102,21 +95,25 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
     private capabilitiesLoaded: boolean = false;
     private loadCapabilitiesPromise: Promise<void> | null = null;
 
-    // Call status polling control
-    private useCallStatusPolling: boolean = true;
+    // Call detection: poll callStatus, SDK push, or nothing (SIP)
+    private callController?: CallStatusController;
+    private sdkSource?: SdkCallSource;
+    private diagnostics?: DiagnosticsLog;
+    private pushState?: PushState;
 
     // Alert stream health tracking
     private alertTick?: number;
 
     constructor (
-        address: string, 
+        private address: string,
         public port: string, 
-        username: string, 
-        password: string, 
-        callStatusPolling: boolean,
+        private username: string,
+        private password: string,
+        private callDetection: CallDetection,
         public console: Console, 
         public storage: Storage,
-        skipCapabilitiesInit: boolean = false
+        skipCapabilitiesInit: boolean = false,
+        private pushSdk?: PushSdkConfig
     )
     {
         let endpoint = libip.isV4Format (address) ? `${address}:${port}` : `[${address}]:${port}`;
@@ -128,12 +125,12 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
         if (!skipCapabilitiesInit) {
             this.initializeDoorCapabilities();
         }
-        this.useCallStatusPolling = callStatusPolling;
     }
 
     destroy(): void 
     {
         this.listener?.destroy();
+        this.stopCallDetection();
         this.stopAlertStream();
     }
 
@@ -226,6 +223,9 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
 
     emitEvent (eventName: string | symbol, ...args: any[])
     {
+        if (eventName === 'event') {
+            this.diagnostics?.append ('emit', { event: HikvisionDoorbellEvent[args[0]], door: args[1] });
+        }
         try {
             this.listener.emit(eventName, ...args);
         } catch (error) {
@@ -258,12 +258,7 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
             await this.listenAlertStream();
             this.console.info ('Using alert stream for events');
 
-            if (this.useCallStatusPolling) {
-                this.startCallStatusPolling();
-                this.console.info ('Call status polling started');
-            } else {
-                this.console.info ('Call status polling disabled (using SIP)');
-            }
+            this.startCallDetection();
 
             this.listener = new HikvisionDoorbell_Destroyable (() => {
                 this.listener = undefined;
@@ -281,7 +276,7 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
                     }
                 }
                 
-                this.stopCallStatusPolling();
+                this.stopCallDetection();
             });
         }
     
@@ -753,7 +748,8 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
     // Timezone properties
     private deviceTimezone?: string; // GMT offset in format like '+03:00'
     
-    async getCallStatus(): Promise<string>
+    /** The station's call status, or undefined when the request failed. */
+    async getCallStatus(): Promise<string | undefined>
     {
         try {
             const response = await this.request ({
@@ -769,7 +765,7 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
             return callState;
         } catch (e) {
             this.console.error (`Failed to get call status: ${e}`);
-            return 'idle';
+            return undefined;
         }
     }
 
@@ -786,23 +782,17 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
         this.callStatusInterval = setInterval(async () => {
             try {
                 const callState = await this.getCallStatus();
+                if (callState === undefined) {
+                    // a failed request says nothing about the call; reading it as idle would end a live call
+                    return;
+                }
+                this.diagnostics?.append ('poll', { status: callState });
                 
                 if (callState !== this.lastCallState) {
                     this.console.info (`Call state changed: ${this.lastCallState} -> ${callState}`);
-                    
-                    if (callState === 'ring') {
-                        this.console.debug ('Doorbell ringing detected via polling');
-                        this.emitEvent ('event', HikvisionDoorbellEvent.TalkInvite);
-                    } else if (callState === 'idle') {
-                        this.console.debug ('Doorbell hangup detected via polling');
-                        this.emitEvent ('event', HikvisionDoorbellEvent.TalkHangup);
-                    } else if (callState === 'onCall') {
-                        this.console.debug ('Doorbell on call detected via polling');
-                        this.emitEvent ('event', HikvisionDoorbellEvent.TalkOnCall);
-                    }
-                    
                     this.lastCallState = callState;
                 }
+                this.callController?.onPollStatus (callState as PolledCallStatus);
             } catch (e) {
                 this.console.warn (`Call status polling error: ${e}`);
             }
@@ -818,6 +808,84 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
             this.console.info ('Call status polling stopped');
         }
         this.isCallPollingActive = false;
+        // push mode stops the poll at the end of each call; the next call starts from idle
+        this.lastCallState = 'idle';
+    }
+
+    private startCallDetection()
+    {
+        if (this.callDetection === 'none') {
+            this.console.info ('Call status polling disabled (using SIP)');
+            return;
+        }
+        const push = this.callDetection === 'push';
+        const volume = process.env.SCRYPTED_PLUGIN_VOLUME;
+        if (push && this.pushSdk?.diagnostics && volume) {
+            this.diagnostics = new DiagnosticsLog (path.join (volume, 'hcnetsdk', 'diagnostics.jsonl'));
+        }
+
+        this.callController = new CallStatusController ({
+            mode: push ? 'push' : 'poll',
+            emit: (e) => this.emitEvent ('event', e),
+            setPolling: (on) => on ? this.startCallStatusPolling() : this.stopCallStatusPolling(),
+        });
+        this.callController.start();
+        if (!push) {
+            return;
+        }
+        if (!this.pushSdk) {
+            this.console.warn ('Call detection is set to push but the Hikvision SDK is not installed, polling instead');
+            return;
+        }
+
+        const source = new SdkCallSource ({
+            libDir: this.pushSdk.libDir,
+            scriptPath: this.pushSdk.scriptPath,
+            host: this.address,
+            port: this.pushSdk.port,
+            username: this.username,
+            password: this.password,
+            diagnostics: this.pushSdk.diagnostics,
+            console: this.console,
+        });
+        source.on ('ready', (sdkVersion: string) => {
+            this.console.info (`Hikvision SDK ${sdkVersion} connected, waiting for call push`);
+            this.callController?.onSdkReady();
+            this.setPushState ({ state: 'armed' });
+        });
+        source.on ('down', (reason: string) => {
+            this.console.warn (`Hikvision SDK push unavailable (${reason}), polling call status`);
+            this.callController?.onSdkDown();
+            this.setPushState ({ state: 'down', reason });
+        });
+        source.on ('ring', () => this.callController?.onSdkRing());
+        source.on ('end', () => this.callController?.onSdkEnd());
+        source.on ('message', (message) => this.diagnostics?.append ('sdk', message));
+        this.sdkSource = source;
+        this.setPushState ({ state: 'starting' });
+        source.start();
+    }
+
+    private stopCallDetection()
+    {
+        this.sdkSource?.stop();
+        this.sdkSource = undefined;
+        this.callController?.destroy();
+        this.callController = undefined;
+        this.stopCallStatusPolling();
+        this.diagnostics = undefined;
+        this.pushState = undefined;
+    }
+
+    /** State of the SDK sidecar, undefined unless push is running. */
+    getPushState(): PushState | undefined
+    {
+        return this.pushState;
+    }
+
+    private setPushState (state: PushState)
+    {
+        this.pushState = state;
     }
 
     /**
@@ -1209,6 +1277,7 @@ export class HikvisionDoorbellAPI extends HikvisionCameraAPI
         this.console.debug (`AlertStream JSON: ${JSON.stringify (eventData, null, 2)}`);
 
         const inline = inlineAcsEvent (eventData);
+        this.diagnostics?.append ('alert', { eventType, major: inline?.major, minor: inline?.minor });
         if (inline) {
             this.processAcsEvent ({ ...inline, time: '', remoteHostAddr: '', mask: '' });
             return;

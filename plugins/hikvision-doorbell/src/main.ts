@@ -1,10 +1,11 @@
 import { HikvisionCamera } from "../../hikvision/src/main"
-import sdk, { Camera, Device, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, LockState, Readme } from "@scrypted/sdk";
+import sdk, { Camera, Device, DeviceCreatorSettings, DeviceInformation, EngineIOHandler, FFmpegInput, HttpRequest, HttpRequestHandler, HttpResponse, Intercom, MediaObject, MediaStreamOptions, Reboot, RequestPictureOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, LockState, Readme } from "@scrypted/sdk";
 import { PassThrough } from "stream";
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { createRtspMediaStreamOptions, RtspProvider, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { startRtpForwarderProcess } from '../../webrtc/src/rtp-forwarders';
 import { HikvisionDoorbellAPI, HikvisionDoorbellEvent } from "./doorbell-api";
+import { CallDetection, PushSdkConfig } from "./call-status-controller";
 import { SipManager, SipRegistration, SipAudioTarget } from "./sip-manager";
 import { parseNumbers } from "xml2js/lib/processors";
 import { EventEmitter } from 'node:events';
@@ -17,6 +18,9 @@ import { join } from 'path';
 import { makeDebugConsole, DebugController } from "./debug-console";
 import { RtpStreamSwitcher } from "./rtp-stream-switcher";
 import { HttpStreamSwitcher, HttpSession } from "./http-stream-switcher";
+import { installSdkZip } from "./sdk/sdk-package";
+import { refuseSdkRequest, SdkUploadSession } from "./sdk/sdk-upload";
+import { getSdkStatus, pluginVolume, pushStatusText, sidecarScriptPath } from "./sdk/sdk-host";
 
 const { mediaManager } = sdk;
 
@@ -34,6 +38,9 @@ const SIP_SERVER_ROOM_NUMBER_KEY: string = 'sipServerRoomNumber';
 const SIP_SERVER_PROXY_PHONE_KEY: string = 'sipServerProxyPhone';
 const SIP_SERVER_DOORBELL_PHONE_KEY: string = 'sipServerDoorbellPhone';
 const SIP_SERVER_BUTTON_NUMBER_KEY: string = 'sipServerButtonNumber';
+const CALL_DETECTION_KEY: string = 'callDetection';
+const SDK_PORT_KEY: string = 'sdkPort';
+const DEFAULT_SDK_PORT: number = 8000;
 
 const DEFAULT_ROOM_NUMBER: string = '5871';
 const DEFAULT_PROXY_PHONE: string = '10102';
@@ -46,6 +53,10 @@ const CANCEL_CALL_DELAY_SEC: number = 3  // Delay before killing active intercom
 const GRACE_PERIOD_SEC: number = 2  // Grace period for seamless SIP reconnection
 const HTTP_SWITCH_DELAY_SEC: number = 1  // Delay between closing old and opening new HTTP session
 
+function endpointPath(request: HttpRequest): string {
+    return request.url.slice (request.rootPath.length).split ('?')[0];
+}
+
 function channelToCameraNumber(channel: string) {
     if (!channel)
         return;
@@ -56,6 +67,11 @@ enum SipMode {
     Off = "Don't Use SIP",
     Client = "Connect to SIP Proxy", 
     Server = "Emulate SIP Proxy"
+}
+
+enum CallDetectionMode {
+    Polling = "Polling",
+    Push = "Push (Hikvision SDK)"
 }
 
 export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, Intercom, Reboot, Readme {
@@ -534,7 +550,7 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
             this.getHttpPort(), 
             this.getUsername(), 
             this.getPassword(), 
-            this.isCallPolling(),
+            this.getCallDetection(),
             this.console, 
             this.storage
         );
@@ -887,7 +903,8 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
                 combobox: true,
                 value: this.storage.getItem (SIP_MODE_KEY) || SipMode.Off,
                 type: 'string'
-            }
+            },
+            ...await this.callDetectionSettings()
         );
 
         ret.unshift (...this.sipSettings());
@@ -1187,11 +1204,111 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
             this.getHttpPort(), 
             this.getUsername(), 
             this.getPassword(), 
-            this.isCallPolling(),
+            this.getCallDetection(),
             this.console,
             this.storage,
-            true // skipCapabilitiesInit
+            true, // skipCapabilitiesInit
+            this.getPushSdkConfig()
         );
+    }
+
+    /** SDK location for push mode; undefined (so the controller keeps polling) when push cannot run. */
+    private getPushSdkConfig(): PushSdkConfig | undefined
+    {
+        if (this.getCallDetection() !== 'push')
+            return undefined;
+        const status = getSdkStatus();
+        if (!status.supported || !status.installed)
+            return undefined;
+        return {
+            libDir: status.installed.libDir,
+            scriptPath: sidecarScriptPath(),
+            port: parseInt (this.storage.getItem (SDK_PORT_KEY)) || DEFAULT_SDK_PORT,
+            // the base class "Debug Events" (Advanced) toggle also turns on SDK diagnostics
+            diagnostics: this.storage.getItem ('debug') === 'true',
+        };
+    }
+
+    /** A new SDK was uploaded: restart event listening so push picks it up. */
+    onSdkInstalled()
+    {
+        if (this.getCallDetection() === 'push') {
+            // same restart as a settings change: drop the event API, then let the listen loop rebuild it
+            this.eventApi?.destroy();
+            this.eventApi = undefined;
+            this.listener?.then (l => l.emit ('error', new Error ('new Hikvision SDK')));
+        }
+    }
+
+    /**
+     * Push state for the SDK box, undefined unless Push is the saved mode. The box polls it
+     * instead of a "Push Status" setting: a Settings event makes the device page reload its
+     * settings, which drops unsaved edits.
+     */
+    getPushStatus(): string | undefined
+    {
+        if (this.getCallDetection() !== 'push')
+            return undefined;
+        return pushStatusText (getSdkStatus(), this.eventApi?.getPushState());
+    }
+
+    private async callDetectionSettings(): Promise<Setting[]>
+    {
+        if (this.getSipMode() !== SipMode.Off)
+            return [];
+
+        const mode = this.storage.getItem (CALL_DETECTION_KEY) || CallDetectionMode.Polling;
+        // same layout and behaviour as SIP Mode: titled html, then an untitled dropdown
+        // (combobox, as two plain choices render as chips); push settings appear after Save
+        const ret: Setting[] = [
+            {
+                title: 'Call Detection',
+                value: `<p>Polling asks the doorbell for its call status every second. Push receives call start and end from the Hikvision SDK and polls only during a call.</p>
+                <p><b>Warning: Some firmware versions do not push call events; if rings are missed, use Polling.</b></p>`,
+                type: 'html',
+                readonly: true,
+            },
+            {
+                key: CALL_DETECTION_KEY,
+                choices: Object.values (CallDetectionMode),
+                combobox: true,
+                value: mode,
+            },
+        ];
+        if (mode !== CallDetectionMode.Push)
+            return ret;
+
+        const status = getSdkStatus();
+        const endpoint = await sdk.endpointManager.getPath();
+        // only the international site needs no sign-in, but it has no arm64 package
+        let download: string;
+        if (status.arch === 'arm64')
+            download = `Download <a href="https://open.hikvision.com/download/5cda567cf47ae80dd41a54b3?type=10" target="_blank" rel="noopener">ArmLinux64</a> from the Hikvision Open Platform and upload the zip below.`;
+        else if (status.arch === 'x64')
+            download = `Download <a href="https://www.hikvision.com/en/support/tools/hitools/clf4633a00e385d6ea/" target="_blank" rel="noopener">Device Network SDK_Linux64</a> from Hikvision (no sign-in) and upload the zip below.`;
+        else
+            download = `Hikvision has no SDK for this server (${status.arch}).`;
+
+        // the titled html block goes first: an untitled selector has no row
+        // margin, so a plain setting right after it would overlap it
+        ret.push (
+            {
+                key: 'sdkSetup',
+                title: 'Hikvision SDK',
+                type: 'html',
+                readonly: true,
+                value: `<p>Push needs Hikvision's Device Network SDK, which the plugin can't include. ${download}</p>
+                <iframe src="${endpoint}sdk?device=${encodeURIComponent (this.nativeId)}" title="Hikvision SDK upload" style="display:block;width:100%;height:150px;border:0;margin-top:8px"></iframe>`,
+            },
+            {
+                key: SDK_PORT_KEY,
+                title: 'SDK Port',
+                description: 'Device SDK (server) port, 8000 unless changed on the doorbell.',
+                type: 'number',
+                value: parseInt (this.storage.getItem (SDK_PORT_KEY)) || DEFAULT_SDK_PORT,
+            },
+        );
+        return ret;
     }
 
     private async stopRing()
@@ -1489,17 +1606,70 @@ export class HikvisionCameraDoorbell extends HikvisionCamera implements Camera, 
         this.console.debug ('Using call status polling for invite detection');
     }
 
-    private isCallPolling(): boolean {
-        return this.getSipMode() === SipMode.Off;
+    private getCallDetection(): CallDetection {
+        if (this.getSipMode() !== SipMode.Off)
+            return 'none';
+        return this.storage.getItem (CALL_DETECTION_KEY) === CallDetectionMode.Push ? 'push' : 'poll';
     }
 }
 
-export class HikvisionDoorbellProvider extends RtspProvider
+export class HikvisionDoorbellProvider extends RtspProvider implements HttpRequestHandler, EngineIOHandler
 {
     static CAMERA_NATIVE_ID_KEY: string = 'cameraNativeId';
 
     constructor() {
         super();
+    }
+
+    // SDK upload page: <endpoint>/sdk (page), /sdk/status (JSON), /sdk/upload (WebSocket)
+    async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        const path = endpointPath (request);
+        const refused = refuseSdkRequest (request);
+        if (refused) {
+            this.console.warn (`Refused SDK page request: ${refused}`);
+            response.send ('Forbidden', { code: 403 });
+        }
+        else if (path === '/sdk' || path === '/sdk/') {
+            response.sendFile ('sdk-upload.html', {
+                headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+            });
+        }
+        else if (path === '/sdk/status') {
+            // ?device=<nativeId> (the box in a doorbell's settings) adds that doorbell's push state
+            const nativeId = new URL (request.url, 'http://localhost').searchParams.get ('device');
+            const device = nativeId && this.devices.get (nativeId);
+            const push = device instanceof HikvisionCameraDoorbell ? device.getPushStatus() : undefined;
+            response.send (JSON.stringify ({ ...getSdkStatus(), push }), {
+                headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+            });
+        }
+        else {
+            response.send ('Not Found', { code: 404 });
+        }
+    }
+
+    async onConnection(request: HttpRequest, ws: WebSocket): Promise<void> {
+        const refused = refuseSdkRequest (request);
+        if (refused || endpointPath (request) !== '/sdk/upload') {
+            if (refused)
+                this.console.warn (`Refused SDK upload connection: ${refused}`);
+            ws.close();
+            return;
+        }
+        const session = new SdkUploadSession (async (zip) => {
+            const info = await installSdkZip (zip, pluginVolume(), process.arch);
+            this.console.info (`Hikvision SDK ${info.version} (${info.arch}) installed`);
+            this.onSdkInstalled();
+            return info;
+        }, (message) => ws.send (message));
+        ws.onmessage = (event) => session.onMessage (event.data);
+    }
+
+    private onSdkInstalled() {
+        for (const device of this.devices.values()) {
+            if (device instanceof HikvisionCameraDoorbell)
+                device.onSdkInstalled();
+        }
     }
 
     getScryptedDeviceCreator(): string {
@@ -1564,7 +1734,7 @@ export class HikvisionDoorbellProvider extends RtspProvider
                 `${settings.httpPort || '80'}`,
                  username, 
                  password, 
-                 false,
+                 'none',
                  this.console, 
                  this.storage
                 );

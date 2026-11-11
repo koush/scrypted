@@ -53,6 +53,23 @@ This mode should be used if you have an **Indoor Station** and a `doorbell` conn
 
 You should also enable the **Hik-Connect** (Platform Access Mode) in the `doorbell` settings so that `this device` receives a call notification. These are the implementation features of the doorbell software, unfortunately.
 
+##### Call detection: Push (Hikvision SDK)
+
+In this mode the plugin learns about calls through the **Call Detection** setting:
+
+- **Polling** (default) asks the `doorbell` for its call status every second.
+- **Push (Hikvision SDK)** receives call start and end from the `doorbell` the moment they happen, over Hikvision's Device Network SDK, and polls only during a call (answering on the indoor station is not pushed, and the plugin needs it to stop ringing).
+
+Push needs the Device Network SDK, which Hikvision does not allow plugins to include:
+
+1. Download the SDK for the Scrypted server's processor: **ArmLinux64** from the [Hikvision Open Platform](https://open.hikvision.com/download/5cda567cf47ae80dd41a54b3?type=10) for arm64 (sign-in with a phone number), or **Device Network SDK_Linux64** from [Hikvision HiTools](https://www.hikvision.com/en/support/tools/hitools/clf4633a00e385d6ea/) for x64 (no sign-in).
+2. Select **Push (Hikvision SDK)**, save, and upload the zip, exactly as downloaded, in the **Hikvision SDK** block that appears. Only the Linux library folder is kept, in `hcnetsdk/` in the plugin's data folder.
+3. The **Hikvision SDK** block shows `Status: Armed` once the SDK is connected to the `doorbell` (SDK port 8000 unless changed on the `doorbell`).
+
+Push runs on Linux arm64 and x64 servers with `python3` installed. Whenever push cannot run (no SDK, unsupported server, `doorbell` unreachable), the **Hikvision SDK** block says why and the plugin keeps polling. If the SDK helper process exits or loses its connection to the `doorbell`, the plugin polls until it is back; a helper that hangs without exiting is not detected, and rings are missed until the plugin is reloaded. Some firmware versions do not push call events; if rings are missed, switch back to **Polling**.
+
+With **Debug Events** (Advanced) on, push mode also writes every event the `doorbell` sends over the SDK, plus poll results, to `hcnetsdk/diagnostics.jsonl` (5 MB, one rotation). Use it to check what your firmware pushes, then turn it off.
+
 #### Connect to SIP Proxy
 
 This mode should be used when you have a separate SIP gateway and all your intercom devices work via SIP telephony.
