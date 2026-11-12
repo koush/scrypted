@@ -6,6 +6,7 @@ import { connectCameraAPI, OnvifCameraAPI } from '../onvif-api';
 import { OnvifIntercom } from '../onvif-intercom';
 import { AIState, BatteryInfoResponse, DeviceStatusResponse, Enc, EventsResponse } from './api';
 import { ReolinkNvrDevice } from './nvr';
+import { getChannelIntercomStreamUrl } from './intercom';
 
 export const moToB64 = async (mo: MediaObject) => {
     const bufferImage = await sdk.mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg');
@@ -341,11 +342,8 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
-        if (!this.onvifIntercom.url) {
-            const client = await this.getOnvifClient();
-            const streamUrl = await client.getStreamUrl();
-            this.onvifIntercom.url = streamUrl;
-        }
+        const client = await this.getOnvifClient();
+        this.onvifIntercom.url = await getChannelIntercomStreamUrl(client, this.getRtspChannel());
         return this.onvifIntercom.startIntercom(media);
     }
 
@@ -527,7 +525,7 @@ export class ReolinkNvrCamera extends RtspSmartCamera implements Camera, DeviceP
 
     createOnvifClient() {
         const { username, password, httpPort, ipAddress } = this.nvrDevice.storageSettings.values;
-        const address = `${ipAddress}:${httpPort}`;
+        const address = `${ipAddress}:${httpPort || 80}`;
         return connectCameraAPI(address, username, password, this.getLogger(), undefined);
     }
 
