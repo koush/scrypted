@@ -28,7 +28,7 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
         },
     });
 
-    _admin: boolean;
+    _admin!: boolean;
     async getAdmin() {
         if (this._admin !== undefined)
             return this._admin;
@@ -48,7 +48,7 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
 
     async getScryptedUserAccessControl(): Promise<ScryptedUserAccessControl> {
         if (await this.getAdmin())
-            return;
+            return undefined!;
 
         const self = sdk.deviceManager.getDeviceState(this.nativeId);
 
@@ -60,6 +60,8 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
                         addAccessControlsForInterface(self.id, ScryptedInterface.ScryptedDevice),
                         addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/webrtc').id,
                             ScryptedInterface.ScryptedDevice,
+                            ScryptedInterface.MediaConverter,
+                            ScryptedInterface.BufferConverter,
                             ScryptedInterface.EngineIOHandler),
                         addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/core').id,
                             ScryptedInterface.ScryptedDevice,
@@ -77,7 +79,7 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
     }
 
     get username() {
-        return this.nativeId.substring('user:'.length);
+        return this.nativeId!.substring('user:'.length);
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -120,7 +122,7 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
             ],
             type: ScryptedDeviceType.Person,
         })
-        await usersService.addUser(user.username, value.toString(), admin ? undefined : aclId);
+        await usersService.addUser(user.username, value!.toString(), admin ? undefined : aclId);
     }
 }
 
@@ -177,7 +179,7 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
         const nativeId = `user:${username}`;
         const aclId = await sdk.deviceManager.onDeviceDiscovered({
             providerNativeId: this.nativeId,
-            name: username.toString(),
+            name: username!.toString(),
             nativeId,
             interfaces: [
                 ScryptedInterface.ScryptedUser,
@@ -210,7 +212,7 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
                 type: ScryptedDeviceType.Person,
             })),
         };
-        const nativeIds = new Set(manifest.devices.map(d => d.nativeId));
+        const nativeIds = new Set(manifest.devices!.map(d => d.nativeId));
         for (const nativeId of sdk.deviceManager.getNativeIds()) {
             nativeIds.delete(nativeId);
         }
@@ -219,6 +221,6 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
             await sdk.deviceManager.onDevicesChanged(manifest);
         }
 
-        return manifest.devices.length;
+        return manifest.devices!.length;
     }
 }
