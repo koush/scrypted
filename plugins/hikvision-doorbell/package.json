@@ -1,6 +1,6 @@
 {
    "name": "@vityevato/hikvision-doorbell",
-   "version": "2.0.8",
+   "version": "2.0.9",
    "description": "Hikvision Doorbell Plugin for Scrypted",
    "author": "Roman Sokolov",
    "license": "Apache",
@@ -15,7 +15,8 @@
       "scrypted-debug": "scrypted-debug",
       "scrypted-deploy": "scrypted-deploy",
       "scrypted-readme": "scrypted-readme",
-      "scrypted-package-json": "scrypted-package-json"
+      "scrypted-package-json": "scrypted-package-json",
+      "test": "node --import tsx --test test/*.test.ts"
    },
    "keywords": [
       "scrypted",
@@ -25,6 +26,7 @@
       "doorbell"
    ],
    "scrypted": {
+      "rollup": true,
       "name": "Hikvision Doorbell Plugin",
       "type": "DeviceProvider",
       "interfaces": [
@@ -43,11 +45,12 @@
       "http-auth-client": "^0.4.1",
       "ip": "^1.1.8",
       "lodash": "^4.17.21",
-      "xml2js": "^0.6.0",
-      "sip": "git+https://github.com/kirm/sip.js.git"
+      "sip": "git+https://github.com/kirm/sip.js.git",
+      "xml2js": "^0.6.0"
    },
    "devDependencies": {
       "@types/ip": "^1.1.3",
-      "@types/node": "^18.15.11"
+      "@types/node": "^22.20.5",
+      "tsx": "^4.23.15"
    }
 }
