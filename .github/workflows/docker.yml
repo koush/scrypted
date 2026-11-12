@@ -93,6 +93,7 @@ jobs:
           context: install/docker/
           file: install/docker/Dockerfile${{ matrix.BASE[1] }}
           platforms: linux/amd64,linux/arm64
+          pull: true
           push: true
           # when publishing a tag (beta or latest), platform and version, create some tags as follows.
           # using beta 0.0.1 as an example
