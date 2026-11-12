@@ -197,12 +197,26 @@ export class RtmpClient {
     });
 
     await new Promise<void>((resolve, reject) => {
-      this.socket!.connect(port, host, () => {
+      const socket = this.socket!;
+      const cleanup = () => {
+        socket.removeListener('error', onError);
+        socket.removeListener('close', onClose);
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const onClose = () => {
+        cleanup();
+        reject(new Error('RTMP socket closed before connection completed'));
+      };
+      socket.once('error', onError);
+      socket.once('close', onClose);
+      socket.connect(port, host, () => {
+        cleanup();
         this.console?.log('Socket connected');
         resolve();
       });
-
-      this.socket!.once('error', reject);
     });
 
     this.console?.log('Performing handshake...');
