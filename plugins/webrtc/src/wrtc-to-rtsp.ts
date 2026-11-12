@@ -10,6 +10,7 @@ import { startRtpForwarderProcess } from "./rtp-forwarders";
 import { getFFmpegRtpAudioOutputArguments, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { BundlePolicy, RTCIceCandidate, RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket } from "./werift";
 import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive, logIsLocalIceTransport } from "./werift-util";
+import { createRtspSourceLifecycle } from './rtsp-source-lifecycle';
 
 const { mediaManager } = sdk;
 
@@ -47,15 +48,12 @@ export async function createRTCPeerConnectionSource(options: {
     const intercom = new Deferred<Intercom>();
     ignoreDeferred(sessionControl, intercom);
 
-    const cleanup = () => {
+    const { cleanup, sendTrack } = createRtspSourceLifecycle(clientPromise, () => {
         console.log('webrtc/rtsp cleaning up');
-        clientPromise.then(client => client.destroy()).catch(() => { });
         sessionControl.promise.then(sc => sc.endSession()).catch(() => { });
         peerConnection.promise.then(pc => pc.close()).catch(() => { });
         ignorePromise(intercom.promise.then(intercom => intercom.stopIntercom()));
-    };
-
-    clientPromise.then(socket => socket.on('close', cleanup));
+    }, console);
 
     const start = (async () => {
         const client = await clientPromise;
@@ -120,9 +118,9 @@ export async function createRTCPeerConnectionSource(options: {
                             gotAudio = true;
                             console.log('first audio packet', Date.now() - timeStart);
                         }
-                        rtspServer.sendTrack(audioTrack, rtp.serialize(), false);
+                        sendTrack(rtspServer, audioTrack, rtp.serialize(), false);
                     });
-                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(audioTrack, rtp.serialize(), true));
+                    track.onReceiveRtcp.subscribe(rtp => sendTrack(rtspServer, audioTrack, rtp.serialize(), true));
                 });
             };
 
@@ -138,9 +136,9 @@ export async function createRTCPeerConnectionSource(options: {
                             const naluTypes = getNaluTypesInNalu(rtp.payload);
                             console.log('video packet types', ...[...naluTypes]);
                         }
-                        rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
+                        sendTrack(rtspServer, videoTrack, rtp.serialize(), false);
                     });
-                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
+                    track.onReceiveRtcp.subscribe(rtp => sendTrack(rtspServer, videoTrack, rtp.serialize(), true));
 
                     track.onReceiveRtp.once(() => {
                         clearTimeout(timeout);
