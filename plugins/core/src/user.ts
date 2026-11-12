@@ -1,4 +1,4 @@
-import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceManifest, DeviceProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedUser, ScryptedUserAccessControl, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import sdk, { DeviceCreator, DeviceCreatorSettings, DeviceManifest, DeviceProvider, Readme, ScryptedDeviceAccessControl, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedUser, ScryptedUserAccessControl, Setting, Settings, SettingValue } from "@scrypted/sdk";
 import { addAccessControlsForInterface } from "@scrypted/sdk/acl";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 export const UsersNativeId = 'users';
@@ -52,17 +52,33 @@ export class User extends ScryptedDeviceBase implements Settings, ScryptedUser {
 
         const self = sdk.deviceManager.getDeviceState(this.nativeId);
 
+        const acls: ScryptedDeviceAccessControl[] = [];
+        if (sdk.systemManager.getDeviceByName('@scrypted/webrtc')) {
+            acls.push(
+                addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/webrtc').id,
+                    ScryptedInterface.ScryptedDevice,
+                    ScryptedInterface.MediaConverter,
+                    ScryptedInterface.BufferConverter,
+                    ScryptedInterface.EngineIOHandler)
+            )
+        }
+
+        if (sdk.systemManager.getDeviceByName('@scrypted/snapshot')) {
+            acls.push(
+                addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/snapshot').id,
+                    ScryptedInterface.ScryptedDevice,
+                    ScryptedInterface.MediaConverter,
+                    ScryptedInterface.BufferConverter)
+            )
+        }
+
         const ret: ScryptedUserAccessControl = {
             devicesAccessControls: [
                 ...this.storageSettings.values.defaultAccess
                     ? [
                         // grant this? not sure.
                         addAccessControlsForInterface(self.id, ScryptedInterface.ScryptedDevice),
-                        addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/webrtc').id,
-                            ScryptedInterface.ScryptedDevice,
-                            ScryptedInterface.MediaConverter,
-                            ScryptedInterface.BufferConverter,
-                            ScryptedInterface.EngineIOHandler),
+                        ...acls,
                         addAccessControlsForInterface(sdk.systemManager.getDeviceByName('@scrypted/core').id,
                             ScryptedInterface.ScryptedDevice,
                             ScryptedInterface.EngineIOHandler),
@@ -135,12 +151,12 @@ export class UsersCore extends ScryptedDeviceBase implements Readme, DeviceProvi
         };
 
         this.syncUsers()
-        .then(length => {
-            if (!length) {
-                this.console.log('no users found, looping for first user');
-                setInterval(() => this.syncUsers(), 60 * 1000);
-            }
-        })
+            .then(length => {
+                if (!length) {
+                    this.console.log('no users found, looping for first user');
+                    setInterval(() => this.syncUsers(), 60 * 1000);
+                }
+            })
     }
 
     async getDevice(nativeId: string): Promise<any> {
