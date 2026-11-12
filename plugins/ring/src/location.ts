@@ -174,7 +174,7 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
             // not logging this error as it is a valid case to not have a security panel
         });
 
-        if (this.location.hasAlarmBaseStation) {
+        if (this.location.hasAlarmBaseStation || this.interfaces?.includes(ScryptedInterface.SecuritySystem)) {
             this.location.getLocationMode();
         }
 
@@ -363,7 +363,8 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
             SecuritySystemMode.AwayArmed,
             SecuritySystemMode.HomeArmed
         ]
-        if (this.plugin.settingsStorage.values.nightModeBypassAlarmState !== 'Disabled') {
+        // Ring Location Modes have no night mode
+        if (this.location.hasAlarmBaseStation && this.plugin.settingsStorage.values.nightModeBypassAlarmState !== 'Disabled') {
             supportedModes.push(SecuritySystemMode.NightArmed)
         }
 
@@ -376,6 +377,16 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
     }
 
     async armSecuritySystem(mode: SecuritySystemMode): Promise<void> {
+        if (!this.location.hasAlarmBaseStation) {
+            if (mode === SecuritySystemMode.AwayArmed)
+                await this.location.setLocationMode('away');
+            else if (mode === SecuritySystemMode.HomeArmed)
+                await this.location.setLocationMode('home');
+            else if (mode === SecuritySystemMode.Disarmed)
+                await this.location.setLocationMode('disarmed');
+            return;
+        }
+
         if (mode === SecuritySystemMode.AwayArmed) {
             await this.location.armAway();
         } else if (mode === SecuritySystemMode.HomeArmed) {
@@ -393,6 +404,10 @@ export class RingLocationDevice extends ScryptedDeviceBase implements DeviceProv
     }
 
     async disarmSecuritySystem(): Promise<void> {
+        if (!this.location.hasAlarmBaseStation) {
+            await this.location.setLocationMode('disarmed');
+            return;
+        }
         await this.location.disarm();
     }
 }
