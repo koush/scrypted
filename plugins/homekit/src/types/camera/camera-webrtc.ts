@@ -157,6 +157,15 @@ export function createHomeKitWebRTCDelegate(camera: RTCSignalingChannel, console
         console.log('HSV3 WebRTC ended');
     };
 
+    // Playback hints may wait for talkback negotiation or be unsupported. They
+    // must not block session control, key updates, or a reoffer response.
+    const hintPlayback = (control: RTCSessionControl) => {
+        void Promise.resolve().then(() => control.setPlayback({
+            audio: 'on-demand',
+            video: false,
+        })).catch(() => console.warn('HSV3 WebRTC playback hint failed; retaining session'));
+    };
+
     const delegate: WebRTCStreamingDelegate & { stopAll(): void; onSessionEnded?: (id: string) => Promise<void> } = {
         async handleSolicitOffer(request) {
             if (sessions.has(request.sessionIdentifier) || sessions.size >= 16)
@@ -184,15 +193,12 @@ export function createHomeKitWebRTCDelegate(camera: RTCSignalingChannel, console
             (async () => {
                 try {
                     const control = await camera.startRTCSignalingSession(signaling);
-                    await control.setPlayback({
-                        audio: 'on-demand',
-                        video: false,
-                    });
                     if (sessions.get(id) !== session) {
                         await control?.endSession();
                         return;
                     }
                     session.control = control;
+                    hintPlayback(control);
                     for await (const update of session.receiveKeys.queue) {
                         if (sessions.get(id) !== session)
                             break;
@@ -244,17 +250,16 @@ export function createHomeKitWebRTCDelegate(camera: RTCSignalingChannel, console
             console.log('HSV3 WebRTC answer forwarded');
         },
         async handleReoffer(request) {
-            console.warn(request);
             const session = sessions.get(request.sessionIdentifier);
-            await session.control!.setRemoteDescription({
+            const control = session?.control;
+            if (!control)
+                throw new Error('HomeKit remote session control is not ready');
+            await control.setRemoteDescription({
                 type: 'offer',
                 sdp: request.sdpOffer,
             }, );
-            const response = await session.control.createLocalDescription('answer');
-            session.control.setPlayback({
-                audio: 'on-demand',
-                video: false,
-            });
+            const response = await control.createLocalDescription('answer');
+            hintPlayback(control);
             return {
                 sdpAnswer: response.sdp,
             }
