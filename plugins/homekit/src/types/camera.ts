@@ -1,8 +1,8 @@
 import type { Resolution, RTCSignalingChannel } from '@scrypted/sdk';
-import sdk, { AudioSensor, Camera, DeviceProvider, Intercom, MotionSensor, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { AudioSensor, Camera, DeviceProvider, Intercom, MotionSensor, OnOff, PrivacyMode, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { createCameraStorageSettings } from '../camera-mixin';
 import { DummyDevice, addSupportedType, bindCharacteristic } from '../common';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, H264Level, H264Profile, MediaContainerType, RecordingPacket, SRTPCryptoSuites, SecureVideoController, Service, VideoCodecType, WithUUID } from '../hap';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingConfiguration, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, ChangeReason, Characteristic, CharacteristicEventTypes, H264Level, H264Profile, MediaContainerType, RecordingPacket, SRTPCryptoSuites, SecureVideoController, Service, VideoCodecType, WithUUID } from '../hap';
 import type { HomeKitPlugin } from '../main';
 import { setServiceName } from '../service-names';
 import { createMultiTierRtpDelegate } from './camera/camera-multitier-rtp';
@@ -22,7 +22,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
-    async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom & OnOff & Resolution, homekitPlugin: HomeKitPlugin) {
+    async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom & OnOff & PrivacyMode & Resolution, homekitPlugin: HomeKitPlugin) {
         const console = deviceManager.getMixinConsole(device.id, undefined);
         const storage = deviceManager.getMixinStorage(device.id, undefined);
         const cameraStorage = createCameraStorageSettings({ storage, onDeviceEvent: undefined });
@@ -280,6 +280,15 @@ addSupportedType({
             }
         }
 
+        // HSV3 gates streaming on its global operating mode and snapshots/recording on the recording
+        // one, and configures recording without a motion sensor, so bind every one that exists.
+        const operatingModeServices = [
+            controller instanceof SecureVideoController ? controller.globalOperatingModeService : undefined,
+            controller.recordingManagement?.operatingModeService,
+        ].filter((service): service is Service => !!service);
+        if (operatingModeServices.length && device.interfaces.includes(ScryptedInterface.PrivacyMode) && storage.getItem('privacyMode') === 'true')
+            bindPrivacyMode(device, operatingModeServices, console);
+
         // if the camera is a device provider, merge in child devices and 
         // ensure the devices are skipped by the rest of homekit by
         // reporting that they've been merged
@@ -298,3 +307,96 @@ addSupportedType({
         return accessory;
     }
 });
+
+/**
+ * Bind HomeKitCameraActive (the camera's own on/off in the Home app, also driven by
+ * the Home/Away camera modes) to the camera's privacy mode: privacy mode on means inactive.
+ */
+function bindPrivacyMode(device: ScryptedDevice & PrivacyMode, operatingModeServices: Service[], console: Console) {
+    const characteristics = operatingModeServices.map(service => service.getCharacteristic(Characteristic.HomeKitCameraActive));
+
+    // The value last applied, shown until the camera reports it, since its state event can trail
+    // the call. Bounded in time, so a lost event can't hide later changes made elsewhere.
+    let pending: boolean | undefined;
+    let target: boolean | undefined;
+    let pendingTimeout: NodeJS.Timeout | undefined;
+    // Show the newest intended state: a queued write, then one awaiting its event, then the device.
+    const isActive = () => !(target ?? pending ?? device.privacyMode);
+    // Only on a real change: every update persists HAP controller state and, under HSV3, re-runs the
+    // operating mode listeners.
+    const sync = () => characteristics.forEach(c => {
+        if (!!c.value !== isActive())
+            c.updateValue(isActive());
+    });
+    const setPending = (value: boolean | undefined) => {
+        pending = value;
+        clearTimeout(pendingTimeout);
+        if (value !== undefined)
+            pendingTimeout = setTimeout(() => setPending(undefined), 30000);
+        sync();
+    };
+
+    // Switching can be slow (a round trip to the camera), so answer HAP right away and apply in
+    // the background, one change at a time, ending on the latest write. Every write is applied,
+    // including the mode hubs re-send on each connection: skipping writes that look redundant
+    // against the camera's possibly lagging state can drop a real change.
+    let applying = false;
+    let events = 0;
+    const apply = async () => {
+        applying = true;
+        while (target !== undefined) {
+            const privacyMode = target;
+            target = undefined;
+            const eventsBefore = events;
+            const previous = pending;
+            setPending(privacyMode);
+            const start = Date.now();
+            try {
+                await device.setPrivacyMode(privacyMode);
+                console.log(`privacy mode ${privacyMode ? 'on' : 'off'} (${Date.now() - start} ms)`);
+                // Confirmed only by an event during the call; a cached value that matches may be stale.
+                const confirmed = events !== eventsBefore && device.privacyMode === privacyMode;
+                setPending(confirmed ? undefined : privacyMode);
+            }
+            catch (e) {
+                console.error('failed to set privacy mode', e);
+                // Fall back to any earlier applied value still awaiting its event.
+                setPending(previous);
+            }
+        }
+        applying = false;
+    };
+
+    for (const active of characteristics) {
+        active.on(CharacteristicEventTypes.SET, (value, callback) => {
+            callback();
+            target = !value;
+            if (!applying)
+                apply();
+            else
+                // Mirror a queued write onto the other operating mode now; HSV3 gates streaming
+                // and recording separately and the in-flight call may take a while.
+                sync();
+        });
+
+        // HAP restores its persisted value when controller storage loads; the camera is the source
+        // of truth. Re-sync once the restore finishes, since it sets the sensors' StatusActive last.
+        // The characteristic is a uint8, so compare as booleans.
+        active.on(CharacteristicEventTypes.CHANGE, change => {
+            if (change.reason !== ChangeReason.WRITE && !!change.newValue !== isActive())
+                setImmediate(() => {
+                    if (!!active.value !== isActive())
+                        sync();
+                });
+        });
+    }
+
+    device.listen(ScryptedInterface.PrivacyMode, () => {
+        events++;
+        if (device.privacyMode === pending)
+            setPending(undefined);
+        else
+            sync();
+    });
+    sync();
+}

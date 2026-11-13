@@ -1130,6 +1130,19 @@ export interface PanTiltZoom {
 }
 
 /**
+ * PrivacyMode turns the camera itself off: it stops capturing and streaming video for every client,
+ * as opposed to a client choosing not to view or record it.
+ */
+export interface PrivacyMode {
+  /**
+   * True when the camera is turned off.
+   */
+  privacyMode?: boolean;
+
+  setPrivacyMode(privacyMode: boolean): Promise<void>;
+}
+
+/**
  * Display devices can play back audio and video.
  */
 export interface Display {
@@ -2409,6 +2422,7 @@ export enum ScryptedInterface {
   VideoRecorder = "VideoRecorder",
   VideoRecorderManagement = "VideoRecorderManagement",
   PanTiltZoom = "PanTiltZoom",
+  PrivacyMode = "PrivacyMode",
   EventRecorder = "EventRecorder",
   VideoClips = "VideoClips",
   VideoCameraConfiguration = "VideoCameraConfiguration",

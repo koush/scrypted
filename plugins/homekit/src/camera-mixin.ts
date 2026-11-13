@@ -160,6 +160,17 @@ ${this.storageSettings.values.qrCode}
             });
         }
 
+        if (this.interfaces.includes(ScryptedInterface.PrivacyMode)
+            && (this.interfaces.includes(ScryptedInterface.MotionSensor) || this.cameraStorageSettings.values.secureVideo3)) {
+            settings.push({
+                title: 'Camera Privacy Mode',
+                description: 'Link the camera\'s on/off in the Home app to the camera\'s privacy mode. Turning the camera off in the Home app, or a Home/Away mode set to Off, turns the camera itself off for every client. Home hubs reapply the Home app\'s camera mode when they reconnect, so a change made elsewhere (the camera\'s own app) lasts until then. Requires HomeKit Secure Video recording.',
+                key: 'privacyMode',
+                value: this.storage.getItem('privacyMode') === 'true',
+                type: 'boolean',
+            });
+        }
+
         return [...await super.getMixinSettings(), ...settings, ...await this.cameraStorageSettings.getSettings()];
     }
 
@@ -171,12 +182,17 @@ ${this.storageSettings.values.qrCode}
             return this.cameraStorageSettings.putSetting(key, value);
         }
 
+        const oldValue = this.storage.getItem(key);
         if (key === 'debugMode') {
             this.storage.setItem(key, JSON.stringify(value));
         }
         else {
             this.storage.setItem(key, value?.toString() || '');
         }
+
+        // privacy mode is bound when the accessory is created.
+        if (key === 'privacyMode' && oldValue !== this.storage.getItem(key))
+            this.alertReload();
 
         deviceManager.onMixinEvent(this.id, this, ScryptedInterface.Settings, undefined);
     }
