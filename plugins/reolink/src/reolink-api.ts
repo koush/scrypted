@@ -96,6 +96,7 @@ export class ReolinkCameraClient {
     credential: AuthFetchCredentialState;
     parameters: Record<string, string>;
     tokenLease: number;
+    private loginPromise: Promise<Record<string, string>>;
 
     constructor(public host: string, public username: string, public password: string, public channelId: number, public console: Console, public readonly forceToken?: boolean) {
         this.credential = {
@@ -121,11 +122,22 @@ export class ReolinkCameraClient {
         return pt;
     }
 
-    async login() {
-        if (this.tokenLease > Date.now()) {
-            return;
-        }
+    async login(forceToken = this.forceToken) {
+        if (this.loginPromise)
+            return this.loginPromise;
+        if (this.tokenLease > Date.now())
+            return this.parameters;
 
+        this.loginPromise = this.loginInternal(forceToken);
+        try {
+            return await this.loginPromise;
+        }
+        finally {
+            this.loginPromise = undefined;
+        }
+    }
+
+    private async loginInternal(forceToken: boolean) {
         if (this.parameters?.token) {
             this.console.log(`token expired at ${this.tokenLease}, logging out before renewing...`);
             await this.logout();
@@ -135,9 +147,10 @@ export class ReolinkCameraClient {
             this.console.log('performing initial login...');
         }
 
-        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password, this.forceToken);
+        const { parameters, leaseTimeSeconds } = await getLoginParameters(this.host, this.username, this.password, forceToken);
         this.parameters = parameters;
         this.tokenLease = Date.now() + 1000 * leaseTimeSeconds;
+        return parameters;
     }
 
     async logout() {
@@ -166,13 +179,52 @@ export class ReolinkCameraClient {
     }
 
     async requestWithLogin(options: HttpFetchOptions<Readable>, body?: Readable) {
-        await this.login();
-        const url = options.url as URL;
-        const params = url.searchParams;
-        for (const [k, v] of Object.entries(this.parameters)) {
-            params.set(k, v);
+        // API POST bodies are small JSON payloads. Keep the bytes so a rejected
+        // request can be replayed with a fresh stream, rather than a consumed one.
+        let payload: Buffer;
+        if (body) {
+            const chunks: Buffer[] = [];
+            for await (const chunk of body)
+                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            payload = Buffer.concat(chunks);
         }
-        return this.request(options, body);
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const parameters = await this.login(attempt ? true : this.forceToken);
+            const url = new URL(options.url.toString());
+            for (const key of ['token', 'user', 'password'])
+                url.searchParams.delete(key);
+            for (const [key, value] of Object.entries(parameters))
+                url.searchParams.set(key, value);
+
+            const response = await this.request({ ...options, url },
+                payload === undefined ? undefined : Readable.from([payload]));
+            let result = response.body;
+            // Snapshots return buffers and some commands return text, but their
+            // authentication errors are still JSON. Leave successful media intact.
+            if (Buffer.isBuffer(result) || typeof result === 'string') {
+                try {
+                    result = JSON.parse(result.toString());
+                }
+                catch {
+                    return response;
+                }
+            }
+            const entries = Array.isArray(result) ? result : [result];
+            const loginRequired = (entry: any) => entry?.error?.rspCode === -6;
+            if (!entries.some(loginRequired))
+                return response;
+
+            // A slow response from an old session must not evict a newer login.
+            if (this.parameters === parameters) {
+                this.parameters = undefined;
+                this.tokenLease = undefined;
+            }
+            // Never replay a batch that may already have executed some commands.
+            // Invalidate on the final failure too, but leave the error to the caller.
+            if (attempt || !entries.every(loginRequired))
+                return response;
+        }
     }
 
     async reboot() {
