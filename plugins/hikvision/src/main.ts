@@ -762,7 +762,7 @@ export class HikvisionCamera extends RtspSmartCamera implements Camera, Intercom
             headers: {
                 'Content-Type': 'application/octet-stream',
                 // 'Connection': 'close',
-                'Content-Length': '0'
+                'Content-Length': '2147483647'
             },
         }, passthrough);
 
