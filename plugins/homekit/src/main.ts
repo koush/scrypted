@@ -207,14 +207,16 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         // their children, so a reordering is necessary
         const reorderedDeviceIds = reorderDevicesByProvider(deviceIds);
 
-        // safety checks in case something went wrong
+        // safety checks in case something went wrong. do not throw here, as
+        // that would prevent the bridge from being published at all. a device
+        // missing from the reordered list will simply not be exposed to HomeKit.
         if (deviceIds.length !== reorderedDeviceIds.length) {
-            throw Error(`error in device reordering, expected ${deviceIds.length} devices but only got ${reorderedDeviceIds.length}!`);
+            this.log.w(`error in device reordering, expected ${deviceIds.length} devices but only got ${reorderedDeviceIds.length}!`);
         }
         const uniqueDeviceIds = new Set<string>(deviceIds);
         const uniqueReorderedIds = new Set<string>(reorderedDeviceIds);
         if (uniqueDeviceIds.size !== uniqueReorderedIds.size) {
-            throw Error(`error in device reordering, expected ${uniqueDeviceIds.size} unique devices but only got ${uniqueReorderedIds.size} entries!`);
+            this.log.w(`error in device reordering, expected ${uniqueDeviceIds.size} unique devices but only got ${uniqueReorderedIds.size} entries!`);
         }
 
         const autoAdd = this.storageSettings.values.autoAdd ?? true;
