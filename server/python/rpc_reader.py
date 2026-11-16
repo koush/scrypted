@@ -9,6 +9,7 @@ import os
 import pickle
 import threading
 from asyncio.events import AbstractEventLoop
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
@@ -225,16 +226,35 @@ async def prepare_peer_readloop(loop: AbstractEventLoop, rpcTransport: RpcTransp
     await rpcTransport.prepare()
 
     mutex = threading.Lock()
+    sendState = threading.local()
+
+    def write(message, reject, serializationContext):
+        if serializationContext:
+            buffers = serializationContext.get("buffers", None)
+            if buffers:
+                for buffer in buffers:
+                    rpcTransport.writeBuffer(buffer, reject)
+
+        rpcTransport.writeSerialized(message, reject)
 
     def send(message, reject=None, serializationContext=None):
-        with mutex:
-            if serializationContext:
-                buffers = serializationContext.get("buffers", None)
-                if buffers:
-                    for buffer in buffers:
-                        rpcTransport.writeBuffer(buffer, reject)
+        # The transport's write lock is not reentrant, but send() can be reentered on the
+        # same thread, e.g. a garbage collector finalizer may run during an allocation
+        # inside writeSerialized while the lock is held. Queue reentrant messages and
+        # flush them after the current message is written, while still holding the lock.
+        pending = getattr(sendState, "pending", None)
+        if pending is not None:
+            pending.append((message, reject, serializationContext))
+            return
 
-            rpcTransport.writeSerialized(message, reject)
+        pending = sendState.pending = deque()
+        try:
+            with mutex:
+                write(message, reject, serializationContext)
+                while pending:
+                    write(*pending.popleft())
+        finally:
+            sendState.pending = None
 
     peer = rpc.RpcPeer(send)
     peer.nameDeserializerMap["Buffer"] = SidebandBufferSerializer()
