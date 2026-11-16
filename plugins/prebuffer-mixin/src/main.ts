@@ -1199,7 +1199,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             prebufferSession = session;
             prebufferSession.ensurePrebufferSession();
             await prebufferSession.parserSessionPromise;
-            server.sdp = await prebufferSession.sdp;
+            server.sdp = (await prebufferSession.sdp).trim() + '\r\n';
             return true;
           }
           if (u.pathname === '/' + session.rtspServerMutedPath) {
@@ -1209,7 +1209,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             await prebufferSession.parserSessionPromise;
             const sdp = parseSdp(await prebufferSession.sdp);
             sdp.msections = sdp.msections.filter(msection => msection.type === 'video');
-            server.sdp = sdp.toSdp();
+            server.sdp = sdp.toSdp().trim() + '\r\n';
             return true;
           }
         }
