@@ -13,7 +13,7 @@ import { ClusterCore, ClusterCoreNativeId } from './cluster';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
 import { checkLegacyLxc, checkLxc, checkLxcVersionUpdateNeeded } from './platform/lxc';
-import { ConsoleServiceNativeId, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
+import { ConsoleServiceNativeId, PluginReplService, PluginSocketService, ReplServiceNativeId } from './plugin-socket-service';
 import { ScriptCore, ScriptCoreNativeId, newScript } from './script-core';
 import { TerminalService, TerminalServiceNativeId, newTerminalService } from './terminal-service';
 import { UsersCore, UsersNativeId } from './user';
@@ -34,7 +34,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
     automationCore: AutomationCore;
     users: UsersCore;
     consoleService: PluginSocketService;
-    replService: PluginSocketService;
+    replService: PluginReplService;
     terminalService: TerminalService;
     localAddresses: string[];
     storageSettings = new StorageSettings(this, {
@@ -311,7 +311,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Dev
         if (nativeId === TerminalServiceNativeId)
             return this.terminalService ||= new TerminalService(TerminalServiceNativeId, false);
         if (nativeId === ReplServiceNativeId)
-            return this.replService ||= new PluginSocketService(ReplServiceNativeId, 'repl');
+            return this.replService ||= new PluginReplService();
         if (nativeId === ConsoleServiceNativeId)
             return this.consoleService ||= new PluginSocketService(ConsoleServiceNativeId, 'console');
     }
