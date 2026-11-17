@@ -1161,9 +1161,12 @@ async def plugin_async_main(
 
     peer.params["ping"] = ping
 
-    peer.params["getRemote"] = lambda api, pluginId, hostInfo: PluginRemote(
-        clusterSetup, api, pluginId, hostInfo, loop
-    )
+    def get_remote(api, pluginId, hostInfo):
+        remote = PluginRemote(clusterSetup, api, pluginId, hostInfo, loop)
+        peer.params.pop("getRemote", None)
+        return remote
+
+    peer.params["getRemote"] = get_remote
 
     try:
         await readLoop()
