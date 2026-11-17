@@ -24,6 +24,7 @@ import { EnvControl } from './services/env';
 import { Info } from './services/info';
 import { ServiceControl } from './services/service-control';
 import { sleep } from './sleep';
+import { Deferred } from './deferred';
 
 installSourceMapSupport({
     environment: 'node',
@@ -67,6 +68,10 @@ function preparePeer(socket: tls.TLSSocket, type: 'server' | 'client') {
     peerLifecycle(serializer, peer, socket, type);
 
     return peer;
+}
+
+function computeClusterChallengeHash(challenge: string, clusterSecret: string) {
+    return crypto.createHmac('sha256', clusterSecret).update(`scrypted-cluster-challenge:${challenge}`).digest('base64');
 }
 
 export interface ClusterForkOptions {
@@ -277,12 +282,16 @@ export function startClusterClient(mainFilename: string, options?: {
                 process.env.SCRYPTED_CLUSTER_ADDRESS = socket.localAddress;
 
             const peer = preparePeer(socket, 'client');
-            peer.params['service-control'] = options?.serviceControl;
-            peer.params['env-control'] = envControl;
-            peer.params['info'] = new Info();
-            peer.params['fs.promises'] = {
-                [RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN]: true,
-                ...fs.promises,
+            const challenge = new Deferred<void>();
+            challenge.promise.catch(() => { });
+            const challengeNonce = crypto.randomBytes(32).toString('hex');
+            peer.params['challenge'] = challengeNonce;
+            peer.params['respondChallenge'] = async (proof: string) => {
+                if (proof !== computeClusterChallengeHash(challengeNonce, clusterSecret)) {
+                    challenge.reject(new Error('cluster server authentication failed'));
+                    throw new Error('cluster server authentication failed');
+                }
+                challenge.resolve();
             };
 
             const { localAddress, localPort } = socket;
@@ -309,6 +318,27 @@ export function startClusterClient(mainFilename: string, options?: {
                 };
 
                 const { clusterId, clusterWorkerId } = await connectForkWorker(auth, properties);
+                const supportsChallenge = await peer.getParam('supportsChallenge');
+                if (!supportsChallenge)
+                    throw new Error('cluster server authentication unsupported');
+                const timeout = setTimeout(() => challenge.reject(new Error('cluster server challenge timeout')), 10000);
+                try {
+                    await challenge.promise;
+                }
+                finally {
+                    clearTimeout(timeout);
+                }
+                delete peer.params['challenge'];
+                delete peer.params['respondChallenge'];
+
+                peer.params['service-control'] = options?.serviceControl;
+                peer.params['env-control'] = envControl;
+                peer.params['info'] = new Info();
+                peer.params['fs.promises'] = {
+                    [RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN]: true,
+                    ...fs.promises,
+                };
+
                 const clusterPeerSetup = setupCluster(peer);
                 await clusterPeerSetup.initializeCluster({ clusterId, clusterSecret: clusterSecret!, clusterWorkerId });
                 console.log('Cluster server authenticated.', localAddress, localPort, properties);
@@ -356,6 +386,7 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
         socket.setKeepAlive(true, 10000);
 
         const peer = preparePeer(socket, 'server');
+        peer.params.supportsChallenge = true;
 
         const connectForkWorker: ConnectForkWorker = async (auth: ClusterObject, properties: ClusterWorkerProperties) => {
             const id = crypto.randomUUID();
@@ -371,6 +402,14 @@ export function createClusterServer(mainFilename: string, scryptedRuntime: Scryp
                 if (!process.env.SCRYPTED_DISABLE_CLUSTER_SERVER_TRUST) {
                     if (auth.port !== socket.remotePort || !socket.remoteAddress!.endsWith(auth.address))
                         throw new Error('cluster object address mismatch');
+                }
+                const challenge = await peer.getParam('challenge');
+                const respondChallenge = await peer.getParam('respondChallenge');
+                if (respondChallenge) {
+                    if (typeof challenge !== 'string' || !challenge)
+                        throw new Error('invalid cluster challenge');
+                    const proof = computeClusterChallengeHash(challenge, scryptedRuntime.clusterSecret);
+                    await respondChallenge(proof);
                 }
                 const remoteAddress = socket.remoteAddress!;
                 const worker: RunningClusterWorker = {
