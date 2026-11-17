@@ -53,7 +53,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
         // but in plugin-host, mark Buffer as transport safe.
         if (!peer.constructorSerializerMap.get(Buffer))
             peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
-        const getRemote = await peer.getParam('getRemote');
+        const getRemote = peer.tags.getRemote || await peer.getParam('getRemote');
         const remote = await getRemote(api, pluginId, hostInfo) as PluginRemote;
 
         const accessControls: AccessControls = peer.tags.acl;

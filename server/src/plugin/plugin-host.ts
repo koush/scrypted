@@ -301,7 +301,7 @@ export class PluginHost {
                     await sleep(30000);
                     if (this.killed)
                         return;
-                    pingPromise ||= peer.getParam('ping');
+                    pingPromise ||= peer.tags.ping || peer.getParam('ping');
                     const ping = await pingPromise;
                     lastPong = await ping(Date.now());
                 }

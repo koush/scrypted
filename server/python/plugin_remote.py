@@ -883,7 +883,7 @@ class PluginRemote:
 
             def host_fork(options: dict = None) -> PluginFork:
                 async def finishFork(forkPeer: rpc.RpcPeer):
-                    getRemote = await forkPeer.getParam("getRemote")
+                    getRemote = forkPeer.tags.get('getRemote', None) or await forkPeer.getParam("getRemote")
                     remote: PluginRemote = await getRemote(
                         self.api, self.pluginId, self.hostInfo
                     )
@@ -960,9 +960,10 @@ class PluginRemote:
                         if directGetRemote is getRemote:
                             raise Exception("cluster fork peer not direct connected")
 
-                        forkPeer = getattr(
+                        forkPeer: rpc.RpcPeer = getattr(
                             directGetRemote, rpc.RpcPeer.PROPERTY_PROXY_PEER
                         )
+                        forkPeer.tags['getRemote'] = directGetRemote
                         return await finishFork(forkPeer)
 
                     async def getClusterForkWrapped():

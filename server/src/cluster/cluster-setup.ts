@@ -98,8 +98,6 @@ export function setupCluster(peer: RpcPeer) {
                 }
 
                 const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, socket, socket);
-                // set params from the primary peer, needed for get getRemote in cluster mode.
-                Object.assign(clusterPeer.params, peer.params);
                 clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
                 return clusterPeer;
             }
@@ -350,8 +348,6 @@ export function setupCluster(peer: RpcPeer) {
             const clusterPeerPort = client.remotePort!;
             const clusterPeerKey = getClusterPeerKey(clusterPeerAddress, clusterPeerPort);
             const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, client, client);
-            // set params from the primary peer, needed for get getRemote in cluster mode.
-            Object.assign(clusterPeer.params, peer.params);
             // the listening peer sourceKey (client address/port) is used by the OTHER peer (the client)
             // to determine if it is already connected to THIS peer (the server).
             clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);

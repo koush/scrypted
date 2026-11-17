@@ -67,7 +67,8 @@ export function createClusterForkWorker(
         const {
             stdout: stdoutGen,
             stderr: stderrGen,
-            getRemote
+            getRemote,
+            ping
         } = await clusterGetRemote();
 
         writeWorkerGenerator(stdoutGen, stdout).catch(() => { });
@@ -76,9 +77,12 @@ export function createClusterForkWorker(
         const directGetRemote = await connectRPCObject(getRemote);
         if (directGetRemote === getRemote)
             throw new Error('cluster fork peer not direct connected');
+        const directPing = await connectRPCObject(ping);
         const peer: RpcPeer = directGetRemote[RpcPeer.PROPERTY_PROXY_PEER];
         if (!peer)
             throw new Error('cluster fork peer undefined?');
+        peer.tags.getRemote = directGetRemote;
+        peer.tags.ping = directPing;
         return peer;
     })();
 
