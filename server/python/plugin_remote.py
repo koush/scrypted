@@ -655,7 +655,7 @@ class PluginRemote:
         self.pluginId = pluginId
         self.hostInfo = hostInfo
         self.loop = loop
-        self.replPort = None
+        self.replStreamService = None
         self.__dict__["__proxy_oneway_methods"] = [
             "notify",
             "updateDeviceState",
@@ -1079,12 +1079,12 @@ class PluginRemote:
 
             pluginInstance = await rpc.maybe_await(create_scrypted_plugin())
             try:
-                from plugin_repl import createREPLServer
+                from plugin_repl import createREPLStreamService
 
-                self.replPort = await createREPLServer(sdk, pluginInstance)
+                self.replStreamService = createREPLStreamService(sdk, pluginInstance)
             except Exception as e:
                 print(f"Warning: Python REPL cannot be loaded: {e}")
-                self.replPort = 0
+                self.replStreamService = None
             return pluginInstance
 
         from main import fork  # type: ignore
@@ -1137,13 +1137,12 @@ class PluginRemote:
         return WritableDeviceState(id, setState)
 
     async def getServicePort(self, name):
-        if name == "repl":
-            if self.replPort is None:
-                raise Exception("REPL unavailable: Plugin not loaded.")
-            if self.replPort == 0:
-                raise Exception("REPL unavailable: Python REPL not available.")
-            return [self.replPort, os.getenv("SCRYPTED_CLUSTER_ADDRESS", None)]
         raise Exception(f"unknown service {name}")
+
+    async def getReplStreamService(self, input):
+        if not self.replStreamService:
+            raise Exception("REPL unavailable: Plugin not loaded.")
+        return await self.replStreamService(input)
 
 
 async def plugin_async_main(

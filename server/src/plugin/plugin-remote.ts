@@ -105,6 +105,7 @@ export interface PluginRemoteAttachOptions {
      */
     createMediaManager?: (systemManager: SystemManager, deviceManager: DeviceManagerImpl) => Promise<MediaManager>;
     getServicePort?: (name: string, ...args: any[]) => Promise<[number, string]>;
+    getReplStreamService?: (input: AsyncGenerator<Buffer>) => Promise<AsyncGenerator<Buffer>>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
@@ -113,7 +114,7 @@ export interface PluginRemoteAttachOptions {
 }
 
 export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
-    const { createMediaManager, getServicePort, getDeviceConsole, getMixinConsole } = options || {};
+    const { createMediaManager, getServicePort, getReplStreamService, getDeviceConsole, getMixinConsole } = options || {};
 
     if (!peer.constructorSerializerMap.get(Buffer))
         peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
@@ -310,6 +311,9 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 }
             },
         }
+
+        if (getReplStreamService)
+            remote.getReplStreamService = getReplStreamService;
 
         ret.pluginRemoteAPI = remote;
 

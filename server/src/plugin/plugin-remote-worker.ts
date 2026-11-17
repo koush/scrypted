@@ -16,7 +16,7 @@ import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions, Pl
 import { pipeWorkerConsole, prepareConsoles } from './plugin-console';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, setupPluginRemote } from './plugin-remote';
-import { createREPLServer } from './plugin-repl';
+import { createREPLStreamService } from './plugin-repl';
 import { getPluginVolume } from './plugin-volume';
 import { ChildProcessWorker } from './runtime/child-process-worker';
 import { createClusterForkWorker } from './runtime/cluster-fork-worker';
@@ -61,7 +61,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
 
     const { getDeviceConsole, getMixinConsole } = prepareConsoles(() => peer.selfName, () => systemManager, () => deviceManager, getPlugins);
 
-    let replPort: Promise<number>;
+    let replStreamService: (input: AsyncGenerator<Buffer>) => Promise<AsyncGenerator<Buffer>>;
 
     let _pluginConsole: Console;
     const getPluginConsole = () => {
@@ -101,12 +101,12 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
         getDeviceConsole,
         getMixinConsole,
         async getServicePort(name) {
-            if (name === 'repl') {
-                if (!replPort)
-                    throw new Error('REPL unavailable: Plugin not loaded.')
-                return [await replPort, process.env.SCRYPTED_CLUSTER_ADDRESS!] as [number, string];
-            }
             throw new Error(`unknown service ${name}`);
+        },
+        async getReplStreamService(input) {
+            if (!replStreamService)
+                throw new Error('REPL unavailable: Plugin not loaded.');
+            return replStreamService(input);
         },
         async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, zipAPI: PluginZipAPI, zipOptions: PluginRemoteLoadZipOptions) {
             const mainFile = zipOptions?.main || 'main';
@@ -419,7 +419,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
                 if (typeof pluginInstance === 'function')
                     pluginInstance = await pluginInstance();
 
-                replPort = createREPLServer(scrypted, params, pluginInstance);
+                replStreamService = createREPLStreamService(scrypted, params, pluginInstance);
                 postInstallSourceMapSupport(scrypted);
 
                 return pluginInstance;

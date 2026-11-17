@@ -190,4 +190,11 @@ export class PluginComponent {
 
         return this.scrypted.plugins[pluginId]!.remote.getServicePort(name, ...args);
     }
+
+    async getReplStreamService(pluginId: string, input: AsyncGenerator<Buffer>): Promise<AsyncGenerator<Buffer>> {
+        const remote = this.scrypted.plugins[pluginId]?.remote;
+        if (!remote?.getReplStreamService)
+            throw new Error('REPL is not supported by this plugin.');
+        return remote.getReplStreamService(input);
+    }
 }
