@@ -398,6 +398,22 @@ export class RpcPeer {
         RpcPeer.PROPERTY_PROXY_PROPERTIES,
         RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN,
     ]);
+    static readonly FORBIDDEN_RPC_METHODS = new Set<string>([
+        'constructor',
+        'prototype',
+        '__proto__',
+        '__defineGetter__',
+        '__defineSetter__',
+        '__lookupGetter__',
+        '__lookupSetter__',
+        'apply',
+        'bind',
+        'call',
+        'caller',
+        'arguments',
+        'eval',
+        'Function',
+    ]);
 
     constructor(public selfName: string, public peerName: string, public send: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
         this.killed = new Promise<string>((resolve, reject) => {
@@ -412,6 +428,17 @@ export class RpcPeer {
         return !value[Symbol.asyncIterator]
             && !value[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]
             && this.getDefaultTransportSafeArgumentTypes().has(value.constructor?.name);
+    }
+
+    static validateRpcMethod(method: any) {
+        if (typeof method !== 'string' || !method)
+            throw new Error('invalid rpc method');
+        // Reject constructors, native getters/setters, and other inherited
+        // builtins that would allow a peer to escape the proxied object.
+        if (RpcPeer.FORBIDDEN_RPC_METHODS.has(method)
+            || method in Object.prototype
+            || method in Function.prototype)
+            throw new Error(`rpc method ${method} is not allowed`);
     }
 
     isTransportSafe(value: any) {
@@ -755,6 +782,9 @@ export class RpcPeer {
                         if (!target)
                             throw new Error(`proxy id ${rpcApply.proxyId} not found`);
 
+                        if (rpcApply.method)
+                            RpcPeer.validateRpcMethod(rpcApply.method);
+
                         const args = [];
                         for (const arg of (rpcApply.args || [])) {
                             args.push(this.deserialize(arg, deserializationContext));
@@ -763,7 +793,7 @@ export class RpcPeer {
                         let value: any;
                         if (rpcApply.method) {
                             const method = target[rpcApply.method];
-                            if (!method)
+                            if (typeof method !== 'function')
                                 throw new Error(`target ${target?.constructor?.name} does not have method ${rpcApply.method}`);
 
                             const isIteratorNext = RpcPeer.getIteratorNext(target) === rpcApply.method;
