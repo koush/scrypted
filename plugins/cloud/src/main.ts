@@ -51,6 +51,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         token_info: {
             hide: true,
         },
+        stateNonce: {
+            hide: true,
+        },
         lastPersistedRegistrationId: {
             hide: true,
         },
@@ -1301,7 +1304,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             if (url.search) {
                 const state = url.searchParams.get('state');
                 if (state) {
-                    const { s, d, r } = JSON.parse(state);
+                    const { s, d, r, n } = JSON.parse(state);
+                    if (!n || n !== this.storageSettings.values.stateNonce) {
+                        this.console.warn('rejected oauth callback with an invalid state nonce', req.socket?.remoteAddress);
+                        res.writeHead(401);
+                        res.end();
+                        return;
+                    }
+                    this.storageSettings.values.stateNonce = undefined;
                     url.searchParams.set('state', s);
                     const oauthClient = systemManager.getDeviceById<OauthClient>(d);
                     await oauthClient.onOauthCallback(url.toString()).catch();
@@ -1315,7 +1325,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 const hash = new URLSearchParams(url.hash.substring(1));
                 const state = hash.get('state');
                 if (state) {
-                    const { s, d, r } = JSON.parse(state);
+                    const { s, d, r, n } = JSON.parse(state);
+                    if (!n || n !== this.storageSettings.values.stateNonce) {
+                        this.console.warn('rejected oauth callback with an invalid state nonce', req.socket?.remoteAddress);
+                        res.writeHead(401);
+                        res.end();
+                        return;
+                    }
+                    this.storageSettings.values.stateNonce = undefined;
                     hash.set('state', s);
                     url.hash = '#' + hash.toString();
                     const oauthClient = systemManager.getDeviceById<OauthClient>(d);
