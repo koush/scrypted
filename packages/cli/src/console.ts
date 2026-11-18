@@ -3,16 +3,31 @@ import { createAsyncQueue } from '../../../common/src/async-queue';
 import { sleep } from '../../../common/src/sleep';
 
 export async function connectConsole(sdk: ScryptedStatic, timeoutSeconds: number, idOrName: string) {
+    const device: any = sdk.systemManager.getDeviceById(idOrName) || sdk.systemManager.getDeviceByName(idOrName);
+    const pluginId: string = device?.pluginId || idOrName;
+    const nativeId: string = device?.nativeId || 'undefined';
+
+    // non-follow mode can read the buffered console directly instead of
+    // streaming until the timeout expires.
+    if (timeoutSeconds > 0) {
+        try {
+            const plugins = await sdk.systemManager.getComponent('plugins');
+            const buffer = await plugins.readConsole(device?.id || idOrName);
+            if (buffer)
+                process.stdout.write(new Uint8Array(Buffer.from(buffer)));
+            return;
+        }
+        catch (e) {
+            // older servers do not implement readConsole, fall back to streaming.
+        }
+    }
+
     const consoleSvc = await sdk.systemManager.getDeviceByName<DeviceProvider>("@scrypted/core").getDevice("consoleservice");
     if (!consoleSvc) {
         throw Error("@scrypted/core does not provide a Console Service");
     }
 
     const consoleSvcDirect = await sdk.connectRPCObject<StreamService<Buffer | string, Buffer>>(consoleSvc);
-
-    const device: any = sdk.systemManager.getDeviceById(idOrName) || sdk.systemManager.getDeviceByName(idOrName);
-    const pluginId: string = device?.pluginId || idOrName;
-    const nativeId: string = device?.nativeId || 'undefined';
 
     let timedOut = false;
     let endStream: (() => void) | undefined;
