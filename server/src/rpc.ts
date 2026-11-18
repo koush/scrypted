@@ -311,7 +311,7 @@ export class RpcPeer {
     static activeRpcPeer: RpcPeer | undefined;
 
     static isRpcProxy(value: any) {
-        return !!value?.[RpcPeer.PROPERTY_PROXY_ID];
+        return value?.[RpcPeer.PROPERTY_PROXY_PEER] instanceof RpcPeer;
     }
 
     static getDefaultTransportSafeArgumentTypes() {
