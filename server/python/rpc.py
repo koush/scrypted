@@ -522,8 +522,17 @@ class RpcPeer:
                 try:
                     serializationContext: Dict = {}
                     target = self.localProxyMap.get(message["proxyId"], None)
-                    if not target:
+                    if target is None:
                         raise Exception("proxy id %s not found" % message["proxyId"])
+
+                    if method is not None:
+                        if not isinstance(method, str) or not method:
+                            raise ValueError("invalid rpc method")
+                        # Async iteration is the one special method in the wire protocol.
+                        if (method.startswith("__") and method != "__anext__") or (
+                            method == "mro" and isinstance(target, type)
+                        ):
+                            raise ValueError(f"rpc method {method} is not allowed")
 
                     args = []
                     for arg in message["args"] or []:
@@ -533,12 +542,7 @@ class RpcPeer:
                     #     args.append(None)
 
                     value = None
-                    if method:
-                        if not hasattr(target, method):
-                            raise Exception(
-                                "target %s does not have method %s"
-                                % (type(target), method)
-                            )
+                    if method is not None:
                         invoke = getattr(target, method)
                         value = await maybe_await(invoke(*args))
                     else:
