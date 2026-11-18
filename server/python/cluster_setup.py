@@ -55,6 +55,8 @@ class ClusterSetup:
         sha256 = self.computeClusterObjectHash(o)
         if sha256 != o["sha256"]:
             raise Exception("secret incorrect")
+        if o.get("id", None) != self.clusterId:
+            raise Exception("invalid cluster id")
         return await self.resolveObject(
             o.get("proxyId", None), o.get("sourceKey", None)
         )
@@ -212,11 +214,11 @@ class ClusterSetup:
 
         clusterObject: ClusterObject = __cluster
 
-        if clusterObject.get("id", None) != self.clusterId:
-            return value
-
         if self.computeClusterObjectHash(clusterObject) != clusterObject.get("sha256", None):
             raise Exception("invalid cluster object signature")
+
+        if clusterObject.get("id", None) != self.clusterId:
+            raise Exception("invalid cluster id")
 
         address = clusterObject.get("address", None)
         port = clusterObject["port"]

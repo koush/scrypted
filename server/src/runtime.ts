@@ -126,6 +126,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     connection.close();
                     return;
                 }
+                if (clusterObject.id !== this.clusterId) {
+                    connection.send({
+                        error: 'invalid cluster id'
+                    });
+                    connection.close();
+                    return;
+                }
 
                 let address = clusterObject.address;
                 if (isClusterAddress(address))

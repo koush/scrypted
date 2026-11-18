@@ -18,9 +18,9 @@ export function isClusterAddress(address: string) {
     return !address || address === process.env.SCRYPTED_CLUSTER_ADDRESS;
 }
 
-export function getClusterObject(clusterId: string, value: any): ClusterObject | undefined {
+export function getClusterObject(value: any): ClusterObject | undefined {
     const clusterObject: ClusterObject = value?.__cluster;
-    if (clusterObject?.id !== clusterId)
+    if (!clusterObject || typeof clusterObject !== 'object' || Array.isArray(clusterObject))
         return undefined;
     return clusterObject;
 }
@@ -72,6 +72,8 @@ export function setupCluster(peer: RpcPeer) {
         const sha256 = computeClusterObjectHash(o, clusterSecret);
         if (sha256 !== o.sha256)
             throw new Error('secret incorrect');
+        if (o.id !== clusterId)
+            throw new Error('invalid cluster id');
         return resolveObject(o.proxyId, o.sourceKey);
     }
 
@@ -255,12 +257,14 @@ export function setupCluster(peer: RpcPeer) {
     }
 
     const connectRPCObject = async (value: any) => {
-        const clusterObject = getClusterObject(clusterId, value);
+        const clusterObject = getClusterObject(value);
         if (!clusterObject)
             return value;
         // invalidate cluster objects that do not have a valid signature for this cluster.
         if (computeClusterObjectHash(clusterObject, clusterSecret) !== clusterObject.sha256)
             throw new Error('invalid cluster object signature');
+        if (clusterObject.id !== clusterId)
+            throw new Error('invalid cluster id');
         const { address, port, proxyId } = clusterObject;
         // handle the case when trying to connect to an object is on this cluster node,
         // returning the actual object, rather than initiating a loopback connection.
