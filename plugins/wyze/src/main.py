@@ -34,6 +34,25 @@ from wyzecam import tutk_protocol
 from wyzecam.api import RateLimitError, post_device
 from wyzecam.tutk.tutk import FRAME_SIZE_2K, FRAME_SIZE_360P, FRAME_SIZE_1080P
 
+# Avoid rejecting valid responses when X-RateLimit-Remaining is low (<= 10)
+_orig_validate_resp = getattr(wyzecam.api, "validate_resp", None)
+if _orig_validate_resp:
+    def _safe_validate_resp(resp):
+        remaining = int(resp.headers.get("X-RateLimit-Remaining", 100))
+        if resp.status_code == 429 or remaining <= 0:
+            raise RateLimitError(resp)
+        resp_json = resp.json()
+        resp_code = str(resp_json.get("code", resp_json.get("errorCode", 0)))
+        if resp_code == "2001":
+            raise wyzecam.api.AccessTokenError()
+        if resp_code not in {"1", "0"}:
+            msg = resp_json.get("msg", resp_json.get("description", resp_code))
+            raise wyzecam.api.WyzeAPIError(resp_code, msg, resp.request)
+        resp.raise_for_status()
+        return resp_json
+
+    wyzecam.api.validate_resp = _safe_validate_resp
+
 os.environ["TUTK_PROJECT_ROOT"] = os.path.join(
     os.environ["SCRYPTED_PLUGIN_VOLUME"], "zip/unzipped/fs"
 )
@@ -1098,7 +1117,7 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
             return time.time() + 60, []
 
     async def refreshDevices(self):
-        print("refreshing")
+        self.print("Refreshing Wyze devices...")
 
         email = self.safeParseJsonStorage("email")
         password = self.safeParseJsonStorage("password")
@@ -1109,48 +1128,86 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
             self.print("Wyze Plugin Settings not configured.")
             return
 
-        auth_info = wyzecam.login(email, password, api_key=apiKey, key_id=keyId)
-        self.authInfo = auth_info
-        self.account = wyzecam.get_user_info(auth_info)
-        cameras = wyzecam.get_camera_list(auth_info)
-        # await self.pollEvents()
-        manifest: scrypted_sdk.DeviceManifest = {"devices": []}
-        for camera in cameras:
-            self.cameras[camera.p2p_id] = camera
+        try:
+            auth_info = None
+            cached_auth = self.safeParseJsonStorage("authInfo")
+            if cached_auth:
+                try:
+                    cred = wyzecam.WyzeCredential(**cached_auth)
+                    self.print("Attempting to reuse/refresh cached auth token...")
+                    auth_info = wyzecam.refresh_token(cred)
+                    self.print("Wyze token refreshed successfully.")
+                except Exception as ex:
+                    self.print(f"Cached token refresh failed ({ex}), falling back to full login.")
+                    auth_info = None
 
-            interfaces: List[ScryptedInterface] = [
-                ScryptedInterface.Settings.value,
-                ScryptedInterface.VideoCamera.value,
-            ]
+            if not auth_info:
+                self.print("Logging in to Wyze API...")
+                auth_info = wyzecam.login(email, password, api_key=apiKey, key_id=keyId)
+                self.print("Wyze login successful.")
 
-            if camera.is_pan_cam:
-                interfaces.append(ScryptedInterface.PanTiltZoom.value)
+            self.authInfo = auth_info
+            try:
+                self.storage.setItem("authInfo", json.dumps(auth_info.model_dump()))
+            except Exception as e:
+                self.print(f"Warning: could not cache authInfo: {e}")
 
-            if camera.is_battery:
-                interfaces.append(ScryptedInterface.Battery.value)
+            self.account = wyzecam.get_user_info(auth_info)
+            cameras = wyzecam.get_camera_list(auth_info)
+            self.print(f"Discovered {len(cameras)} Wyze camera(s).")
 
-            if camera.is_vertical:
-                deviceType = ScryptedDeviceType.Doorbell.value
-                interfaces.append(ScryptedInterface.BinarySensor.value)
-            else:
-                deviceType = ScryptedDeviceType.Camera.value
+            manifest: scrypted_sdk.DeviceManifest = {"devices": []}
+            for camera in cameras:
+                self.cameras[camera.p2p_id] = camera
 
-            device: scrypted_sdk.Device = {
-                "nativeId": camera.p2p_id,
-                "type": deviceType,
-                "name": camera.nickname,
-                "interfaces": interfaces,
-                "info": {
-                    "firmware": camera.firmware_ver,
-                    "ip": camera.ip,
-                    "mac": camera.mac,
-                    "model": camera.model_name,
-                },
-            }
+                interfaces: List[ScryptedInterface] = [
+                    ScryptedInterface.Settings.value,
+                    ScryptedInterface.VideoCamera.value,
+                ]
 
-            manifest["devices"].append(device)
+                if camera.is_pan_cam:
+                    interfaces.append(ScryptedInterface.PanTiltZoom.value)
 
-        await scrypted_sdk.deviceManager.onDevicesChanged(manifest)
+                if camera.is_battery:
+                    interfaces.append(ScryptedInterface.Battery.value)
+
+                if camera.is_vertical:
+                    deviceType = ScryptedDeviceType.Doorbell.value
+                    interfaces.append(ScryptedInterface.BinarySensor.value)
+                else:
+                    deviceType = ScryptedDeviceType.Camera.value
+
+                device: scrypted_sdk.Device = {
+                    "nativeId": camera.p2p_id,
+                    "type": deviceType,
+                    "name": camera.nickname,
+                    "interfaces": interfaces,
+                    "info": {
+                        "firmware": camera.firmware_ver,
+                        "ip": camera.ip,
+                        "mac": camera.mac,
+                        "model": camera.model_name,
+                    },
+                }
+
+                manifest["devices"].append(device)
+
+            await scrypted_sdk.deviceManager.onDevicesChanged(manifest)
+            self.print("Wyze devices successfully published to Scrypted.")
+
+        except RateLimitError as ex:
+            self.print(f"[REFRESH] RateLimitError: {ex}. Cooling down.")
+            delay = max(60, int(ex.reset_by - time.time() + 5)) if getattr(ex, 'reset_by', None) else 600
+            self.print(f"[REFRESH] Will retry refreshDevices in {delay} seconds.")
+            asyncio.get_event_loop().call_later(
+                delay, lambda: asyncio.ensure_future(self.refreshDevices())
+            )
+        except Exception as ex:
+            self.print(f"[REFRESH] Unexpected error during refreshDevices: {ex}")
+            print_exception(self.print, ex)
+            asyncio.get_event_loop().call_later(
+                60, lambda: asyncio.ensure_future(self.refreshDevices())
+            )
 
     async def getSettings(self):
         ret: List[Setting] = []
@@ -1191,6 +1248,11 @@ class WyzePlugin(scrypted_sdk.ScryptedDeviceBase, DeviceProvider):
 
     async def putSetting(self, key, value):
         self.storage.setItem(key, json.dumps(value))
+        if key in ("email", "password", "keyId", "apiKey"):
+            try:
+                self.storage.removeItem("authInfo")
+            except Exception:
+                pass
 
         asyncio.ensure_future(self.refreshDevices())
 
