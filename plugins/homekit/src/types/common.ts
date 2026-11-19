@@ -1,8 +1,9 @@
-import sdk, { AirQuality, AirQualitySensor, CO2Sensor, DeviceProvider, Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, HumiditySettingStatus, NOXSensor, OnOff, PM10Sensor, PM25Sensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VOCSensor } from "@scrypted/sdk";
+import sdk, { AirQuality, AirQualitySensor, CO2Sensor, DeviceProvider, Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, HumiditySettingStatus, Lock, NOXSensor, OnOff, PM10Sensor, PM25Sensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VOCSensor } from "@scrypted/sdk";
 import { bindCharacteristic } from "../common";
 import { Accessory, Characteristic, CharacteristicEventTypes, Service, uuid } from '../hap';
 import type { HomeKitPlugin } from "../main";
 import { getService as getOnOffService } from "./onoff-base";
+import { getService as getLockService } from "./lock-base";
 import { HOMEKIT_MIXIN } from "../homekit-mixin";
 
 const { deviceManager, systemManager } = sdk;
@@ -345,6 +346,35 @@ export function mergeOnOffDevicesByType(device: ScryptedDevice & DeviceProvider,
         const onOffService = getOnOffService(child, accessory, Service.Switch)
         mergedDevices.push(child);
         return onOffService;
+    });
+
+    return {
+        services: services.filter(service => !!service),
+        devices: mergedDevices,
+    };
+}
+
+/*
+ * mergeLockDevices looks for child lock devices under the given device provider
+ * and merges them as lock mechanisms to the accessory represented by the device
+ * provider, such as the door opener of a doorbell.
+ *
+ * Returns the services created as well as all of the child Lock devices which have
+ * been merged.
+ */
+export function mergeLockDevices(device: ScryptedDevice & DeviceProvider, accessory: Accessory): { services: Service[], devices: (ScryptedDevice & Lock)[] } {
+    if (!device.interfaces.includes(ScryptedInterface.DeviceProvider))
+        return undefined;
+
+    const children = getChildDevices(device);
+    const mergedDevices = [];
+    const services = children.map((child: ScryptedDevice & Lock) => {
+        if (child.type !== ScryptedDeviceType.Lock || !child.interfaces.includes(ScryptedInterface.Lock) || !child.interfaces.includes(HOMEKIT_MIXIN))
+            return undefined;
+
+        const lockService = getLockService(child, accessory, child.nativeId);
+        mergedDevices.push(child);
+        return lockService;
     });
 
     return {
