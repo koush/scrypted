@@ -1,0 +1,1 @@
+../../homekit/src/types/camera/jitter-buffer.ts

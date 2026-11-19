@@ -1,4 +1,4 @@
-import { isNextSequenceNumber, JitterBuffer, RtpPacket } from "../../homekit/src/types/camera/jitter-buffer";
+import { isNextSequenceNumber, JitterBuffer, RtpPacket } from "./jitter-buffer";
 
 // H.265 NAL unit types
 // https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/hevc/hevc.h
