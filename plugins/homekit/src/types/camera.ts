@@ -11,7 +11,7 @@ import { createSecureVideoController, secureVideoCmafEnabled } from './camera/ca
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
 import { FORCE_OPUS } from './camera/camera-utils';
 import { createHomeKitWebRTCDelegate } from './camera/camera-webrtc';
-import { makeAccessory, mergeOnOffDevicesByType } from './common';
+import { makeAccessory, mergeLockDevices, mergeOnOffDevicesByType } from './common';
 
 const { deviceManager, systemManager } = sdk;
 
@@ -291,6 +291,11 @@ addSupportedType({
 
             // merge in sirens
             mergeOnOffDevicesByType(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory, ScryptedDeviceType.Siren).devices.forEach(device => {
+                homekitPlugin.mergedDevices.add(device.id)
+            });
+
+            // merge in locks, such as the door opener of a doorbell
+            mergeLockDevices(device as ScryptedDevice as ScryptedDevice & DeviceProvider, accessory).devices.forEach(device => {
                 homekitPlugin.mergedDevices.add(device.id)
             });
         }
