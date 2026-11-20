@@ -126,6 +126,7 @@ class ScryptedInterface(str, Enum):
     BufferConverter = "BufferConverter"
     Buttons = "Buttons"
     Camera = "Camera"
+    CarbonMonoxideSensor = "CarbonMonoxideSensor"
     Charger = "Charger"
     ChatCompletion = "ChatCompletion"
     ClusterForkInterface = "ClusterForkInterface"
@@ -198,6 +199,7 @@ class ScryptedInterface(str, Enum):
     Sensors = "Sensors"
     Settings = "Settings"
     Sleep = "Sleep"
+    SmokeSensor = "SmokeSensor"
     StartStop = "StartStop"
     StreamService = "StreamService"
     TamperSensor = "TamperSensor"
@@ -1200,6 +1202,10 @@ class Camera:
         pass
 
 
+class CarbonMonoxideSensor:
+
+    carbonMonoxideDetected: bool
+
 class Charger:
     """Charger reports whether or not a device is being charged from an external power source. Usually used for battery powered devices."""
 
@@ -1743,6 +1749,10 @@ class Sleep:
 
     sleeping: bool
 
+class SmokeSensor:
+
+    smokeDetected: bool
+
 class StartStop:
     """StartStop represents a device that can be started, stopped, and possibly paused and resumed. Typically vacuum cleaners or washers."""
 
@@ -2132,6 +2142,8 @@ class ScryptedInterfaceProperty(str, Enum):
     ambientLight = "ambientLight"
     occupied = "occupied"
     flooded = "flooded"
+    smokeDetected = "smokeDetected"
+    carbonMonoxideDetected = "carbonMonoxideDetected"
     ultraviolet = "ultraviolet"
     luminance = "luminance"
     position = "position"
@@ -2668,6 +2680,22 @@ class DeviceState:
     @flooded.setter
     def flooded(self, value: bool):
         self.setScryptedProperty("flooded", value)
+
+    @property
+    def smokeDetected(self) -> bool:
+        return self.getScryptedProperty("smokeDetected")
+
+    @smokeDetected.setter
+    def smokeDetected(self, value: bool):
+        self.setScryptedProperty("smokeDetected", value)
+
+    @property
+    def carbonMonoxideDetected(self) -> bool:
+        return self.getScryptedProperty("carbonMonoxideDetected")
+
+    @carbonMonoxideDetected.setter
+    def carbonMonoxideDetected(self, value: bool):
+        self.setScryptedProperty("carbonMonoxideDetected", value)
 
     @property
     def ultraviolet(self) -> float:
@@ -3312,6 +3340,20 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "flooded"
+    ]
+  },
+  "SmokeSensor": {
+    "name": "SmokeSensor",
+    "methods": [],
+    "properties": [
+      "smokeDetected"
+    ]
+  },
+  "CarbonMonoxideSensor": {
+    "name": "CarbonMonoxideSensor",
+    "methods": [],
+    "properties": [
+      "carbonMonoxideDetected"
     ]
   },
   "UltravioletSensor": {

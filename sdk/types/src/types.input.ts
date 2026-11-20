@@ -1521,6 +1521,12 @@ export interface OccupancySensor {
 export interface FloodSensor {
   flooded?: boolean;
 }
+export interface SmokeSensor {
+  smokeDetected?: boolean;
+}
+export interface CarbonMonoxideSensor {
+  carbonMonoxideDetected?: boolean;
+}
 export interface UltravioletSensor {
   ultraviolet?: number;
 }
@@ -2439,6 +2445,8 @@ export enum ScryptedInterface {
   AmbientLightSensor = "AmbientLightSensor",
   OccupancySensor = "OccupancySensor",
   FloodSensor = "FloodSensor",
+  SmokeSensor = "SmokeSensor",
+  CarbonMonoxideSensor = "CarbonMonoxideSensor",
   UltravioletSensor = "UltravioletSensor",
   LuminanceSensor = "LuminanceSensor",
   PositionSensor = "PositionSensor",
