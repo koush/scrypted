@@ -175,10 +175,11 @@ export class ReolinkCameraClient {
         }
         const response = await this.request(options, body);
         let result = response.body;
-        // Snapshot failures can contain JSON instead of JPEG data.
-        if (Buffer.isBuffer(result) && result[0] === 0xff)
-            return response;
-        if (Buffer.isBuffer(result) || typeof result === 'string') {
+        if (options.responseType !== 'json') {
+            // The RLC-520A labels JSON snapshot errors as text/html.
+            const mediaType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+            if (mediaType !== 'application/json' && mediaType !== 'text/html')
+                return response;
             try {
                 result = JSON.parse(result.toString());
             }
