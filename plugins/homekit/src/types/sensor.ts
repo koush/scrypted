@@ -1,4 +1,4 @@
-import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM10Sensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, NOXSensor, AirQuality, EntrySensor, TamperSensor, CO2Sensor } from '@scrypted/sdk';
+import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM10Sensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, NOXSensor, AirQuality, EntrySensor, TamperSensor, CO2Sensor, SmokeSensor, CarbonMonoxideSensor } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -31,6 +31,8 @@ const supportedSensors: string[] = [
     ScryptedInterface.Thermometer,
     ScryptedInterface.HumiditySensor,
     ScryptedInterface.FloodSensor,
+    ScryptedInterface.SmokeSensor,
+    ScryptedInterface.CarbonMonoxideSensor,
     ScryptedInterface.AirQualitySensor,
     ScryptedInterface.PM10Sensor,
     ScryptedInterface.PM25Sensor,
@@ -49,7 +51,7 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM10Sensor & PM25Sensor & VOCSensor & NOXSensor & EntrySensor & TamperSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & SmokeSensor & CarbonMonoxideSensor & AirQualitySensor & PM10Sensor & PM25Sensor & VOCSensor & NOXSensor & EntrySensor & TamperSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
 
         if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
@@ -112,6 +114,20 @@ addSupportedType({
             setServiceName(service, `${device.name} Leak`);
             bindCharacteristic(device, ScryptedInterface.FloodSensor, service, Characteristic.LeakDetected,
                 () => !!device.flooded);
+        }
+
+        if (device.interfaces.includes(ScryptedInterface.SmokeSensor)) {
+            const service = accessory.addService(Service.SmokeSensor, device.name);
+            setServiceName(service, `${device.name} Smoke`);
+            bindCharacteristic(device, ScryptedInterface.SmokeSensor, service, Characteristic.SmokeDetected,
+                () => !!device.smokeDetected);
+        }
+
+        if (device.interfaces.includes(ScryptedInterface.CarbonMonoxideSensor)) {
+            const service = accessory.addService(Service.CarbonMonoxideSensor, device.name);
+            setServiceName(service, `${device.name} Carbon Monoxide`);
+            bindCharacteristic(device, ScryptedInterface.CarbonMonoxideSensor, service, Characteristic.CarbonMonoxideDetected,
+                () => !!device.carbonMonoxideDetected);
         }
 
         if (device.interfaces.includes(ScryptedInterface.AirQualitySensor)) {
