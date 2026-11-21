@@ -177,6 +177,7 @@ class ScryptedInterface(str, Enum):
     PositionSensor = "PositionSensor"
     PowerSensor = "PowerSensor"
     PressButtons = "PressButtons"
+    PrivacyMode = "PrivacyMode"
     Program = "Program"
     PushHandler = "PushHandler"
     Readme = "Readme"
@@ -1584,6 +1585,14 @@ class PressButtons:
         pass
 
 
+class PrivacyMode:
+    """PrivacyMode turns the camera itself off: it stops capturing and streaming video for every client, as opposed to a client choosing not to view or record it."""
+
+    privacyMode: bool  # True when the camera is turned off.
+    async def setPrivacyMode(self, privacyMode: bool) -> None:
+        pass
+
+
 class Program:
 
     async def run(self, variables: Any = None) -> Any:
@@ -2115,6 +2124,7 @@ class ScryptedInterfaceProperty(str, Enum):
     audioVolumes = "audioVolumes"
     recordingActive = "recordingActive"
     ptzCapabilities = "ptzCapabilities"
+    privacyMode = "privacyMode"
     lockState = "lockState"
     entryOpen = "entryOpen"
     batteryLevel = "batteryLevel"
@@ -2195,6 +2205,7 @@ class ScryptedInterfaceMethods(str, Enum):
     deleteRecordingStream = "deleteRecordingStream"
     setRecordingActive = "setRecordingActive"
     ptzCommand = "ptzCommand"
+    setPrivacyMode = "setPrivacyMode"
     getRecordedEvents = "getRecordedEvents"
     getVideoClip = "getVideoClip"
     getVideoClips = "getVideoClips"
@@ -2532,6 +2543,14 @@ class DeviceState:
     @ptzCapabilities.setter
     def ptzCapabilities(self, value: PanTiltZoomCapabilities):
         self.setScryptedProperty("ptzCapabilities", value)
+
+    @property
+    def privacyMode(self) -> bool:
+        return self.getScryptedProperty("privacyMode")
+
+    @privacyMode.setter
+    def privacyMode(self, value: bool):
+        self.setScryptedProperty("privacyMode", value)
 
     @property
     def lockState(self) -> LockState:
@@ -3076,6 +3095,15 @@ ScryptedInterfaceDescriptors = {
     ],
     "properties": [
       "ptzCapabilities"
+    ]
+  },
+  "PrivacyMode": {
+    "name": "PrivacyMode",
+    "methods": [
+      "setPrivacyMode"
+    ],
+    "properties": [
+      "privacyMode"
     ]
   },
   "EventRecorder": {
