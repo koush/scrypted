@@ -4,6 +4,7 @@ import { once } from 'events';
 import net from 'net';
 import { PassThrough, Readable, Writable } from 'stream';
 import { clusterListenZero } from '../cluster/cluster-setup';
+import { ConsoleTimestampTransform } from './console-timestamp';
 
 export interface ConsoleServer {
     pluginConsole: Console;
@@ -15,8 +16,8 @@ export interface ConsoleServer {
 }
 
 export interface StdPassThroughs {
-    stdout: PassThrough;
-    stderr: PassThrough;
+    stdout: ConsoleTimestampTransform;
+    stderr: ConsoleTimestampTransform;
     buffers: Buffer[];
 }
 
@@ -191,8 +192,8 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
             nativeId = undefined;
         let pts = outputs.get(nativeId)
         if (!pts) {
-            const stdout = new PassThrough();
-            const stderr = new PassThrough();
+            const stdout = new ConsoleTimestampTransform();
+            const stderr = new ConsoleTimestampTransform();
 
             pts = {
                 stdout,
@@ -202,22 +203,8 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
             outputs.set(nativeId, pts);
             const ptsRef = pts;
 
-            let writeTimestamp = true;
-            let timestampTimer: NodeJS.Timeout;
-            stdout.on('close', () => clearTimeout(timestampTimer));
-            stderr.on('close', () => clearTimeout(timestampTimer));
-
             const appendOutput = (data: Buffer) => {
                 const { buffers } = ptsRef;
-
-                if (writeTimestamp) {
-                    writeTimestamp = false;
-                    buffers.push(Buffer.from(`########################\n`));
-                    buffers.push(Buffer.from(`${new Date().toLocaleString()}\n`));
-                    buffers.push(Buffer.from(`########################\n`));
-                    timestampTimer = setTimeout(() => writeTimestamp = true, 5 * 60 * 1000);
-                }
-
                 buffers.push(data);
                 // when we're over 4000 lines or whatever these buffer are,
                 // truncate down to 2000.
