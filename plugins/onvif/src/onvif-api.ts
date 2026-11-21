@@ -151,6 +151,12 @@ export class OnvifCameraAPI {
                     ret.emit('event', OnvifEvent.MotionBuggy);
                 }
             }
+            else if (eventTopic.includes('RuleEngine/FieldDetector/ObjectsInside')
+                || eventTopic.includes('RuleEngine/LineDetector/Crossed')) {
+                // IsInside / State = false is the event ending, not motion.
+                if (dataValue !== false)
+                    ret.emit('event', OnvifEvent.MotionBuggy);
+            }
             else if (eventTopic.includes('RuleEngine/ObjectDetector')) {
                 if (dataValue) {
                     try {
