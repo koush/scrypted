@@ -31,7 +31,10 @@ export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, Humi
         // todo light sensor
         this.binaryState = sensor.isOpened;
         this.audioDetected = !!sensor.alarmTriggeredAt;
-        this.flooded = !!sensor.leakDetectedAt;
+        // sensors with an external leak probe report it separately from the internal probe.
+        // externalLeakDetectedAt is not in the unifi-protect typings yet.
+        const externalLeakDetectedAt = (sensor as any).externalLeakDetectedAt;
+        this.flooded = !!sensor.leakDetectedAt || !!externalLeakDetectedAt;
         if (!!sensor.isMotionDetected)
             debounceMotionDetected(this);
     }
