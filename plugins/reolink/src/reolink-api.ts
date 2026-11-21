@@ -169,10 +169,30 @@ export class ReolinkCameraClient {
         await this.login();
         const url = options.url as URL;
         const params = url.searchParams;
-        for (const [k, v] of Object.entries(this.parameters)) {
+        const parameters = this.parameters;
+        for (const [k, v] of Object.entries(parameters)) {
             params.set(k, v);
         }
-        return this.request(options, body);
+        const response = await this.request(options, body);
+        let result = response.body;
+        if (options.responseType !== 'json') {
+            // The RLC-520A labels JSON snapshot errors as text/html.
+            const mediaType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+            if (mediaType !== 'application/json' && mediaType !== 'text/html')
+                return response;
+            try {
+                result = JSON.parse(result.toString());
+            }
+            catch {
+                return response;
+            }
+        }
+        const entries = Array.isArray(result) ? result : [result];
+        if (this.parameters === parameters && entries.some(entry => entry?.error?.rspCode === -6)) {
+            this.parameters = undefined;
+            this.tokenLease = undefined;
+        }
+        return response;
     }
 
     async reboot() {
