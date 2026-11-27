@@ -1,13 +1,14 @@
 import { automaticallyConfigureSettings, checkPluginNeedsAutoConfigure } from "@scrypted/common/src/autoconfigure-codecs";
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, DeviceCreatorSettings, DeviceInformation, FFmpegInput, Intercom, Lock, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoRecorder, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
+import sdk, { Camera, Device, DeviceCreatorSettings, DeviceInformation, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, Reboot, RequestPictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, ScryptedNativeId, Setting, VideoCameraConfiguration, VideoRecorder, VideoTextOverlay, VideoTextOverlays } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { createRtspMediaStreamOptions, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { AmcrestCameraClient, AmcrestEvent, AmcrestEventData } from "./amcrest-api";
 import { amcrestAutoConfigureSettings, autoconfigureSettings } from "./amcrest-configure";
+import { DahuaLock } from "./dahua-lock";
 
 const { mediaManager } = sdk;
 
@@ -22,13 +23,14 @@ const rtspChannelSetting: Setting = {
     placeholder: '1',
 };
 
-class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, Lock, VideoRecorder, Reboot, ObjectDetector, VideoTextOverlays {
+export class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, VideoRecorder, Reboot, ObjectDetector, VideoTextOverlays, DeviceProvider {
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     onvifIntercom = new OnvifIntercom(this);
     hasSmartDetection: boolean;
+    dahuaLock: DahuaLock;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
@@ -40,6 +42,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.hasSmartDetection = this.storage.getItem('hasSmartDetection') === 'true';
         this.updateDevice();
         this.updateDeviceInfo();
+        this.reportDevices();
     }
 
     async getVideoTextOverlays(): Promise<Record<string, VideoTextOverlay>> {
@@ -516,9 +519,9 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             interfaces.push(ScryptedInterface.Intercom);
         }
 
-        const enableDahuaLock = this.storage.getItem('enableDahuaLock') === 'true';
-        if (isDoorbell && doorbellType === DAHUA_DOORBELL_TYPE && enableDahuaLock) {
-            interfaces.push(ScryptedInterface.Lock);
+        // the lock is a child device, so it can be exposed as a lock (ie, to HomeKit).
+        if (this.isDahuaLockEnabled()) {
+            interfaces.push(ScryptedInterface.DeviceProvider);
         }
 
         const continuousRecording = this.storage.getItem('continuousRecording') === 'true';
@@ -568,6 +571,56 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         this.updateDevice();
         this.updateDeviceInfo();
+        this.reportDevices();
+    }
+
+    isDahuaLockEnabled() {
+        return this.storage.getItem('doorbellType') === DAHUA_DOORBELL_TYPE
+            && this.storage.getItem('enableDahuaLock') === 'true';
+    }
+
+    async reportDevices() {
+        const devices: Device[] = [];
+        const lockEnabled = this.isDahuaLockEnabled();
+
+        if (lockEnabled) {
+            devices.push({
+                providerNativeId: this.nativeId,
+                nativeId: `${this.nativeId}-lock`,
+                name: `${this.name} Lock`,
+                info: {
+                    ...this.info,
+                },
+                interfaces: [
+                    ScryptedInterface.Lock,
+                ],
+                type: ScryptedDeviceType.Lock,
+            });
+        }
+
+        await sdk.deviceManager.onDevicesChanged({
+            providerNativeId: this.nativeId,
+            devices,
+        });
+
+        // create the lock right away so it reports its state before the first command,
+        // otherwise HomeKit shows it as unlocked and misses the first state change.
+        if (lockEnabled)
+            await this.getDevice(`${this.nativeId}-lock`);
+    }
+
+    async getDevice(nativeId: string): Promise<any> {
+        if (nativeId.endsWith('-lock')) {
+            this.dahuaLock ||= new DahuaLock(this, nativeId);
+            return this.dahuaLock;
+        }
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+        if (nativeId.endsWith('-lock')) {
+            clearTimeout(this.dahuaLock?.autoLockTimeout);
+            delete this.dahuaLock;
+        }
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
@@ -688,18 +741,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
     showRtspUrlOverride() {
         return false;
-    }
-
-    async lock(): Promise<void> {
-        if (!this.client.lock()) {
-            this.console.error("Could not lock");
-        }
-    }
-
-    async unlock(): Promise<void> {
-        if (!this.client.unlock()) {
-            this.console.error("Could not unlock");
-        }
     }
 }
 

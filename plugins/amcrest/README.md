@@ -40,7 +40,9 @@ Each 'Channel' or (camera) Device attached to the NVR must be configured as sepa
 * `Channel Number Override` camera's channel number as known to DVR
 
 ## Dahua Lock/Unlock
-Dahua DTO video intercoms have built-in access control for locks/doors. If you have set the Amcrest plugin up with `Doorbell Type` set to `Dahua Doorbell`, you can enable support for remotely locking/unlocking by enabling/toggle the option `Enable Dahua Lock`.
+Dahua VTO video intercoms have built-in access control for locks/doors. If you have set the Amcrest plugin up with `Doorbell Type` set to `Dahua Doorbell`, you can enable support for remotely locking/unlocking by enabling/toggle the option `Enable Dahua Lock`. This adds a separate lock device to the doorbell, which HomeKit and other integrations expose as a lock.
+
+Door strikes do not report their state and lock again on their own. After unlocking, the lock is reported as locked again once the unlock period configured on the intercom has passed.
 
 # Troubleshooting
 ## General
