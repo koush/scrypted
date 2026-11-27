@@ -1514,7 +1514,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const map = new Map<MediaStreamDestination, string>();
     map.set('local', this.streamSettings.getDefaultStream(ret)?.stream?.id);
     map.set('remote', this.streamSettings.getRemoteStream(ret)?.stream?.id);
-    map.set('medium-resolution', this.streamSettings.getRemoteRecordingStream(ret)?.stream?.id);
+    map.set('medium-resolution', this.streamSettings.getRemoteStream(ret)?.stream?.id);
     map.set('remote-recorder', this.streamSettings.getRemoteRecordingStream(ret)?.stream?.id);
     map.set('local-recorder', this.streamSettings.getRecordingStream(ret)?.stream?.id);
     map.set('low-resolution', this.streamSettings.getLowResolutionStream(ret)?.stream?.id);
