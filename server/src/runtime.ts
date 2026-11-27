@@ -188,10 +188,9 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     checkUpgrade(req: express.Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>, res: express.Response<any, Record<string, any>>, pluginData: HttpPluginData): void {
-        // pluginData.pluginHost.io.
         const { sid } = req.query;
-        const client = (pluginData.pluginHost.io as any).clients[sid as string];
-        if (client) {
+        const clients = (pluginData.pluginHost.io as any).clients;
+        if (typeof sid === 'string' && Object.prototype.hasOwnProperty.call(clients, sid)) {
             res.locals.username = 'existing-io-session';
         }
     }
