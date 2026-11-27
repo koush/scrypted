@@ -67,8 +67,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     clusterSecret = process.env.SCRYPTED_CLUSTER_SECRET || crypto.randomBytes(16).toString('hex');
     clusterWorkers = new Map<string, RunningClusterWorker>();
     serverClusterWorkerId!: string;
-    plugins: { [id: string]: PluginHost } = {};
-    pluginDevices: { [id: string]: PluginDevice } = {};
+    plugins: { [id: string]: PluginHost } = Object.create(null);
+    pluginDevices: { [id: string]: PluginDevice } = Object.create(null);
     devices: { [id: string]: DeviceProxyPair } = {};
     stateManager = new ScryptedStateManager(this);
     logger = new Logger(this, '', 'Scrypted');

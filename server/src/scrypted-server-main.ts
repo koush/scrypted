@@ -806,7 +806,15 @@ async function start(mainFilename: string, options?: {
             (app as any).handle(req, {
                 socket,
                 upgradeHead
-            })
+            }, (err?: unknown) => {
+                // Express's default final handler requires a real ServerResponse.
+                if (err)
+                    console.error('upgrade routing error', err);
+                if (socket.writable && !socket.writableEnded) {
+                    const status = err ? '500 Internal Server Error' : '404 Not Found';
+                    socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+                }
+            });
         });
         return server;
     }
