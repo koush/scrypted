@@ -121,6 +121,7 @@ class ClusterSetup:
             future.set_result(peer)
             self.clusterPeers[clusterPeerKey] = future
             peer.params["connectRPCObject"] = lambda o: self.connectClusterObject(o)
+            peer.params["isRpcProxy"] = lambda o: isinstance(o, rpc.RpcProxy)
             try:
                 await peerReadLoop()
             except:

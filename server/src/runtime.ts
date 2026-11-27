@@ -15,7 +15,7 @@ import { Parser as TarParser } from 'tar';
 import { URL } from "url";
 import WebSocket, { Server as WebSocketServer } from "ws";
 import { computeClusterObjectHash } from './cluster/cluster-hash';
-import { isClusterAddress } from './cluster/cluster-setup';
+import { isClusterAddress, setupCluster } from './cluster/cluster-setup';
 import { ClusterObject } from './cluster/connect-rpc-object';
 import { Plugin, PluginDevice, ScryptedAlert, ScryptedUser } from './db-types';
 import { httpFetch } from './fetch/http-fetch';
@@ -47,6 +47,7 @@ import { getNpmPackageInfo, PluginComponent } from './services/plugin';
 import { ServiceControl } from './services/service-control';
 import { UsersService } from './services/users';
 import { getState, ScryptedStateManager, setState } from './state';
+import { RpcPeer } from './rpc';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -85,6 +86,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             })
         },
     });
+    runtimePeer = new RpcPeer('runtime', 'runtime', (message, reject, serializationContext) => {
+        console.warn('unexpected message to runtime peer', message);
+    });
+    clusterSetup = setupCluster(this.runtimePeer);
     pluginComponent = new PluginComponent(this);
     serviceControl = new ServiceControl();
     alerts = new Alerts(this);
@@ -944,6 +949,12 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         process.on('SIGINT', () => this.exit());
         // catch kill
         process.on('SIGTERM', () => this.exit());
+
+        await this.clusterSetup.initializeCluster({
+            clusterId: this.clusterId,
+            clusterSecret: this.clusterSecret,
+            clusterWorkerId: this.serverClusterWorkerId,
+        });
 
         for await (const pluginDevice of this.datastore.getAll(PluginDevice)) {
             // this may happen due to race condition around deletion/update. investigate.

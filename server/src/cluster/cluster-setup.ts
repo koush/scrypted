@@ -67,6 +67,10 @@ export function setupCluster(peer: RpcPeer) {
         }
         return ret;
     }
+    
+    const isRpcProxy = async (o: any) => {
+        return RpcPeer.isRpcProxy(o);
+    };
 
     const connectClusterObject = async (o: ClusterObject) => {
         const sha256 = computeClusterObjectHash(o, clusterSecret);
@@ -153,6 +157,7 @@ export function setupCluster(peer: RpcPeer) {
             threadPeer.onProxySerialization = value => onProxySerialization(threadPeer, value, threadPeerKey);
 
             threadPeer.params.connectRPCObject = connectClusterObject;
+            threadPeer.params.isRpcProxy = isRpcProxy;
 
             function cleanup(message: string) {
                 peerCleanup();
@@ -334,6 +339,18 @@ export function setupCluster(peer: RpcPeer) {
             properties,
         };
     }
+
+    const registerClusterPeer = (clusterPeer: RpcPeer, key = `local:${RpcPeer.generateId()}`) => {
+        clusterPeer.onProxySerialization = value => onProxySerialization(clusterPeer, value, key);
+        const registered = Promise.resolve(clusterPeer);
+        clusterPeers.set(key, registered);
+        clusterPeer.killedSafe.finally(() => {
+            if (clusterPeers.get(key) === registered)
+                clusterPeers.delete(key);
+        });
+        return key;
+    }
+
     const initializeCluster: InitializeCluster = async (options: {
         clusterId: string;
         clusterSecret: string;
@@ -357,6 +374,7 @@ export function setupCluster(peer: RpcPeer) {
             clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
             clusterPeers.set(clusterPeerKey, Promise.resolve(clusterPeer));
             clusterPeer.params.connectRPCObject = connectClusterObject;
+            clusterPeer.params.isRpcProxy = isRpcProxy;
             client.on('close', () => {
                 clusterPeers.delete(clusterPeerKey);
                 clusterPeer.kill('cluster socket closed');
@@ -389,6 +407,7 @@ export function setupCluster(peer: RpcPeer) {
         SCRYPTED_CLUSTER_ADDRESS,
         clusterPeers,
         onProxySerialization,
+        registerClusterPeer,
         connectClusterObject,
         ensureClusterPeer,
         mainThreadPort,
