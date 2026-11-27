@@ -190,8 +190,12 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     checkUpgrade(req: express.Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>, res: express.Response<any, Record<string, any>>, pluginData: HttpPluginData): void {
         const { sid } = req.query;
         const clients = (pluginData.pluginHost.io as any).clients;
-        if (typeof sid === 'string' && Object.prototype.hasOwnProperty.call(clients, sid)) {
-            res.locals.username = 'existing-io-session';
+        if (typeof sid !== 'string' || !Object.prototype.hasOwnProperty.call(clients, sid))
+            return;
+        const endpointRequest: HttpRequest = clients?.[sid]?.request?.scrypted?.endpointRequest;
+        if (endpointRequest) {
+            res.locals.aclId = endpointRequest.aclId;
+            res.locals.username = endpointRequest.username;
         }
     }
 
@@ -396,6 +400,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             return undefined;
 
         const user = await this.datastore.tryGet(ScryptedUser, username);
+        if (!user)
+            throw new Error(`User not found: ${username}`);
         if (user?.aclId) {
             const accessControl = this.getDevice<SU>(user.aclId);
             const acls = await accessControl!.getScryptedUserAccessControl();
