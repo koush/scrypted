@@ -47,6 +47,18 @@ export function setupCluster(peer: RpcPeer) {
     // incoming connections: use the remote random/unique port
     // outgoing connections: use the local random/unique port
     const clusterPeers = new Map<string, Promise<RpcPeer>>();
+    const clusterPeersResolved = new Map<string, RpcPeer>();
+    function clusterPeersSet(key: string, peerPromise: Promise<RpcPeer>) {
+        clusterPeers.set(key, peerPromise);
+        peerPromise.then(peer => {
+            if (clusterPeers.get(key) === peerPromise)
+                clusterPeersResolved.set(key, peer);
+        }).catch(() => { });
+    }
+    function clusterPeersDelete(key: string) {
+        clusterPeers.delete(key);
+        clusterPeersResolved.delete(key);
+    }
 
     peer.killedSafe.finally(() => {
         for (const cp of clusterPeers.values()) {
@@ -68,6 +80,10 @@ export function setupCluster(peer: RpcPeer) {
         return ret;
     }
 
+    const isRpcProxy = async (o: any) => {
+        return RpcPeer.isRpcProxy(o);
+    };
+
     const connectClusterObject = async (o: ClusterObject) => {
         const sha256 = computeClusterObjectHash(o, clusterSecret);
         if (sha256 !== o.sha256)
@@ -88,7 +104,7 @@ export function setupCluster(peer: RpcPeer) {
 
         clusterPeerPromise = (async () => {
             const socket = net.connect(connectPort, address);
-            socket.on('close', () => clusterPeers.delete(clusterPeerKey));
+            socket.on('close', () => clusterPeersDelete(clusterPeerKey));
 
             try {
                 await once(socket, 'connect');
@@ -101,6 +117,7 @@ export function setupCluster(peer: RpcPeer) {
 
                 const clusterPeer = createDuplexRpcPeer(peer.selfName, clusterPeerKey, socket, socket);
                 clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
+                clusterPeer.onProxyDeserialization = onProxyDeserialization;
                 return clusterPeer;
             }
             catch (e) {
@@ -110,7 +127,7 @@ export function setupCluster(peer: RpcPeer) {
             }
         })();
 
-        clusterPeers.set(clusterPeerKey, clusterPeerPromise);
+        clusterPeersSet(clusterPeerKey, clusterPeerPromise);
         return clusterPeerPromise;
     };
 
@@ -144,15 +161,17 @@ export function setupCluster(peer: RpcPeer) {
 
         const threadPeerKey = `thread:${tid}`;
         function peerCleanup() {
-            clusterPeers.delete(threadPeerKey);
+            clusterPeersDelete(threadPeerKey);
         }
         peerPromise = tidDeferred.promise.then(port => {
             const threadPeer = NodeThreadWorker.createRpcPeer(peer.selfName, threadPeerKey, port);
             // set params from the primary peer, needed for get getRemote in cluster mode.
             Object.assign(threadPeer.params, peer.params);
             threadPeer.onProxySerialization = value => onProxySerialization(threadPeer, value, threadPeerKey);
+            threadPeer.onProxyDeserialization = onProxyDeserialization;
 
             threadPeer.params.connectRPCObject = connectClusterObject;
+            threadPeer.params.isRpcProxy = isRpcProxy;
 
             function cleanup(message: string) {
                 peerCleanup();
@@ -165,7 +184,7 @@ export function setupCluster(peer: RpcPeer) {
             return threadPeer;
         });
         peerPromise.catch(() => peerCleanup());
-        clusterPeers.set(threadPeerKey, peerPromise);
+        clusterPeersSet(threadPeerKey, peerPromise);
         tidPeers.set(tid, peerPromise);
 
         return peerPromise;
@@ -334,6 +353,40 @@ export function setupCluster(peer: RpcPeer) {
             properties,
         };
     }
+
+    const onProxyDeserialization = (proxy: any) => {
+        const o = getClusterObject(proxy);
+        if (!o)
+            return;
+        const sha256 = computeClusterObjectHash(o, clusterSecret);
+        if (sha256 !== o.sha256)
+            throw new Error('secret incorrect');
+        if (o.id !== clusterId)
+            throw new Error('invalid cluster id');
+        const sourceKey = o.sourceKey;
+        const sourcePeer = sourceKey
+            ? clusterPeersResolved.get(sourceKey)
+            : peer;
+        if (!sourcePeer)
+            return;
+        const ret = sourcePeer?.localProxyMap.get(o.proxyId);
+        if (!ret || RpcPeer.isRpcProxy(ret))
+            return;
+        return ret;
+    }
+
+    const registerClusterPeer = (clusterPeer: RpcPeer, key = `local:${RpcPeer.generateId()}`) => {
+        clusterPeer.onProxySerialization = value => onProxySerialization(clusterPeer, value, key);
+        clusterPeer.onProxyDeserialization = onProxyDeserialization;
+        const registered = Promise.resolve(clusterPeer);
+        clusterPeersSet(key, registered);
+        clusterPeer.killedSafe.finally(() => {
+            if (clusterPeers.get(key) === registered)
+                clusterPeersDelete(key);
+        });
+        return key;
+    }
+
     const initializeCluster: InitializeCluster = async (options: {
         clusterId: string;
         clusterSecret: string;
@@ -355,10 +408,12 @@ export function setupCluster(peer: RpcPeer) {
             // the listening peer sourceKey (client address/port) is used by the OTHER peer (the client)
             // to determine if it is already connected to THIS peer (the server).
             clusterPeer.onProxySerialization = (value) => onProxySerialization(clusterPeer, value, clusterPeerKey);
-            clusterPeers.set(clusterPeerKey, Promise.resolve(clusterPeer));
+            clusterPeer.onProxyDeserialization = onProxyDeserialization;
+            clusterPeersSet(clusterPeerKey, Promise.resolve(clusterPeer));
             clusterPeer.params.connectRPCObject = connectClusterObject;
+            clusterPeer.params.isRpcProxy = isRpcProxy;
             client.on('close', () => {
-                clusterPeers.delete(clusterPeerKey);
+                clusterPeersDelete(clusterPeerKey);
                 clusterPeer.kill('cluster socket closed');
                 clients.delete(client);
             });
@@ -368,6 +423,7 @@ export function setupCluster(peer: RpcPeer) {
         clusterPort = port;
 
         peer.onProxySerialization = value => onProxySerialization(peer, value, undefined!);
+        peer.onProxyDeserialization = onProxyDeserialization;
         delete peer.params.initializeCluster;
 
         peer.killedSafe.finally(() => clusterRpcServer.close());
@@ -389,6 +445,7 @@ export function setupCluster(peer: RpcPeer) {
         SCRYPTED_CLUSTER_ADDRESS,
         clusterPeers,
         onProxySerialization,
+        registerClusterPeer,
         connectClusterObject,
         ensureClusterPeer,
         mainThreadPort,

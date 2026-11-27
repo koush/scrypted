@@ -30,6 +30,13 @@ def getClusterPeerKey(address: str, port: int):
     return f"{address}:{port}"
 
 
+def getClusterObject(value: Any):
+    clusterObject = getattr(value, "__cluster", None)
+    if clusterObject is None or type(clusterObject) is not dict:
+        return None
+    return clusterObject
+
+
 class ClusterSetup:
     def __init__(self, loop: AbstractEventLoop, peer: rpc.RpcPeer):
         self.loop = loop
@@ -40,6 +47,25 @@ class ClusterSetup:
         self.clusterPort: int = None
         self.SCRYPTED_CLUSTER_ADDRESS: str = None
         self.clusterPeers: Mapping[str, asyncio.Future[rpc.RpcPeer]] = {}
+        self.clusterPeersResolved: Mapping[str, rpc.RpcPeer] = {}
+
+    def clusterPeersSet(self, key: str, peerFuture):
+        self.clusterPeers[key] = peerFuture
+
+        def resolved(future):
+            if self.clusterPeers.get(key, None) is not peerFuture:
+                return
+            try:
+                peer = future.result()
+            except BaseException:
+                return
+            self.clusterPeersResolved[key] = peer
+
+        peerFuture.add_done_callback(resolved)
+
+    def clusterPeersDelete(self, key: str):
+        self.clusterPeers.pop(key, None)
+        self.clusterPeersResolved.pop(key, None)
 
     async def resolveObject(self, id: str, sourceKey: str):
         sourcePeer: rpc.RpcPeer = (
@@ -96,6 +122,26 @@ class ClusterSetup:
 
         return proxyId, properties
 
+    def onProxyDeserialization(self, proxy: Any):
+        o = getClusterObject(proxy)
+        if not o:
+            return None
+        sha256 = self.computeClusterObjectHash(o)
+        if sha256 != o.get("sha256", None):
+            raise Exception("secret incorrect")
+        if o.get("id", None) != self.clusterId:
+            raise Exception("invalid cluster id")
+        sourceKey = o.get("sourceKey", None)
+        sourcePeer = (
+            self.clusterPeersResolved.get(sourceKey, None) if sourceKey else self.peer
+        )
+        if not sourcePeer or not sourcePeer.localProxyMap:
+            return None
+        ret = sourcePeer.localProxyMap.get(o.get("proxyId", None), None)
+        if not ret or isinstance(ret, rpc.RpcProxy):
+            return None
+        return ret
+
     async def initializeCluster(self, options: dict):
         if self.clusterPort:
             return
@@ -117,16 +163,18 @@ class ClusterSetup:
             peer.onProxySerialization = lambda value: self.onProxySerialization(
                 peer, value, clusterPeerKey
             )
+            peer.onProxyDeserialization = self.onProxyDeserialization
             future: asyncio.Future[rpc.RpcPeer] = asyncio.Future()
             future.set_result(peer)
-            self.clusterPeers[clusterPeerKey] = future
+            self.clusterPeersSet(clusterPeerKey, future)
             peer.params["connectRPCObject"] = lambda o: self.connectClusterObject(o)
+            peer.params["isRpcProxy"] = lambda o: isinstance(o, rpc.RpcProxy)
             try:
                 await peerReadLoop()
             except:
                 pass
             finally:
-                self.clusterPeers.pop(clusterPeerKey, None)
+                self.clusterPeersDelete(clusterPeerKey)
                 peer.kill("cluster client killed")
                 writer.close()
                 try:
@@ -139,6 +187,7 @@ class ClusterSetup:
         self.peer.onProxySerialization = lambda value: self.onProxySerialization(
             self.peer, value, None
         )
+        self.peer.onProxyDeserialization = self.onProxyDeserialization
         del self.peer.params["initializeCluster"]
 
     def computeClusterObjectHash(self, o: ClusterObject) -> str:
@@ -181,8 +230,9 @@ class ClusterSetup:
                         clusterPeer, value, clusterPeerKey
                     )
                 )
+                clusterPeer.onProxyDeserialization = self.onProxyDeserialization
             except:
-                self.clusterPeers.pop(clusterPeerKey, None)
+                self.clusterPeersDelete(clusterPeerKey)
                 raise
 
             async def run_loop():
@@ -191,7 +241,7 @@ class ClusterSetup:
                 except:
                     pass
                 finally:
-                    self.clusterPeers.pop(clusterPeerKey, None)
+                    self.clusterPeersDelete(clusterPeerKey)
                     clusterPeer.kill("cluster peer killed")
                     writer.close()
                     try:
@@ -204,15 +254,13 @@ class ClusterSetup:
 
         clusterPeerPromise = self.loop.create_task(connectClusterPeer())
 
-        self.clusterPeers[clusterPeerKey] = clusterPeerPromise
+        self.clusterPeersSet(clusterPeerKey, clusterPeerPromise)
         return clusterPeerPromise
 
     async def connectRPCObject(self, value):
-        __cluster = getattr(value, "__cluster", None)
-        if type(__cluster) is not dict:
+        clusterObject = getClusterObject(value)
+        if clusterObject is None:
             return value
-
-        clusterObject: ClusterObject = __cluster
 
         if self.computeClusterObjectHash(clusterObject) != clusterObject.get("sha256", None):
             raise Exception("invalid cluster object signature")

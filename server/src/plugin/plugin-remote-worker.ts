@@ -45,6 +45,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
     const { initializeCluster, connectRPCObject, mainThreadBrokerRegister, mainThreadPort } = clusterPeerSetup;
 
     peer.params.initializeCluster = initializeCluster;
+    peer.params.isRpcProxy = (value: any) => RpcPeer.isRpcProxy(value);
     peer.params.ping = async (time: number) => {
         return time;
     };
@@ -78,7 +79,7 @@ export function startPluginRemote(mainFilename: string, pluginId: string, peerSe
         createMediaManager: async (sm, dm) => {
             systemManager = sm;
             deviceManager = dm;
-            return new MediaManagerImpl(systemManager, dm);
+            return new MediaManagerImpl(systemManager, dm, connectRPCObject);
         },
         onGetRemote: async (_api, _pluginId) => {
             class PluginForkableAPI extends PluginAPIProxy {

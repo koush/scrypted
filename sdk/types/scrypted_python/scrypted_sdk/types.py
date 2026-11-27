@@ -1131,7 +1131,7 @@ class TamperState(TypedDict):
     pass
 
 
-TYPES_VERSION = "0.5.55"
+TYPES_VERSION = "0.5.57"
 
 
 class AirPurifier:
@@ -2017,6 +2017,9 @@ class MediaManager:
         pass
 
     async def createMediaObjectFromUrl(self, data: str, options: Any = None) -> Union[MediaObject, Any]:
+        pass
+
+    async def ensureTrusted(self, mediaObject: MediaObject) -> MediaObject:
         pass
 
     async def getFFmpegPath(self) -> str:

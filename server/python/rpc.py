@@ -173,6 +173,7 @@ class RpcPeer:
         self.remoteWeakProxies: Mapping[str, any] = {}
         self.nameDeserializerMap: Mapping[str, RpcSerializer] = {}
         self.onProxySerialization: Callable[[Any, str], tuple[str, Any]] = None
+        self.onProxyDeserialization: Callable[[Any], Any] = None
         self.killed = False
         self.tags = {}
 
@@ -469,6 +470,12 @@ class RpcPeer:
                     __remote_proxy_oneway_methods,
                 )
             setattr(proxy, "__proxy_finalizer_id", __remote_proxy_finalizer_id)
+
+            if self.onProxyDeserialization:
+                resolved = self.onProxyDeserialization(proxy)
+                if resolved:
+                    return resolved
+
             return proxy
 
         if __local_proxy_id:

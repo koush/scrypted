@@ -298,6 +298,7 @@ export class RpcPeer {
         proxyId: string;
         properties: any;
     };
+    onProxyDeserialization?: (rpcProxy: any) => any;
     constructorSerializerMap = new Map<any, string>();
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
     killed: Promise<string>;
@@ -562,6 +563,9 @@ export class RpcPeer {
                 return deserializer.deserialize(proxy, deserializationContext);
             }
 
+            const onProxyDeserializationResolved = this.onProxyDeserialization?.(proxy);
+            if (onProxyDeserializationResolved)
+                return onProxyDeserializationResolved;
             return proxy;
         }
 

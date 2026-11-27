@@ -7,6 +7,8 @@ import MimeType from 'whatwg-mimetype';
 import { getScryptedFFmpegPath } from './ffmpeg-path';
 import { MediaObject } from "./mediaobject";
 import { MediaObjectRemote } from "./plugin-api";
+import { RpcPeer } from "../rpc";
+import { getClusterObject } from "../cluster/cluster-setup";
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything
@@ -35,20 +37,25 @@ export abstract class MediaManagerBase implements MediaManager {
     #getDeviceById: <T>(id: string) => T & ScryptedDevice;
     #getPluginDeviceId: () => string;
     #getMixinConsole: (mixinId: string, nativeId: ScryptedNativeId) => Console;
+    #trusted: boolean;
+    #connectRPCObject: (value: any) => Promise<any>;
 
     constructor(
         getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } },
         getDeviceById: <T>(id: string) => T & ScryptedDevice,
         getPluginDeviceId: () => string,
         getMixinConsole: (mixinId: string, nativeId: ScryptedNativeId) => Console,
-        privileged: boolean,
+        trusted: boolean,
+        connectRPCObject: (value: any) => Promise<any>,
     ) {
         this.#getSystemState = getSystemState;
         this.#getDeviceById = getDeviceById;
         this.#getPluginDeviceId = getPluginDeviceId;
         this.#getMixinConsole = getMixinConsole;
+        this.#trusted = trusted;
+        this.#connectRPCObject = connectRPCObject;
 
-        if (privileged) {
+        if (trusted) {
             for (const h of ['http', 'https']) {
                 this.builtinConverters.push({
                     id: getBuiltinId(this.builtinConverters.length),
@@ -156,6 +163,50 @@ export abstract class MediaManagerBase implements MediaManager {
                 return data as Buffer;
             }
         });
+    }
+
+    async ensureTrusted(mediaObject: MediaObject): Promise<MediaObject> {
+        if (!mediaObject)
+            throw new Error('Invalid MediaObject.');
+
+        if (mediaObject.trusted !== true) {
+            throw new Error('Untrusted MediaObject.');
+        }
+
+        if (mediaObject instanceof MediaObject) {
+            return mediaObject;
+        }
+
+        // invalid input.
+        if (!RpcPeer.isRpcProxy(mediaObject))
+            throw new Error('Invalid MediaObject.');
+
+        // connect and validate
+        const clusterObject = getClusterObject(mediaObject);
+        if (!clusterObject)
+            throw new Error('Untrusted MediaObject.');
+
+        const remoteMediaObject = await this.#connectRPCObject(mediaObject);
+        const peer: RpcPeer | undefined = remoteMediaObject?.[RpcPeer.PROPERTY_PROXY_PEER];
+        if (!peer) {
+            throw new Error('Invalid MediaObject.');
+        }
+
+        const isRpcProxyMethod: (obj: any) => Promise<boolean> = await peer.getParam('isRpcProxy');
+        if (!isRpcProxyMethod) {
+            throw new Error('Invalid MediaObject.');
+        } 
+        
+        const isRpcProxy = await isRpcProxyMethod(remoteMediaObject);
+        if (isRpcProxy === true) {
+            throw new Error('Untrusted MediaObject.');
+        }
+        if (isRpcProxy !== false) {
+            throw new Error('Invalid MediaObject.');
+        }
+        if (remoteMediaObject.trusted !== true)
+            throw new Error('Untrusted MediaObject.');
+        return remoteMediaObject;
     }
 
     async convertMediaObjectToJSON<T>(mediaObject: MediaObjectInterface, toMimeType: string): Promise<T> {
@@ -268,7 +319,7 @@ export abstract class MediaManagerBase implements MediaManager {
         return url.data.toString();
     }
 
-    #createMediaObjectRemote<T extends MediaObjectCreateOptions>(data: any | Buffer | Promise<string | Buffer>, mimeType: string, options?: T): MediaObjectRemote & T {
+    #createMediaObjectRemote<T extends MediaObjectCreateOptions & { trusted?: boolean }>(data: any | Buffer | Promise<string | Buffer>, mimeType: string, options?: T): MediaObjectRemote & T {
         if (!mimeType)
             throw new Error('no mimeType provided');
         if (mimeType === ScryptedMimeTypes.MediaObject)
@@ -280,8 +331,9 @@ export abstract class MediaManagerBase implements MediaManager {
         const sourceId = typeof options?.sourceId === 'string' ? options?.sourceId : this.#getPluginDeviceId();
         options ||= {} as T;
         options.sourceId = sourceId;
+        options.trusted = this.#trusted;
 
-        return new MediaObject(mimeType, data, options) as MediaObject & T;
+        return new MediaObject(mimeType, data, this.#trusted, options) as MediaObject & T;
     }
 
     async createFFmpegMediaObject<T extends MediaObjectCreateOptions>(ffMpegInput: FFmpegInput, options?: T): Promise<MediaObjectInterface & T> {
@@ -462,7 +514,7 @@ export abstract class MediaManagerBase implements MediaManager {
 }
 
 export class MediaManagerImpl extends MediaManagerBase {
-    constructor(systemManager: SystemManager, deviceManager: DeviceManager) {
+    constructor(systemManager: SystemManager, deviceManager: DeviceManager, connectRPCObject: (value: any) => Promise<any>) {
         super(
             () => systemManager.getSystemState(),
             <T>(id: string) => systemManager.getDeviceById<T>(id),
@@ -473,6 +525,7 @@ export class MediaManagerImpl extends MediaManagerBase {
                 return deviceManager.getMixinConsole(mixinId, nativeId);
             },
             true,
+            connectRPCObject,
         );
     }
 }
@@ -482,7 +535,8 @@ export class MediaManagerHostImpl extends MediaManagerBase {
         getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } },
         console: Console,
         getDeviceById: (id: string) => any,
-        privileged: boolean) {
-        super(getSystemState, getDeviceById, () => pluginDeviceId, () => console, privileged);
+        trusted: boolean,
+        connectRPCObject: (value: any) => Promise<any>) {
+        super(getSystemState, getDeviceById, () => pluginDeviceId, () => console, trusted, connectRPCObject);
     }
 }
