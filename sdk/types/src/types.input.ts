@@ -1969,11 +1969,6 @@ export interface MediaManager {
    * Get the directory where the plugin should store files.
    */
   getFilesPath(): Promise<string>;
-
-  /**
-   * Check if the given media object is trusted by the system. Trusted media objects are ones created by the system, plugins, or admin users.
-   */
-  ensureTrusted(mediaObject: MediaObject): Promise<MediaObject>;
 }
 export interface MediaContainer {
   container?: string;

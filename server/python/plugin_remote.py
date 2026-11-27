@@ -1150,7 +1150,6 @@ async def plugin_async_main(
 ):
     peer, readLoop = await rpc_reader.prepare_peer_readloop(loop, rpcTransport)
     peer.params["print"] = print
-    peer.params["isRpcProxy"] = lambda o: isinstance(o, rpc.RpcProxy)
 
     clusterSetup = ClusterSetup(loop, peer)
     peer.params["initializeCluster"] = lambda options: clusterSetup.initializeCluster(

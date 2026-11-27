@@ -6,6 +6,7 @@ import os from 'os';
 import { PassThrough } from 'stream';
 import WebSocket from 'ws';
 import { utilizesClusterForkWorker } from '../cluster/cluster-labels';
+import { setupCluster } from '../cluster/cluster-setup';
 import { Plugin, PluginDevice } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
 import type { LogEntry, Logger } from '../logger';
@@ -209,7 +210,7 @@ export class PluginHost {
 
         const { runtime } = this.packageJson.scrypted;
         const mediaManager = runtime && runtime !== 'node'
-            ? new MediaManagerHostImpl(pluginDeviceId, () => scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id), true, scrypted.clusterSetup.connectRPCObject)
+            ? new MediaManagerHostImpl(pluginDeviceId, () => scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id), true)
             : undefined;
 
         this.api = new PluginHostAPI(scrypted, this.pluginId, this, mediaManager!);
@@ -373,7 +374,6 @@ export class PluginHost {
                     reject(new Error('peer disconnected'));
                 }
             });
-            this.scrypted.clusterSetup.registerClusterPeer(this.peer);
 
             peer = Promise.resolve(this.peer);
 
@@ -400,12 +400,20 @@ export class PluginHost {
                 }
             });
 
+            const clusterSetup = setupCluster(this.peer);
             const { runtimeWorker, forkPeer, clusterWorkerId } = createClusterForkWorker(
                 runtimeWorkerOptions,
                 scrypted,
-                Promise.resolve(this.scrypted.clusterFork),
+                (async () => {
+                    await clusterSetup.initializeCluster({
+                        clusterId: this.scrypted.clusterId,
+                        clusterSecret: this.scrypted.clusterSecret,
+                        clusterWorkerId: this.scrypted.serverClusterWorkerId,
+                    });
+                    return this.scrypted.clusterFork;
+                })(),
                 async () => fs.promises.readFile(this.zipFile),
-                this.scrypted.clusterSetup.connectRPCObject);
+                clusterSetup.connectRPCObject);
 
             forkPeer.then(peer => {
                 const originalPeer = this.peer;
@@ -500,7 +508,6 @@ export class PluginHost {
             console,
             id => this.scrypted.getDevice(id),
             !accessControls,
-            this.scrypted.clusterSetup.connectRPCObject,
         );
         const api = new PluginAPIProxy(this.api, mediaManager);
         api.acl = accessControls;
