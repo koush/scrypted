@@ -219,6 +219,10 @@ export async function* handleFragmentsRequests(streamId: number, device: Scrypte
         else {
             audioArgs = [
                 '-acodec', 'copy',
+                // FFmpeg 7.1.x does not flag RTSP AAC packets as keyframes
+                // (trac #11531, fixed in 8.0 by cf7dfddee). Without this the
+                // copied audio never starts and HKSV clips are silent.
+                '-copyinkf:a',
                 '-bsf:a', 'aac_adtstoasc',
             ];
         }
