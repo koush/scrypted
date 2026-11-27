@@ -283,7 +283,8 @@ interface ErrorType {
 }
 
 export class RpcPeer {
-    params: { [name: string]: any } = {};
+    // RPC param names come from the peer; only explicitly registered names should resolve.
+    params: { [name: string]: any } = Object.create(null);
     pendingResults: { [id: string]: Deferred } = {};
     localProxied = new Map<any, LocalProxiedEntry>();
     localProxyMap = new Map<string, any>();
@@ -483,7 +484,7 @@ export class RpcPeer {
         }
         this.yieldedAsyncIterators.clear();
         this.pendingResults = Object.freeze({});
-        this.params = Object.freeze({});
+        this.params = Object.freeze(Object.create(null));
         this.remoteWeakProxies = Object.freeze({});
         this.localProxyMap.clear()
         this.localProxied.clear();

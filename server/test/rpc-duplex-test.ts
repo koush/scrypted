@@ -1,3 +1,4 @@
+import { strictEqual } from 'assert';
 import net from 'net';
 import { listenZeroSingleClient } from "../src/listen-zero";
 import { createDuplexRpcPeer } from "../src/rpc-serializer";
@@ -22,6 +23,8 @@ async function test() {
 
     await (await p1.getParam('test'))();
     await (await p2.getParam('test'))();
+    for (const name of ['constructor', '__proto__', 'toString'])
+        strictEqual(await p1.getParam(name), undefined);
 
     n1.destroy();
     n2.destroy();
