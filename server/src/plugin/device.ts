@@ -247,8 +247,12 @@ export class StorageImpl implements Storage {
         return Object.keys(this.storage).filter(key => key.startsWith(this.prefix!))[index]!.substring(this.prefix!.length);
     }
     removeItem(key: string): void {
-        delete this.storage[this.prefix + key];
-        this.api.setStorage(this.nativeId, this.storage);
+        const storage = this.storage;
+        const fullKey = this.prefix + key;
+        if (!Object.prototype.hasOwnProperty.call(storage, fullKey))
+            return;
+        delete storage[fullKey];
+        this.api.setStorage(this.nativeId, storage);
     }
     setItem(key: string, value: string): void {
         key = toStorageString(key);
