@@ -550,7 +550,7 @@ class WebRTCTrack implements RTCOutputMediaObjectTrack, RTCInputMediaObjectTrack
 
         const f = await createTrackForwarder(this.video, this.audio);
         this.attachForwarder(f);
-        waitClosed(this.connectionManagement.pc).finally(() => f.kill());
+        this.connectionManagement.killForwarderOnClose(f);
         this.removed.promise.finally(() => f.kill());
     }
 
@@ -589,6 +589,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     weriftSignalingSession: WeriftSignalingSession;
     activeTracks = new Set<WebRTCTrack>();
     closed = false;
+    private forwardersToKillOnClose = new Set<() => void>();
 
     constructor(public console: Console, public clientSession: RTCSignalingSession,
         public requireOpus: boolean,
@@ -625,11 +626,37 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             this.closed = true;
             this.sframeReceiveKeys.clear();
             this.sframeAudioReceiver.clear();
+            for (const kill of this.forwardersToKillOnClose) {
+                try {
+                    kill();
+                }
+                catch (e) {
+                }
+            }
+            this.forwardersToKillOnClose.clear();
         });
         waitConnected(this.pc)
             .then(() => logIsLocalIceTransport(this.console, this.pc)).catch(() => { });
 
         this.weriftSignalingSession = new WeriftSignalingSession(console, this.pc);
+    }
+
+    /**
+     * Kill the forwarder when the peer connection closes.
+     *
+     * This relies on the single waitClosed subscription made in the constructor.
+     * A waitClosed(pc) subscription per stream is not released until the connection
+     * closes, so a long lived connection kept every stream it ever played reachable:
+     * the forwarder, its rtsp client and ffmpeg process, and the transceivers.
+     */
+    killForwarderOnClose(f: Awaited<ReturnType<typeof createTrackForwarder>>) {
+        if (this.closed) {
+            f.kill();
+            return;
+        }
+        const kill = () => f.kill();
+        this.forwardersToKillOnClose.add(kill);
+        f.killPromise.catch(() => { }).finally(() => this.forwardersToKillOnClose.delete(kill));
     }
 
     async probe() {
@@ -773,7 +800,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                 this.console.log('done waiting ice connected');
                 const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
                 ret.attachForwarder(f);
-                waitClosed(this.pc).finally(() => f?.kill());
+                this.killForwarderOnClose(f);
                 ret.removed.promise.finally(() => f?.kill());
             }
             catch (e) {
