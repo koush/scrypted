@@ -803,16 +803,32 @@ async function start(mainFilename: string, options?: {
     const hookUpgrade = (server: net.Server | tls.Server) => {
         server.on('upgrade', (req, socket, upgradeHead) => {
             (req as any).upgradeHead = upgradeHead;
-            (app as any).handle(req, {
-                socket,
-                upgradeHead
-            }, (err?: unknown) => {
-                // Express's default final handler requires a real ServerResponse.
+
+            // middleware and route handlers expect a real ServerResponse.
+            // construct one for the upgrade socket so response methods have
+            // the outgoing message state they need.
+            if (!(socket instanceof net.Socket) || (socket as any)._httpMessage) {
+                socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+                return;
+            }
+
+            const res = new http.ServerResponse(req);
+            res.shouldKeepAlive = false;
+            res.assignSocket(socket);
+            res.on('finish', () => {
+                if (!socket.destroyed && !socket.writableEnded)
+                    socket.end();
+            });
+
+            (app as any).handle(req, res, (err?: unknown) => {
                 if (err)
                     console.error('upgrade routing error', err);
-                if (socket.writable && !socket.writableEnded) {
-                    const status = err ? '500 Internal Server Error' : '404 Not Found';
-                    socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+                if (!res.headersSent) {
+                    res.statusCode = err ? 500 : 404;
+                    res.end();
+                }
+                else if (!socket.destroyed) {
+                    socket.destroy();
                 }
             });
         });
