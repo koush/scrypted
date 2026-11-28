@@ -234,10 +234,7 @@ async function start(mainFilename: string, options?: {
     const authSalt = crypto.randomBytes(16);
     const createTokens = (userToken: UserToken) => {
         const login_user_token = userToken.toString();
-        const salted = login_user_token + authSalt;
-        const hash = crypto.createHash('sha256');
-        hash.update(salted);
-        const sha = hash.digest().toString('hex');
+        const sha = crypto.createHmac('sha256', authSalt).update(login_user_token).digest('hex');
         const queryToken = `${sha}#${login_user_token}`;
         return {
             authorization: `Bearer ${queryToken}`,
@@ -309,10 +306,7 @@ async function start(mainFilename: string, options?: {
             const [checkHash, ...tokenParts] = token.split('#');
             const tokenPart = tokenParts?.join('#');
             if (checkHash && tokenPart) {
-                const salted = tokenPart + authSalt;
-                const hash = crypto.createHash('sha256');
-                hash.update(salted);
-                const sha = hash.digest().toString('hex');
+                const sha = crypto.createHmac('sha256', authSalt).update(tokenPart).digest('hex');
 
                 if (timingSafeStringEqual(checkHash, sha)) {
                     const userToken = checkValidUserToken(tokenPart);
