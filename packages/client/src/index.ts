@@ -598,8 +598,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         } = scrypted;
         console.log('api attached', Date.now() - start);
 
+        // trust is validated server side against the media object, so it cannot be spoofed by the client.
         mediaManager.createMediaObject = async<T extends MediaObjectCreateOptions>(data: any, mimeType: string, options?: T) => {
-            return new MediaObject(mimeType, data, options) as any;
+            return new MediaObject(mimeType, data, false, options) as any;
         }
 
         const [admin] = await Promise.all([
@@ -1021,8 +1022,9 @@ export async function connectScryptedClientFork(forkMain: (client: ScryptedClien
         } = scrypted;
         console.log('api attached', Date.now() - start);
 
+        // trust is validated server side against the media object, so it cannot be spoofed by the client.
         mediaManager.createMediaObject = async<T extends MediaObjectCreateOptions>(data: any, mimeType: string, options?: T) => {
-            return new MediaObject(mimeType, data, options) as any;
+            return new MediaObject(mimeType, data, false, options) as any;
         }
         console.log('api initialized', Date.now() - start);
 
