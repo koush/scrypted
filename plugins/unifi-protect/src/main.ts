@@ -8,7 +8,7 @@ import { UnifiCamera } from "./camera";
 import { debounceFingerprintDetected, debounceMotionDetected } from "./camera-sensors";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
-import { UnifiSensor } from "./sensor";
+import { getSmokeDetectorInterfaces, isSmokeDetector, UnifiSensor } from "./sensor";
 import { ProtectApi, ProtectCameraConfigInterface, ProtectEventAddInterface, ProtectEventPacket } from "./unifi-protect";
 
 const httpsAgent = new https.Agent({
@@ -432,7 +432,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     version: sensor.hardwareRevision,
                     serialNumber: sensor.id,
                 },
-                interfaces: [
+                interfaces: isSmokeDetector(sensor) ? getSmokeDetectorInterfaces(sensor) : [
                     // todo light sensor
                     ScryptedInterface.Thermometer,
                     ScryptedInterface.HumiditySensor,

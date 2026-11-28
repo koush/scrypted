@@ -1,9 +1,36 @@
-import { AudioSensor, BinarySensor, HumiditySensor, MotionSensor, ScryptedDeviceBase, TemperatureUnit, Thermometer } from "@scrypted/sdk";
+import { AudioSensor, BinarySensor, CarbonMonoxideSensor, HumiditySensor, MotionSensor, ScryptedDeviceBase, ScryptedInterface, SmokeSensor, TemperatureUnit, Thermometer } from "@scrypted/sdk";
 import { UnifiProtect } from "./main";
 import { UnifiMotionDevice, debounceMotionDetected } from "./camera-sensors";
 import { ProtectSensorConfig } from "./unifi-protect";
 
-export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, HumiditySensor, AudioSensor, BinarySensor, MotionSensor, UnifiMotionDevice {
+// the smoke detector fields are not in the unifi-protect typings yet.
+interface ProtectSmokeDetectorConfig {
+    featureFlags?: {
+        alarmTypes?: string[];
+    };
+    smokeStatus?: {
+        smokeAlarm?: boolean;
+        coAlarm?: boolean;
+    } | null;
+}
+
+export function isSmokeDetector(sensor: Readonly<ProtectSensorConfig>) {
+    // other sensors (UP Sense) also advertise smoke and CO alarm types for alarm sound
+    // detection and report an idle smokeStatus, so the model is the only reliable signal.
+    return sensor.marketName === 'USL Smoke' || !!sensor.type?.startsWith('USL-Smoke-');
+}
+
+export function getSmokeDetectorInterfaces(sensor: Readonly<ProtectSensorConfig>) {
+    const alarmTypes = (sensor as ProtectSmokeDetectorConfig).featureFlags?.alarmTypes || [];
+    const interfaces: ScryptedInterface[] = [];
+    if (alarmTypes.includes('smoke'))
+        interfaces.push(ScryptedInterface.SmokeSensor);
+    if (alarmTypes.includes('CO'))
+        interfaces.push(ScryptedInterface.CarbonMonoxideSensor);
+    return interfaces;
+}
+
+export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, HumiditySensor, AudioSensor, BinarySensor, MotionSensor, SmokeSensor, CarbonMonoxideSensor, UnifiMotionDevice {
     motionTimeout: NodeJS.Timeout;
 
     constructor(public protect: UnifiProtect, nativeId: string, protectSensor: Readonly<ProtectSensorConfig>) {
@@ -26,6 +53,10 @@ export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, Humi
         sensor = sensor || this.findSensor();
         if (!sensor)
             return;
+        if (isSmokeDetector(sensor)) {
+            this.updateSmokeDetectorState(sensor);
+            return;
+        }
         this.temperature = sensor.stats.temperature.value;
         this.humidity = sensor.stats.humidity.value;
         // todo light sensor
@@ -37,6 +68,19 @@ export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, Humi
         this.flooded = !!sensor.leakDetectedAt || !!externalLeakDetectedAt;
         if (!!sensor.isMotionDetected)
             debounceMotionDetected(this);
+    }
+
+    updateSmokeDetectorState(sensor: Readonly<ProtectSensorConfig>) {
+        // smokeStatus is null until the detector reports in. keep the last known
+        // state in that case rather than clearing an alarm that may still be active.
+        const smokeStatus = (sensor as ProtectSmokeDetectorConfig).smokeStatus;
+        if (!smokeStatus)
+            return;
+        const interfaces = getSmokeDetectorInterfaces(sensor);
+        if (interfaces.includes(ScryptedInterface.SmokeSensor))
+            this.smokeDetected = !!smokeStatus.smokeAlarm;
+        if (interfaces.includes(ScryptedInterface.CarbonMonoxideSensor))
+            this.carbonMonoxideDetected = !!smokeStatus.coAlarm;
     }
 
     setMotionDetected(motionDetected: boolean) {
